@@ -90,4 +90,27 @@ describe('talkc', () => {
       expect(await main(['shoot', dir], io().io)).toBe(1);
     } finally { fs.rmSync(dir, { recursive: true }); }
   }, 60_000);
+
+  it('theme applies a .talktheme: fonts into assets/fonts, blocks on top of theme.css, and the talk still builds', () => {
+    const dir = tmpTalk("B.in('#h', 0, { dur: 1 });");
+    const pkg = path.join(ISSTA, '../../skill/academic-talk-film/assets/themes/paper.talktheme');
+    try {
+      fs.writeFileSync(path.join(dir, 'theme.css'), '.mine { color: red; }\n');
+      const a = io();
+      expect(main(['theme', dir, pkg], a.io)).toBe(0);
+      expect(a.o.out).toEqual(['applied Paper (paper) to theme.css; 8 font files in assets/fonts']);
+      const css = fs.readFileSync(path.join(dir, 'theme.css'), 'utf8');
+      expect(css.startsWith('/* sage-fonts:begin')).toBe(true);
+      expect(css).toContain('--display: Fraunces');
+      expect(css.endsWith('.mine { color: red; }\n')).toBe(true);
+      expect(fs.readdirSync(path.join(dir, 'assets/fonts'))).toHaveLength(8);
+      expect(main(['theme', dir, pkg], io().io)).toBe(0);
+      expect(fs.readFileSync(path.join(dir, 'theme.css'), 'utf8')).toBe(css); // idempotent
+      expect(main(['build', dir], io().io)).toBe(0);
+      const bad = io();
+      expect(main(['theme', dir, path.join(dir, 'nope.talktheme')], bad.io)).toBe(1);
+      expect(bad.o.err[0]).toMatch(/^talkc: cannot read/);
+      expect(main(['theme', dir], io().io)).toBe(2);
+    } finally { fs.rmSync(dir, { recursive: true }); }
+  });
 });

@@ -14,6 +14,8 @@
 //                                            built first, an .html film is shot as is
 //   talkc publish <talk> [slug] [--out <dir>]   the self-contained public file,
 //                                            <talk>/build/public/<slug>.html (slug: talk)
+//   talkc theme <talk> <theme.talktheme>       apply a sage-theme/1 theme: its fonts into
+//                                            assets/fonts, its blocks into theme.css
 // Exit codes: 0 ok, 1 talk has errors (or frames could not be rendered), 2 usage.
 //
 // Commands that need a browser (shoot, validate --render) import @sage/render lazily, so build, validate and
@@ -21,13 +23,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileTalk } from './compile.ts';
+import { compileTalk, defaultEngineDir } from './compile.ts';
 import { formatDiagnostic, hasErrors, type Diagnostic } from './diagnostics.ts';
 import { formatCplist } from './layout.ts';
 import { loadTalk } from './load.ts';
 import { publishTalk } from './publish.ts';
 import { recordTalk } from './record.ts';
 import { validateRendered } from './talk-render.ts';
+import { TALK_FONTS_DIR, applyThemeToCss, parseTheme, themeFontFaces } from './theme.ts';
 import { sortDiagnostics, validateTalk } from './validate.ts';
 
 export interface Io { out: (s: string) => void; err: (s: string) => void }
@@ -38,7 +41,8 @@ const USAGE = `usage: talkc <command> <talk> [options]
   validate <talk> [--json] [--public] [--render]
   layout <talk> [--json] [--public]
   shoot <talk|film.html> [--holds] [--around S] [--times a,b] [--beats ch.beat,...] [--no-backups] [--out <dir>]
-  publish <talk> [slug] [--out <dir>]`;
+  publish <talk> [slug] [--out <dir>]
+  theme <talk> <theme.talktheme>`;
 
 /** Flags per command; `true` = takes a value. */
 const FLAGS: Record<string, Record<string, boolean>> = {
@@ -46,6 +50,7 @@ const FLAGS: Record<string, Record<string, boolean>> = {
   validate: { '--json': false, '--public': false, '--render': false },
   layout: { '--json': false, '--public': false },
   publish: { '--out': true },
+  theme: {},
   shoot: { '--holds': false, '--around': true, '--times': true, '--beats': true, '--no-backups': false, '--out': true },
 };
 
@@ -75,7 +80,7 @@ const list = (vs: string[] | undefined) => (vs ?? []).flatMap((v) => v.split(','
 export function main(argv: readonly string[], io: Io = stdio): number | Promise<number> {
   if (argv[0] === '-h' || argv[0] === '--help') { io.err(USAGE); return 0; }
   const p = parse(argv);
-  if (typeof p === 'string' || p.pos.length < 1 || p.pos.length > (p.cmd === 'publish' ? 2 : 1)) {
+  if (typeof p === 'string' || p.pos.length < 1 || p.pos.length > (p.cmd === 'publish' || p.cmd === 'theme' ? 2 : 1) || (p.cmd === 'theme' && p.pos.length !== 2)) {
     if (typeof p === 'string' && p) io.err(`talkc: ${p}`);
     io.err(USAGE);
     return 2;
@@ -93,6 +98,7 @@ export function main(argv: readonly string[], io: Io = stdio): number | Promise<
     return 0;
   }
   if (cmd === 'shoot') return shoot(dir, p, out, io);
+  if (cmd === 'theme') return theme(dir, path.resolve(p.pos[1]!), io);
   if (cmd === 'publish') {
     const slug = p.pos[1];
     if (slug !== undefined && !/^[A-Za-z0-9._-]+$/.test(slug)) { io.err(`talkc: bad slug ${slug} (use letters, numbers, . _ -)`); return 2; }
@@ -126,6 +132,27 @@ export function main(argv: readonly string[], io: Io = stdio): number | Promise<
   const rec = recordTalk(talk, { public: pub });
   for (const d of rec.diagnostics) io.err(formatDiagnostic(d));
   io.out(json ? JSON.stringify(rec.layout, null, 2) : formatCplist(rec.layout));
+  return 0;
+}
+
+/** talkc theme: the app's theme.apply without the app (no downloads: the package must hold its fonts). */
+function theme(dir: string, pkg: string, io: Io): number {
+  let raw: unknown;
+  try { raw = JSON.parse(fs.readFileSync(path.join(pkg, 'theme.json'), 'utf8')); } catch (e) { io.err(`talkc: cannot read ${pkg}/theme.json: ${(e as Error).message}`); return 1; }
+  const r = parseTheme(raw);
+  if (!r.theme) { for (const m of r.problems) io.err(`talkc: theme.json: ${m}`); return 1; }
+  const talk = loadTalk(dir);
+  if (!talk.spine) { for (const d of talk.diagnostics) io.err(formatDiagnostic(d)); return 1; }
+  const faces = themeFontFaces(r.theme);
+  const missing = faces.filter((f) => !fs.existsSync(path.join(pkg, 'fonts', f.file)));
+  if (missing.length) { io.err(`talkc: the theme lacks ${missing.map((f) => 'fonts/' + f.file).join(', ')} (save it in the SAGE app to download them)`); return 1; }
+  fs.mkdirSync(path.join(dir, TALK_FONTS_DIR), { recursive: true });
+  for (const f of faces) fs.copyFileSync(path.join(pkg, 'fonts', f.file), path.join(dir, TALK_FONTS_DIR, f.file));
+  const file = talk.spine.theme ?? 'theme.css';
+  const abs = path.join(dir, file);
+  const css = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '';
+  fs.writeFileSync(abs, applyThemeToCss(css, fs.readFileSync(path.join(defaultEngineDir(), 'talk.css'), 'utf8'), r.theme));
+  io.out(`applied ${r.theme.name} (${r.theme.id}) to ${file}${faces.length ? `; ${faces.length} font files in ${TALK_FONTS_DIR}` : ''}`);
   return 0;
 }
 

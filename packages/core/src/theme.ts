@@ -285,6 +285,18 @@ export function mergeFaces(a: readonly FontFace[], b: readonly FontFace[]): Font
   return [...m.values()];
 }
 
+/**
+ * A talk's theme.css with `theme` applied: the theme block replaced, and in the fonts block the
+ * previous theme's faces replaced by this theme's (faces of other families, added on their own
+ * for single elements, stay).
+ */
+export function applyThemeToCss(css: string, engineCss: string, theme: Theme): string {
+  let previous = new Set<string>();
+  try { const t = extractTheme(engineCss, css); previous = new Set(FONT_ROLES.map((r) => t.fonts[r].family)); } catch { /* not expressible: keep every face */ }
+  const keep = parseFontFaces(css).filter((f) => !previous.has(f.family));
+  return withThemeBlocks(css, mergeFaces(keep, themeFontFaces(theme)), theme);
+}
+
 // ---------------------------------------------------------------------------------------
 // Extract: the theme a talk effectively has (talk.css defaults, overridden by theme.css)
 // ---------------------------------------------------------------------------------------

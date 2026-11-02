@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  FONT_ROLES, TALK_FONTS_DIR, THEME_FORMAT, defaultEngineDir, extractTheme, fontStack, mergeFaces, parseFontFaces, parseTheme,
+  TALK_FONTS_DIR, applyThemeToCss, THEME_FORMAT, defaultEngineDir, extractTheme, fontStack, mergeFaces, parseFontFaces, parseTheme,
   themeCssPatch, themeFontFaces, themeJson, themePackageCss, themeSlug, type FontFace, type Theme,
 } from '@sage/core';
 import {
@@ -151,13 +151,10 @@ export class Themer {
     }
     const file = await this.themeFile();
     const engine = this.engineCss();
+    // Fonts embedded for other uses (fonts.add) stay; the previous theme's go.
     const edit = await this.host.computedEdit('theme.apply', [file], (texts) => {
       const css = texts[file] ?? '';
-      // Keep fonts embedded for other uses (fonts.add); drop the previous theme's.
-      let previous: Set<string>;
-      try { const t = extractTheme(engine, css); previous = new Set(FONT_ROLES.map((r) => t.fonts[r].family)); } catch { previous = new Set(); }
-      const keep = parseFontFaces(css).filter((f) => !previous.has(f.family));
-      return [themeCssPatch(file, css, mergeFaces(keep, faces), theme)];
+      return [{ file, range: [0, css.length], newText: applyThemeToCss(css, engine, theme) }];
     }, binaries, author);
     return { theme, fonts: binaries.map((b) => b.rel), edit };
   }
