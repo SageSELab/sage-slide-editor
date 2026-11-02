@@ -69,7 +69,7 @@ function guardRuntimeText(talk: LoadedTalk, id: string, html: string) {
   const hits = runtimeTextKeys(talk).filter((k) => {
     if (k === '#' + id || k.startsWith('#' + id + '/')) return true; // the element or an unnamed descendant
     const own = /^#([^/]+)/.exec(k)?.[1];
-    return !!own && new RegExp(`\\bid\\s*=\\s*["']${own.replace(/[.*+?^${}()|[\]\\]/g, '\\/** Computes the core Edit for an op against the talk as loaded from disk. */')}["']`).test(html); // a named descendant
+    return !!own && new RegExp(`\\bid\\s*=\\s*["']${own.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`).test(html); // a named descendant
   });
   if (hits.length) {
     throw new RpcError(ErrorCode.EditFailed, `#${id} contains text the film rewrites while it plays (${hits.join(', ')}); edit it in the beat's motion instead`, { code: 'runtime-text' });
