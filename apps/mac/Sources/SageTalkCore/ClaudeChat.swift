@@ -69,6 +69,10 @@ public final class ClaudeChat {
     public var draft = ""
     /// Reasoning effort sent with every message (the footer control; the Agent SDK `effort` option).
     public var effort: ClaudeProtocol.Effort = .high
+    /// Files attached to the next message (paths as the prompt will name them).
+    public private(set) var attachments: [String] = []
+    /// The talk folder: attachments inside it or next to it are named relative to it.
+    public var attachmentBase: URL?
     /// Rows the user expanded.
     public var expanded: Set<String> = []
 
@@ -165,14 +169,25 @@ public final class ClaudeChat {
 
     // MARK: Commands
 
-    /// Sends the draft. The user's message goes into the transcript at once.
+    /// Adds a file to the next message (dropped from the Materials sidebar or the Finder). The
+    /// path is relative to `attachmentBase` (the talk) when that reads better; duplicates are ignored.
+    public func attach(_ url: URL) {
+        let p = attachmentBase.map { Materials.attachmentPath(for: url, talkRoot: $0) } ?? url.standardizedFileURL.path
+        if !attachments.contains(p) { attachments.append(p) }
+    }
+
+    public func detach(_ path: String) { attachments.removeAll { $0 == path } }
+
+    /// Sends the draft with the attached files. The user's message goes into the transcript at once.
     public func send() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let commands else { return }
+        let files = attachments
         draft = ""
-        entries.append(.user(id: take(), text: text))
+        attachments = []
+        entries.append(.user(id: take(), text: files.isEmpty ? text : text + "\n\nAttached: " + files.joined(separator: ", ")))
         state = .running
-        do { try await commands.send(ClaudeProtocol.SendParams(text: text, effort: effort)) } catch {
+        do { try await commands.send(ClaudeProtocol.SendParams(text: text, attachments: files.isEmpty ? nil : files, effort: effort)) } catch {
             state = .error
             notice("Could not send: \(error.localizedDescription)", isError: true)
         }
@@ -197,7 +212,7 @@ public final class ClaudeChat {
     public func clear() {
         for id in permissions.map(\.id) { answer(id, .deny) }
         entries = []; state = .idle; statusMessage = nil; lastCost = nil; sessionCost = 0; contextTokens = nil
-        lastEditedBeat = nil; expanded = []
+        lastEditedBeat = nil; expanded = []; attachments = []
     }
 }
 

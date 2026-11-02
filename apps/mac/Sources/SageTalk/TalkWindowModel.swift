@@ -46,6 +46,10 @@ final class TalkWindowModel {
 
     /// The Claude pane (TalkWindowModel+Claude.swift).
     let chat = ClaudeChat()
+    /// talk.json's materials, listed for the Materials sidebar (PLAN 7).
+    var materials: [Materials.Entry] = []
+    /// The navigator column's tab.
+    var navigatorTab: NavigatorTab = .beats
 
     let canvas = FilmView()
     let thumbnails: ThumbnailStore
@@ -100,7 +104,7 @@ final class TalkWindowModel {
         selectedHold = nil; error = nil; status = nil; diagnostics = []
         filmURL = nil
         filmRoot = nil
-        selection = nil; spine = nil; changedBeats = []; spineBeforeExternal = nil
+        selection = nil; spine = nil; changedBeats = []; spineBeforeExternal = nil; materials = []
         edits.reset()
         edits.service = nil
         thumbnails.close()
@@ -132,6 +136,8 @@ final class TalkWindowModel {
             filmRoot = root
             edits.service = sup.client
             spine = SpineSnapshot.load(root)
+            chat.attachmentBase = root
+            reloadMaterials()
             canvas.load(film: r.filmURL, readAccess: root)
         } catch {
             guard gen == openGeneration else { return }

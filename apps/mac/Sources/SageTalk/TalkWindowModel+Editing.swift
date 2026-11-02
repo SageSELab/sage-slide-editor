@@ -118,6 +118,14 @@ extension TalkWindowModel {
             spineBeforeExternal = nil
         }
         spine = fresh ?? spine
+        reloadMaterials()
+    }
+
+    /// Re-lists talk.json's materials (on open and whenever talk.json changes).
+    func reloadMaterials() {
+        guard let root = filmRoot else { materials = []; return }
+        let fresh = Materials.load(talkRoot: root)
+        if fresh != materials { materials = fresh }
     }
 
     /// Someone else changed the talk: the undo history no longer applies, and the beats the

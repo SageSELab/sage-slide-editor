@@ -16,8 +16,11 @@ import WebKit
 ///   edit-*.png, edit.txt  beat-format talks: the edit round trip on another temp copy (select,
 ///                      drag 40 px, retype a headline, set a hold, undo all three; files must be
 ///                      byte-identical afterwards); see SelfTestEditing.swift
-///   claude-pane.png    beat-format talks: the Claude pane after replaying a recorded session
+///   claude-pane.png    beat-format talks: the Claude pane after replaying a recorded session, with
+///                      inline code, the effort control and an attachment chip
 ///                      (SelfTestClaude.swift; also window-claude.png, claude.txt)
+///   materials.png      beat-format talks: the Materials tab over a temp paper and package
+///                      (also window-materials.png)
 ///   result.txt         PASS or FAIL lines for every check
 /// then quits. Used by scripts/selftest.sh. It only ever draws the app's own windows and web
 /// views: no screen capture of any kind.
@@ -75,6 +78,7 @@ enum SelfTest {
         await presenter(model: model, out: out)
         if talk.kind == .beatFormat {
             await claudePane(model: model, out: out)
+            await materialsTab(model: model, out: out)
             let source = talk.root
             await roundTrip(model: model, out: out)
             await editRoundTrip(model: model, source: source, out: out)

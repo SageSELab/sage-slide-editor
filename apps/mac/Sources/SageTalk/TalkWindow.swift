@@ -1,6 +1,9 @@
 import SageTalkCore
 import SwiftUI
 
+/// The navigator column's tabs: the holds, and the talk's materials (PLAN 5.2, 7).
+enum NavigatorTab: String, CaseIterable { case beats = "Beats", materials = "Materials" }
+
 struct TalkWindow: View {
     @Bindable var model: TalkWindowModel
     @State private var rightPane: RightPane = .inspector
@@ -41,6 +44,20 @@ struct TalkWindow: View {
     }
 
     @ViewBuilder private var navigator: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $model.navigatorTab) {
+                ForEach(NavigatorTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().padding(.horizontal, 10).padding(.vertical, 6)
+            .accessibilityIdentifier("navigator.tabs")
+            switch model.navigatorTab {
+            case .beats: beats
+            case .materials: MaterialsView(entries: model.materials, attach: { model.chat.attach($0) })
+            }
+        }
+    }
+
+    @ViewBuilder private var beats: some View {
         if model.holds.isEmpty {
             placeholder(model.talk == nil ? "No talk open" : "Opening…",
                         model.talk == nil ? "File ▸ Open Talk… (⌘O)" : (model.status ?? ""))

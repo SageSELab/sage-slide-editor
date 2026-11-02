@@ -29,9 +29,47 @@ struct ClaudePane: View {
             }
             Divider()
             footer
+            if !chat.attachments.isEmpty { attachmentChips }
             prompt
         }
+        // Files dragged from the Materials tab (or the Finder) are attached to the next message.
+        .dropDestination(for: URL.self) { urls, _ in
+            let files = urls.filter(\.isFileURL)
+            files.forEach(chat.attach)
+            return !files.isEmpty
+        } isTargeted: { dropTargeted = $0 }
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2).padding(2)
+                    .allowsHitTesting(false)
+            }
+        }
         .accessibilityIdentifier("claude.pane")
+    }
+
+    @State private var dropTargeted = false
+
+    /// The files attached to the next message, each removable.
+    private var attachmentChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(chat.attachments, id: \.self) { p in
+                    HStack(spacing: 4) {
+                        Image(systemName: "paperclip")
+                        Text((p as NSString).lastPathComponent).lineLimit(1)
+                        Button { chat.detach(p) } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.borderless).help("Remove \(p)")
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                    .help(p)
+                }
+            }
+            .padding(.horizontal, 10)
+        }
+        .padding(.top, 6)
+        .accessibilityIdentifier("claude.attachments")
     }
 
     private var header: some View {
@@ -81,15 +119,17 @@ struct ClaudePane: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 10) {
-            if let c = chat.lastCost { Text("Last \(ClaudeFormat.usd(c))") }
-            Text("Session \(ClaudeFormat.usd(chat.sessionCost))")
-            if let n = chat.contextTokens { Text("Context \(ClaudeFormat.tokens(n))") }
-            Spacer()
-            if let m = chat.model { Text(m.replacingOccurrences(of: "claude-", with: "")) }
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 10) {
+                if let c = chat.lastCost { Text("Last \(ClaudeFormat.usd(c))") }
+                Text("Session \(ClaudeFormat.usd(chat.sessionCost))")
+                if let n = chat.contextTokens { Text("Context \(ClaudeFormat.tokens(n))") }
+                Spacer()
+                if let m = chat.model { Text(m.replacingOccurrences(of: "claude-", with: "")) }
+            }
+            .lineLimit(1).minimumScaleFactor(0.8)
             effortControl
         }
-        .lineLimit(1).minimumScaleFactor(0.8)
         .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
         .padding(.horizontal, 10).padding(.vertical, 4)
         .accessibilityIdentifier("claude.footer")
@@ -98,18 +138,16 @@ struct ClaudePane: View {
     /// The reasoning effort sent with the next message (the Agent SDK's `effort` option; a running
     /// conversation switches with applyFlagSettings, so changing it does not lose the context).
     private var effortControl: some View {
-        Menu {
+        HStack(spacing: 4) {
+            Image(systemName: "gauge.with.dots.needle.33percent")
+            Text("Effort")
             Picker("Effort", selection: $chat.effort) {
                 ForEach(ClaudeProtocol.Effort.allCases, id: \.self) { Text($0.label).tag($0) }
             }
-            .pickerStyle(.inline).labelsHidden()
-        } label: {
-            Label("Effort: \(chat.effort.label)", systemImage: "gauge.with.dots.needle.33percent")
-                .labelStyle(.titleAndIcon)
+            .pickerStyle(.menu).labelsHidden().controlSize(.mini).fixedSize()
+            .accessibilityIdentifier("claude.effort")
         }
-        .menuStyle(.borderlessButton).menuIndicator(.visible).fixedSize()
         .help("Reasoning effort for the next message. Higher thinks longer and costs more.")
-        .accessibilityIdentifier("claude.effort")
     }
 
     private var prompt: some View {
@@ -189,8 +227,9 @@ private struct MarkdownText: View {
         for r in ChatMarkdown.runs(s) {
             var a = AttributedString(r.text)
             if r.code {
+                // Font only: a translucent background colour on the run drew as opaque white
+                // blocks in the window's own snapshot.
                 a.font = .system(.body, design: .monospaced).weight(r.strong ? .semibold : .regular)
-                a.backgroundColor = Color.secondary.opacity(0.14)
             } else if r.strong || r.emphasis {
                 var f = Font.body
                 if r.strong { f = f.bold() }
