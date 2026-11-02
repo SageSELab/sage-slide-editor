@@ -23,7 +23,7 @@ SAGE Talk.app/Contents/
   PkgInfo
   MacOS/SageTalk             SwiftPM release build, debug symbols stripped
   Resources/
-    AppIcon.icns             placeholder, drawn by packaging/make-icon.swift
+    AppIcon.icns             packaging/AppIcon.svg, rendered by packaging/make-icon.swift
     canvas.js                the editing overlay (packages/engine/src/canvas.js)
     node/bin/node            Node 24.22.2 darwin-arm64 (official tarball), re-signed ad hoc
     node/LICENSE

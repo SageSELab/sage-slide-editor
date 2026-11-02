@@ -113,7 +113,7 @@ CHROMIUM_REV="$("$NODE_X/bin/node" -p 'require(process.argv[1]).browsers.find((b
 
 # ---- Info.plist, icon ---------------------------------------------------------------------
 step "Info.plist and icon"
-if [ ! -f "$CACHE/AppIcon.icns" ] || [ packaging/make-icon.swift -nt "$CACHE/AppIcon.icns" ]; then
+if [ ! -f "$CACHE/AppIcon.icns" ] || [ packaging/make-icon.swift -nt "$CACHE/AppIcon.icns" ] || [ packaging/AppIcon.svg -nt "$CACHE/AppIcon.icns" ]; then
   rm -rf "$CACHE/AppIcon.iconset"
   swift packaging/make-icon.swift "$CACHE/AppIcon.iconset" >/dev/null
   iconutil -c icns "$CACHE/AppIcon.iconset" -o "$CACHE/AppIcon.icns"
