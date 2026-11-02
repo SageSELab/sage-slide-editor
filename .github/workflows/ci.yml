@@ -1,0 +1,47 @@
+# CI per PLAN 12.9. Runs on pull requests and on demand only: macOS runner minutes on a private
+# repository are billed at a multiple of Linux minutes, so there is no push or nightly trigger
+# yet. Add `push: { branches: [main] }` or a `schedule` when the budget allows.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript:
+    name: Core and sidecar (TypeScript)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --if-present typecheck
+      # Browser-equivalence tests use the runner's preinstalled Google Chrome (CHROME_BIN
+      # overrides the path) and skip themselves when it is missing.
+      - run: pnpm -r --if-present test
+
+  swift:
+    name: Mac app (Swift)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # The Swift integration test launches the real sidecar, which needs its dependencies.
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: apps/mac
+        run: swift build
+      - name: Test
+        working-directory: apps/mac
+        run: swift test
