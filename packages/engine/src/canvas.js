@@ -26,18 +26,28 @@
 //   {type: 'rect', id, rect}                                    the selected element's client box changed
 //   {type: 'refused', id, reason}                               'block-children': text edit refused
 //
-// Selection: the topmost element with an id at the point whose own effective opacity is at
-// least 0.05 (an element at opacity 0 is skipped and the one beneath considered). Scene
-// containers (.scene) and full-stage backgrounds (#black and the like) are never selected.
-// Snapping (hold Cmd to disable): to other visible objects' edges and centres and the stage's,
-// within 8 px, with guides; otherwise to a 10 px grid.
-// Clicks: a click selects; a click on the selected text object (or a double-click) puts the
-// caret there; a click on empty stage deselects. Keys while something is selected: arrows
+// Selection (Keynote): a click selects the OUTERMOST object under the pointer (a card, not its
+// title); a click on the selected object goes one level deeper toward the pointer, and once
+// there a click on the deepest text puts the caret in it; a double-click goes straight to the
+// deepest text with the caret. While inside a group a click on a sibling selects the sibling.
+// Escape (not editing) selects the parent object, then deselects. Objects are elements with an
+// id (not scenes, full-stage backgrounds or #slideno) at effective opacity >= 0.05, and inside
+// them the elements without an id that draw something (a card's title, an image); those are
+// named by an element address, `g1>div.t` (the nearest ancestor with an id, then one
+// tag.class[:n] step per level; core edit-html.ts resolves it, and the edit gives the element
+// an id, which the host passes back with adopt()). Text is a leaf: nothing inside an editable
+// text object is selected separately. Every message's `id` is that id or address.
+// Chrome: a 1 px outline with small square handles (larger invisible hit zones); a lighter
+// outline shows what a click would select. Dragging and resizing show a size/position HUD.
+// Snapping (hold Cmd to disable): only to smart guides, the other visible objects' edges and
+// centres and the stage's, within 5 screen px; there is no grid. Shift-drag keeps to one axis;
+// Shift on a corner keeps the aspect ratio (images always do); Option resizes about the centre.
+// Clicks: a click on empty stage deselects. Keys while something is selected: arrows
 // nudge 1 px (Shift: 10 px), Enter edits its text (all selected), typing a character starts
-// editing with it, Cmd-B/I/U format it, Escape deselects, Tab cycles objects. While editing
-// text: Escape or Enter commits and leaves the text (the object stays selected), Shift-Enter is
-// a line break, a click elsewhere commits; Cmd-B/I/U format the selected range. Space is never
-// taken from the engine unless the caret is in text.
+// editing with it, Cmd-B/I/U format it, Escape goes up a level, Tab cycles objects. While
+// editing text: Escape or Enter commits and leaves the text (the object stays selected),
+// Shift-Enter is a line break, a click elsewhere commits; Cmd-B/I/U format the selected range.
+// Space is never taken from the engine unless the caret is in text.
 (function () {
   'use strict';
   if (window.SageCanvas) return;
@@ -64,6 +74,8 @@
     /** The film is playing: the overlay is hidden and every event goes to the engine. */
     suspended: false,
     sel: null,
+    /** The object a click would select (its light outline), while paused. */
+    hover: null,
     editing: null,
     opts: null,
     stage: null,
@@ -81,7 +93,8 @@
       this.stage = document.querySelector('.stage');
       this.film = document.querySelector('.film');
       if (!this.stage || !this.film) return;
-      this.opts = Object.assign({ grid: 10, snap: 8, nudgeDelay: 300, post: null }, opts);
+      // snap: the smart-guide distance in screen px
+      this.opts = Object.assign({ snap: 5, nudgeDelay: 300, post: null }, opts);
       this.on = true;
       this.buildOverlay();
       for (const [target, type, fn] of this.listeners()) target.addEventListener(type, fn, true);
@@ -118,6 +131,7 @@
       this.on = false;
       this.suspended = false;
       this.sel = null;
+      this.hover = null;
       this.drag = null;
       this.lastRect = '';
     },
@@ -128,6 +142,7 @@
           [window, 'pointerdown', (e) => this.onDown(e)], [window, 'pointermove', (e) => this.onMove(e)], [window, 'pointerup', (e) => this.onUp(e)],
           [window, 'click', (e) => this.onClick(e)], [window, 'dblclick', (e) => this.onDblClick(e)], [window, 'keydown', (e) => this.onKey(e)],
           [window, 'resize', () => this.update()], [document, 'selectionchange', () => this.onSelectionChange()],
+          [document, 'mouseleave', () => this.setHover(null)],
         ];
       }
       return this._ls;
@@ -150,6 +165,8 @@
         this.leaveText();
         this.drag = null;
         this.guides(null, null);
+        this.hud(null);
+        this.hover = null;
       }
       this.film.classList.toggle('sage-canvas-on', !playing);
       this.update();
@@ -252,19 +269,107 @@
       return true;
     },
 
-    /** Id of the topmost selectable object at a stage point, or null. */
-    hitTest(x, y) {
+    // --- objects without an id: element addresses ---------------------------------------
+
+    /** The class an address step names: the first class when it is a plain name (core stepClass). */
+    stepClass(cls) {
+      const first = String(cls ?? '').trim().split(/\s+/)[0] || '';
+      return /^[A-Za-z_][\w-]*$/.test(first) ? first : '';
+    },
+    /** `g1>div.t`: the nearest ancestor with an id, then tag.class[:n] per level; null when none. */
+    addressOf(el) {
+      const steps = [];
+      let n = el;
+      for (; n && n !== this.stage && !n.id; n = n.parentElement) {
+        const p = n.parentElement;
+        if (!p) return null;
+        const tag = n.tagName.toLowerCase(), cls = this.stepClass(n.getAttribute('class'));
+        if (!/^[a-z][a-z0-9-]*$/.test(tag)) return null;
+        let i = 0;
+        for (const c of p.children) { if (c === n) break; if (c.tagName.toLowerCase() === tag && this.stepClass(c.getAttribute('class')) === cls) i++; }
+        steps.unshift(tag + (cls ? '.' + cls : '') + (i ? ':' + i : ''));
+      }
+      if (!n || n === this.stage || !this.stage.contains(n)) return null;
+      return steps.length ? `${n.id}>${steps.join('>')}` : n.id;
+    },
+    /** The id or address the host knows the element by. */
+    keyOf(el) { return el ? el.id || this.addressOf(el) : null; },
+    /** The element for an id or an address, or null. */
+    resolve(key) {
+      if (!key) return null;
+      if (!key.includes('>')) return document.getElementById(key);
+      const [base, ...steps] = key.split('>');
+      let cur = document.getElementById(base);
+      for (const st of steps) {
+        const m = /^([a-z][a-z0-9-]*)(?:\.([A-Za-z_][\w-]*))?(?::(\d+))?$/.exec(st);
+        if (!cur || !m) return null;
+        const like = [...cur.children].filter((c) => c.tagName.toLowerCase() === m[1] && this.stepClass(c.getAttribute('class')) === (m[2] || ''));
+        cur = like[m[3] ? +m[3] : 0] || null;
+      }
+      return cur;
+    },
+
+    /**
+     * True when a click can select the element: an object with an id (selectable), or, inside
+     * one, an element without an id that draws something or holds text (not inline markup of
+     * a text, not inside an SVG drawing).
+     */
+    candidate(el) {
+      if (!el || el === this.stage || !this.stage.contains(el)) return false;
+      if (el.id) return this.selectable(el);
+      if (el.closest('#slideno') || (el.closest('svg') && el.tagName.toLowerCase() !== 'svg')) return false;
+      if (el.tagName !== 'IMG' && getComputedStyle(el).display === 'inline') return false;
+      if (!this.visible(el) || this.isBackground(el)) return false;
+      if (!this.paints(el) && !this.editable(el)) return false;
+      // only to reach what has no id of its own: a wrapper around named objects stays out of the way
+      if (el.querySelector('[id]')) return false;
+      return !!this.addressOf(el);
+    },
+    /** The nearest enclosing candidate (Escape goes up to it), or null. */
+    parentCandidate(el) {
+      for (let n = el?.parentElement; n && n !== this.stage; n = n.parentElement) if (this.candidate(n)) return n;
+      return null;
+    },
+
+    /**
+     * The objects under a stage point, outermost first (a card, then its title), for the
+     * topmost element there that draws something. Text is a leaf: the chain ends at the first
+     * editable text. Empty when nothing selectable is there.
+     */
+    chainAt(x, y) {
       const g = this.geom();
       for (const e of document.elementsFromPoint(g.x + x * g.k, g.y + y * g.k)) {
         if (!this.stage.contains(e) || e === this.stage) continue;
         // invisible at this time, or an empty container whose content is hidden: look beneath it
         if (!this.visible(e) || !this.paints(e)) continue;
-        for (let n = e; n && n !== this.stage; n = n.parentElement) {
-          if (this.selectable(n)) return n.id;
+        const out = [];
+        for (let n = e; n && n !== this.stage; n = n.parentElement) if (this.candidate(n)) out.unshift(n);
+        const leaf = out.findIndex((n) => this.editable(n));
+        if (leaf >= 0) out.length = leaf + 1;
+        if (out.length) return out;
+      }
+      return [];
+    },
+
+    /**
+     * What a press on `chain` selects (Keynote): the selection itself when it is under the
+     * pointer (with the next deeper object, which a click without a drag goes to); inside a
+     * group, the object at the selection's level; otherwise the outermost object.
+     */
+    pick(chain) {
+      const sel = this.el(this.sel);
+      const i = sel ? chain.indexOf(sel) : -1;
+      if (i >= 0) return { el: sel, deeper: chain[i + 1] || null, was: true };
+      if (sel) {
+        for (let j = chain.length - 1; j >= 0; j--) {
+          if (chain[j].contains(sel)) return { el: chain[j + 1] || chain[j], deeper: null, was: false };
         }
       }
-      return null;
+      return { el: chain[0] || null, deeper: null, was: false };
     },
+
+    /** Id (or address) of the object a click at a stage point selects from nothing, or null. */
+    hitTest(x, y) { return this.keyOf(this.chainAt(x, y)[0]); },
 
     /** Visible selectable objects that show something, in document order (Tab, snapping). */
     objects() {
@@ -272,7 +377,7 @@
       return [...this.stage.querySelectorAll('[id]')].filter((el) => this.selectable(el) && shows(el));
     },
 
-    el(id) { return id ? document.getElementById(id) : null; },
+    el(id) { return this.resolve(id); },
 
     // --- selection -----------------------------------------------------------------------
 
@@ -320,6 +425,19 @@
 
     selection() { return this.sel; },
 
+    /**
+     * The host's edit gave an addressed element an id (talk.edit's `assigned`): the element
+     * takes it now, without a reload, and the selection follows. True when it was found.
+     */
+    adopt(key, id) {
+      const el = this.el(key);
+      if (!el || !id) return false;
+      if (!el.id) el.id = id;
+      if (this.sel === key) { this.sel = id; this._lastInfo = ''; this.lastRect = ''; }
+      if (this.hover === key) this.hover = id;
+      return true;
+    },
+
     // --- overlay -------------------------------------------------------------------------
 
     buildOverlay() {
@@ -327,19 +445,26 @@
       o.className = 'sage-canvas-overlay';
       o.setAttribute('aria-hidden', 'true');
       o.style.cssText = `position:absolute;left:50%;top:50%;width:${W}px;height:${H}px;transform-origin:50% 50%;pointer-events:none;z-index:2147483646;overflow:visible`;
-      o.innerHTML = '<div class="sc-box"></div>' + HANDLES.map((h) => `<div class="sc-h" data-h="${h}"></div>`).join('') + '<div class="sc-gx"></div><div class="sc-gy"></div>';
+      o.innerHTML = '<div class="sc-hover"></div><div class="sc-box"></div>' + HANDLES.map((h) => `<div class="sc-h" data-h="${h}"></div>`).join('') +
+        '<div class="sc-gx"></div><div class="sc-gy"></div><div class="sc-hud"></div>';
       const css = document.createElement('style');
+      // Sizes are screen px divided by the stage scale (--sc-px: one screen px in stage px).
       css.textContent = `
-        .sage-canvas-overlay .sc-box { position:absolute; display:none; box-sizing:border-box; outline:var(--sc-line) solid #0a84ff; }
+        .sage-canvas-overlay { --sc-accent: #0a84ff; }
+        .sage-canvas-overlay .sc-box, .sage-canvas-overlay .sc-hover { position:absolute; display:none; box-sizing:border-box; }
+        .sage-canvas-overlay .sc-box { outline:var(--sc-px) solid var(--sc-accent); }
         .sage-canvas-overlay .sc-box.sc-editing { outline-style:dashed; outline-color:rgba(10,132,255,0.75); }
-        .sage-canvas-overlay .sc-h { position:absolute; display:none; box-sizing:border-box; width:var(--sc-hs); height:var(--sc-hs); margin:calc(var(--sc-hs) / -2) 0 0 calc(var(--sc-hs) / -2); background:#fff; border:var(--sc-line) solid #0a84ff; border-radius:2px; pointer-events:auto; }
+        .sage-canvas-overlay .sc-hover { outline:var(--sc-px) solid rgba(10,132,255,0.45); }
+        .sage-canvas-overlay .sc-h { position:absolute; display:none; box-sizing:border-box; width:calc(var(--sc-px) * 14); height:calc(var(--sc-px) * 14); margin:calc(var(--sc-px) * -7) 0 0 calc(var(--sc-px) * -7); pointer-events:auto; }
+        .sage-canvas-overlay .sc-h::after { content:''; position:absolute; box-sizing:border-box; left:50%; top:50%; width:calc(var(--sc-px) * 7); height:calc(var(--sc-px) * 7); transform:translate(-50%, -50%); background:#fff; border:var(--sc-px) solid var(--sc-accent); border-radius:calc(var(--sc-px) * 1); box-shadow:0 0 calc(var(--sc-px) * 2) rgba(0,0,0,0.35); }
         .sage-canvas-overlay .sc-h[data-h=nw], .sage-canvas-overlay .sc-h[data-h=se] { cursor:nwse-resize; }
         .sage-canvas-overlay .sc-h[data-h=ne], .sage-canvas-overlay .sc-h[data-h=sw] { cursor:nesw-resize; }
         .sage-canvas-overlay .sc-h[data-h=n], .sage-canvas-overlay .sc-h[data-h=s] { cursor:ns-resize; }
         .sage-canvas-overlay .sc-h[data-h=e], .sage-canvas-overlay .sc-h[data-h=w] { cursor:ew-resize; }
-        .sage-canvas-overlay .sc-gx, .sage-canvas-overlay .sc-gy { position:absolute; display:none; background:#ff2d78; }
-        .sage-canvas-overlay .sc-gx { top:0; height:${H}px; width:var(--sc-line); }
-        .sage-canvas-overlay .sc-gy { left:0; width:${W}px; height:var(--sc-line); }
+        .sage-canvas-overlay .sc-gx, .sage-canvas-overlay .sc-gy { position:absolute; display:none; background:#ffb400; }
+        .sage-canvas-overlay .sc-gx { top:0; height:${H}px; width:var(--sc-px); margin-left:calc(var(--sc-px) / -2); }
+        .sage-canvas-overlay .sc-gy { left:0; width:${W}px; height:var(--sc-px); margin-top:calc(var(--sc-px) / -2); }
+        .sage-canvas-overlay .sc-hud { position:absolute; display:none; white-space:pre; font:500 calc(var(--sc-px) * 11)/1.2 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; font-variant-numeric:tabular-nums; color:#fff; background:rgba(28,28,30,0.86); padding:calc(var(--sc-px) * 3) calc(var(--sc-px) * 6); border-radius:calc(var(--sc-px) * 4); }
         .film.sage-canvas-on .stage [contenteditable] { outline: none; cursor: text; user-select: text; -webkit-user-select: text; caret-color: #0a84ff; }
         .film.sage-canvas-on .stage { cursor: default; }`;
       o.appendChild(css);
@@ -347,29 +472,65 @@
       this.overlay = o;
     },
 
-    /** Redraws the selection box and handles over the selected element. */
+    /** Draws a box over an element (stage px), or hides it. */
+    place(node, el) {
+      if (!el) { node.style.display = 'none'; return null; }
+      const r = this.rectOf(el);
+      Object.assign(node.style, { display: 'block', left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+      return r;
+    },
+
+    /** Redraws the selection box and handles over the selected element, and the hover box. */
     update() {
       const o = this.overlay;
       if (!o) return;
       o.style.display = this.suspended ? 'none' : 'block';
       o.style.transform = this.stage.style.transform;
       const k = this.geom().k;
-      o.style.setProperty('--sc-line', `${2 / k}px`);
-      o.style.setProperty('--sc-hs', `${10 / k}px`);
+      o.style.setProperty('--sc-px', `${1 / k}px`);
       const el = this.el(this.sel), box = o.querySelector('.sc-box');
       const hs = o.querySelectorAll('.sc-h');
+      const hv = this.hover && this.hover !== this.sel && !this.editing && !this.drag ? this.el(this.hover) : null;
+      this.place(o.querySelector('.sc-hover'), hv);
       if (!el) { box.style.display = 'none'; hs.forEach((h) => (h.style.display = 'none')); this.reportRect(null); return; }
-      const r = this.rectOf(el);
-      Object.assign(box.style, { display: 'block', left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+      const r = this.place(box, el);
       box.classList.toggle('sc-editing', !!this.editing);
       const show = this.movable(el) && !this.editing;
+      // a small object keeps only its corner handles, so the middle ones do not crowd it
+      const small = r.w * k < 28 || r.h * k < 28;
       hs.forEach((h) => {
         const k2 = h.dataset.h;
         const x = k2.includes('w') ? r.x : k2.includes('e') ? r.x + r.w : r.x + r.w / 2;
         const y = k2.includes('n') ? r.y : k2.includes('s') ? r.y + r.h : r.y + r.h / 2;
-        Object.assign(h.style, { display: show ? 'block' : 'none', left: `${x}px`, top: `${y}px` });
+        Object.assign(h.style, { display: show && (k2.length === 2 || !small) ? 'block' : 'none', left: `${x}px`, top: `${y}px` });
       });
       if (!this.suspended && !this._selecting) this.reportRect(el);
+    },
+
+    /** The object a click at the pointer would select gets a light outline (paused only). */
+    setHover(key) {
+      if (key === this.hover) return;
+      this.hover = key;
+      this.update();
+    },
+    hoverAt(cx, cy) {
+      cancelAnimationFrame(this._hv);
+      this._hv = requestAnimationFrame(() => {
+        if (!this.on || this.suspended || this.drag || this.editing) return this.setHover(null);
+        const p = this.toStage(cx, cy);
+        if (p.x < 0 || p.y < 0 || p.x > W || p.y > H) return this.setHover(null);
+        this.setHover(this.keyOf(this.pick(this.chainAt(p.x, p.y)).el));
+      });
+    },
+
+    /** The position or size readout beside the pointer while dragging (null hides it). */
+    hud(text, cx, cy) {
+      const n = this.overlay?.querySelector('.sc-hud');
+      if (!n) return;
+      if (text == null) { n.style.display = 'none'; return; }
+      const p = this.toStage(cx, cy), k = this.geom().k;
+      n.textContent = text;
+      Object.assign(n.style, { display: 'block', left: `${p.x + 14 / k}px`, top: `${p.y + 18 / k}px` });
     },
 
     rectKey(rect) { return rect ? `${this.sel} ${rect.x} ${rect.y} ${rect.w} ${rect.h}` : ''; },
@@ -405,12 +566,15 @@
       }
       return { xs, ys };
     },
+    /** The snap distance in stage px (opts.snap is screen px). */
+    snapDist() { return this.opts.snap / this.geom().k; },
     /** Best offset bringing any of `edges` onto any of `lines`, within the snap distance. */
     nearest(edges, lines) {
       let best = null;
+      const lim = this.snapDist();
       for (const e of edges) for (const l of lines) {
         const d = l - e;
-        if (Math.abs(d) <= this.opts.snap && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, line: l };
+        if (Math.abs(d) <= lim && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, line: l };
       }
       return best;
     },
@@ -433,17 +597,18 @@
       e.preventDefault();
       e.stopPropagation();
       this.flushNudge();
+      this.setHover(null);
+      if (handle && this.sel) return this.startDrag(e, this.el(this.sel), handle.dataset.h, { was: true });
       const p = this.toStage(e.clientX, e.clientY);
-      if (handle && this.sel) return this.startDrag(e, this.el(this.sel), handle.dataset.h, true);
-      const id = this.hitTest(p.x, p.y);
-      const was = !!id && id === this.sel;
-      if (id !== this.sel) this.select(id);
-      if (id) this.startDrag(e, this.el(id), null, was);
+      const hit = this.pick(this.chainAt(p.x, p.y));
+      const key = this.keyOf(hit.el);
+      if (key !== this.sel) this.select(key);
+      if (hit.el) this.startDrag(e, hit.el, null, hit);
     },
 
-    startDrag(e, el, handle, wasSelected) {
+    startDrag(e, el, handle, { was = false, deeper = null } = {}) {
       this.drag = {
-        el, handle, x0: e.clientX, y0: e.clientY, moved: false, pointerId: e.pointerId, wasSelected,
+        el, handle, x0: e.clientX, y0: e.clientY, moved: false, pointerId: e.pointerId, wasSelected: was, deeper,
         box: this.box(el), rect: this.rectOf(el), unit: this.unit(el), canMove: this.movable(el),
       };
       try { e.target.setPointerCapture?.(e.pointerId); } catch (err) { /* synthetic events */ }
@@ -451,7 +616,7 @@
 
     onMove(e) {
       const d = this.drag;
-      if (!d) return;
+      if (!d) { if (!this.suspended) this.hoverAt(e.clientX, e.clientY); return; }
       e.preventDefault();
       e.stopPropagation();
       if (!d.canMove) return;
@@ -459,52 +624,69 @@
       d.moved = true;
       const k = this.geom().k;
       const dx = (e.clientX - d.x0) / k, dy = (e.clientY - d.y0) / k; // stage px
-      const r = d.handle ? this.resizeTo(d, dx, dy, !e.metaKey) : this.moveTo(d, dx, dy, !e.metaKey);
+      const mods = { snap: !e.metaKey, shift: e.shiftKey, alt: e.altKey };
+      const r = d.handle ? this.resizeTo(d, dx, dy, mods) : this.moveTo(d, dx, dy, mods);
       d.result = r;
       const s = d.el.style;
       s.left = `${r.left}px`; s.top = `${r.top}px`;
       if (d.handle) { s.width = `${r.width}px`; s.height = `${r.height}px`; }
+      this.hud(d.handle ? `W ${r.width}   H ${r.height}` : `X ${r.left}   Y ${r.top}`, e.clientX, e.clientY);
       this.update();
     },
 
-    /** New left/top for a move by (dx, dy) stage px, snapped. */
-    moveTo(d, dx, dy, snap) {
+    /** New left/top for a move by (dx, dy) stage px: Shift keeps to one axis; smart guides snap. */
+    moveTo(d, dx, dy, { snap = true, shift = false } = {}) {
       const u = d.unit, R = d.rect;
-      let left = d.box.left + dx / u, top = d.box.top + dy / u, gx = null, gy = null;
+      if (shift) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; }
+      let gx = null, gy = null;
       if (snap) {
         const t = this.targets(d.el);
-        const sx = this.nearest([R.x + dx, R.x + dx + R.w / 2, R.x + dx + R.w], t.xs);
-        const sy = this.nearest([R.y + dy, R.y + dy + R.h / 2, R.y + dy + R.h], t.ys);
-        const g = this.opts.grid;
-        if (sx) { left = d.box.left + (dx + sx.d) / u; gx = sx.line; } else left = Math.round(left / g) * g;
-        if (sy) { top = d.box.top + (dy + sy.d) / u; gy = sy.line; } else top = Math.round(top / g) * g;
+        const sx = shift && !dx ? null : this.nearest([R.x + dx, R.x + dx + R.w / 2, R.x + dx + R.w], t.xs);
+        const sy = shift && !dy ? null : this.nearest([R.y + dy, R.y + dy + R.h / 2, R.y + dy + R.h], t.ys);
+        if (sx) { dx += sx.d; gx = sx.line; }
+        if (sy) { dy += sy.d; gy = sy.line; }
       }
       this.guides(gx, gy);
-      return { left: round(left), top: round(top), width: round(d.box.width), height: round(d.box.height) };
+      return { left: round(d.box.left + dx / u), top: round(d.box.top + dy / u), width: round(d.box.width), height: round(d.box.height) };
     },
 
-    /** New box for dragging handle d.handle by (dx, dy) stage px; the opposite edges stay put. */
-    resizeTo(d, dx, dy, snap) {
-      const u = d.unit, b = d.box, R = d.rect, h = d.handle, g = this.opts.grid;
+    /**
+     * New box for dragging handle d.handle by (dx, dy) stage px; the opposite edges stay put
+     * (Option: the centre stays put). A corner keeps the aspect ratio with Shift, and always
+     * for an image. The moving edges snap to smart guides.
+     */
+    resizeTo(d, dx, dy, { snap = true, shift = false, alt = false } = {}) {
+      const u = d.unit, b = d.box, R = d.rect, h = d.handle;
       const t = snap ? this.targets(d.el) : null;
       let gx = null, gy = null;
-      // the moving edge in CSS px of the element's coordinates, snapped
-      const edge = (css0, delta, stage0, lines, setGuide) => {
-        let v = css0 + delta / u;
-        if (snap) {
-          const s = this.nearest([stage0 + delta], lines);
-          if (s) { v = css0 + (delta + s.d) / u; setGuide(s.line); } else v = Math.round(v / g) * g;
-        }
-        return v;
+      const sx = h.includes('w') ? -1 : h.includes('e') ? 1 : 0, sy = h.includes('n') ? -1 : h.includes('s') ? 1 : 0;
+      // the moving edge's stage position, snapped: the delta to use
+      const snapEdge = (delta, edge0, lines, set) => {
+        if (!t) return delta;
+        const s = this.nearest([edge0 + delta], lines);
+        if (s) { set(s.line); return delta + s.d; }
+        return delta;
       };
-      let left = b.left, top = b.top, right = b.left + b.width, bottom = b.top + b.height;
-      if (h.includes('w')) left = Math.min(edge(b.left, dx, R.x, t?.xs, (l) => (gx = l)), right - 1);
-      if (h.includes('e')) right = Math.max(edge(right, dx, R.x + R.w, t?.xs, (l) => (gx = l)), left + 1);
-      if (h.includes('n')) top = Math.min(edge(b.top, dy, R.y, t?.ys, (l) => (gy = l)), bottom - 1);
-      if (h.includes('s')) bottom = Math.max(edge(bottom, dy, R.y + R.h, t?.ys, (l) => (gy = l)), top + 1);
+      if (sx) dx = snapEdge(dx, sx < 0 ? R.x : R.x + R.w, t?.xs, (l) => (gx = l));
+      if (sy) dy = snapEdge(dy, sy < 0 ? R.y : R.y + R.h, t?.ys, (l) => (gy = l));
+      const f = alt ? 2 : 1; // about the centre, both sides move
+      let w = Math.max(1, b.width + (sx * dx * f) / u), hh = Math.max(1, b.height + (sy * dy * f) / u);
+      const aspect = sx && sy && (shift || d.el.tagName === 'IMG') && b.width > 0 && b.height > 0;
+      if (aspect) {
+        const ratio = b.width / b.height;
+        // the edge that moved further sets the size; the other follows (its guide no longer holds)
+        if (Math.abs(w / b.width - 1) >= Math.abs(hh / b.height - 1)) { hh = w / ratio; gy = null; } else { w = hh * ratio; gx = null; }
+      }
+      let left, top;
+      if (alt) { left = b.left + (b.width - w) / 2; top = b.top + (b.height - hh) / 2; } else {
+        left = sx < 0 ? b.left + b.width - w : b.left;
+        top = sy < 0 ? b.top + b.height - hh : b.top;
+      }
+      if (!sx) { w = b.width; left = b.left; }
+      if (!sy) { hh = b.height; top = b.top; }
       this.guides(gx, gy);
       left = round(left); top = round(top);
-      return { left, top, width: round(right) - left, height: round(bottom) - top };
+      return { left, top, width: Math.max(1, round(left + w) - left), height: Math.max(1, round(top + hh) - top) };
     },
 
     onUp(e) {
@@ -514,12 +696,18 @@
       e.stopPropagation();
       this.drag = null;
       this.guides(null, null);
+      this.hud(null);
       if (!d.moved || !d.result) {
-        // A click on the already selected text object puts the caret there (Keynote).
-        if (!d.handle && d.wasSelected && !d.moved && this.editable(d.el)) this.beginText(d.el.id, { x: e.clientX, y: e.clientY });
+        // A click on the selected object goes one level deeper toward the pointer; on the
+        // deepest, a text object takes the caret there (Keynote).
+        if (!d.handle && d.wasSelected && !d.moved) {
+          if (d.deeper) this.select(this.keyOf(d.deeper));
+          else if (this.editable(d.el)) this.beginText(this.keyOf(d.el), { x: e.clientX, y: e.clientY });
+        }
+        this.update();
         return;
       }
-      const r = d.result, id = d.el.id;
+      const r = d.result, id = this.keyOf(d.el);
       if (d.handle) this.post({ type: 'resize', id, left: r.left, top: r.top, width: r.width, height: r.height });
       else if (r.left !== round(d.box.left) || r.top !== round(d.box.top)) this.post({ type: 'move', id, left: r.left, top: r.top });
       this.update();
@@ -531,14 +719,17 @@
       if (this.inStage(e) || e.target?.closest?.('.sage-canvas-overlay')) { e.preventDefault(); e.stopPropagation(); }
     },
 
+    /** A double-click goes straight to the deepest text under the pointer, with the word selected. */
     onDblClick(e) {
       if (this.suspended || !this.inStage(e)) return;
       e.preventDefault();
       e.stopPropagation();
       if (this.editing) { this.selectWordAt(e.clientX, e.clientY); return; }
       const p = this.toStage(e.clientX, e.clientY);
-      const id = this.hitTest(p.x, p.y);
-      if (!id) return;
+      const chain = this.chainAt(p.x, p.y);
+      if (!chain.length) return;
+      const el = [...chain].reverse().find((n) => this.editable(n)) || chain[chain.length - 1];
+      const id = this.keyOf(el);
       if (id !== this.sel) this.select(id);
       if (this.beginText(id, { x: e.clientX, y: e.clientY })) this.selectWordAt(e.clientX, e.clientY);
     },
@@ -624,13 +815,13 @@
       if (name === 'Tab') {
         const objs = this.objects();
         if (!objs.length) return true;
-        const i = objs.findIndex((o) => o.id === this.sel);
+        const i = objs.indexOf(this.el(this.sel));
         const n = i < 0 ? (shift ? objs.length - 1 : 0) : (i + (shift ? -1 : 1) + objs.length) % objs.length;
-        this.select(objs[n].id);
+        this.select(this.keyOf(objs[n]));
         return true;
       }
       if (!this.sel) return false;
-      if (name === 'Escape') { this.select(null); return true; }
+      if (name === 'Escape') { this.select(this.keyOf(this.parentCandidate(this.el(this.sel)))); return true; }
       if (name === 'Enter') return this.beginText(this.sel, 'all') || true;
       const step = shift ? 10 : 1;
       const dir = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[name];
@@ -659,7 +850,7 @@
       if (!n) return;
       clearTimeout(n.timer);
       this.nudge = null;
-      if (n.left !== round(n.from.left) || n.top !== round(n.from.top)) this.post({ type: 'move', id: n.el.id, left: n.left, top: n.top });
+      if (n.left !== round(n.from.left) || n.top !== round(n.from.top)) this.post({ type: 'move', id: this.keyOf(n.el), left: n.left, top: n.top });
     },
 
     // --- text -------------------------------------------------------------------------------
@@ -766,10 +957,10 @@
       if ([...el.querySelectorAll('*')].some((c) => !INLINE.has(c.tagName))) {
         el.innerHTML = ed.orig;
         this.update();
-        this.post({ type: 'refused', id: el.id, reason: 'block-children' });
+        this.post({ type: 'refused', id: this.keyOf(el), reason: 'block-children' });
         return null;
       }
-      const msg = { type: 'text', id: el.id, html };
+      const msg = { type: 'text', id: this.keyOf(el), html };
       if (post) this.post(msg);
       this.update();
       return msg;
@@ -807,7 +998,7 @@
     postFormat() {
       const st = this.textState();
       if (!st) return;
-      const msg = Object.assign({ type: 'format', id: this.editing.el.id }, st), key = JSON.stringify(msg);
+      const msg = Object.assign({ type: 'format', id: this.keyOf(this.editing.el) }, st), key = JSON.stringify(msg);
       if (key === this.editing.lastFormat) return; // unchanged
       this.editing.lastFormat = key;
       this.post(msg);
@@ -854,7 +1045,7 @@
       if (!style) return null;
       for (const [k, v] of Object.entries(style)) el.style[k] = v === null ? '' : typeof v === 'number' && k !== 'fontWeight' ? `${v}px` : String(v);
       this.update();
-      this.post({ type: 'style', id: el.id, style });
+      this.post({ type: 'style', id: this.keyOf(el), style });
       return 'element';
     },
 

@@ -31,6 +31,7 @@ const SYNTHETIC = `<!doctype html><html><head><meta charset="utf-8"><link rel="s
     <h1 id="h" style="position:absolute;left:1000px;top:700px;font-size:60px;margin:0">Hello <b>bold</b> world</h1>
     <p id="p" style="position:absolute;left:1000px;top:500px;font-size:40px;font-weight:400;margin:0">plain words here</p>
     <div id="blk" style="position:absolute;left:1000px;top:900px"><p style="margin:0">block child</p></div>
+    <div id="card" style="position:absolute;left:1500px;top:450px;width:360px;height:260px;background:#eee;font-size:40px;line-height:50px"><div class="cap">PDF</div><div class="ttl">Card title</div><div class="dsc">Card <b>125</b> text</div></div>
     <div style="position:absolute;left:1400px;top:300px"><span id="inner">static child</span></div>
     <div id="wrap" style="position:absolute;left:100px;top:600px;width:300px;height:100px"><span data-a>hidden</span></div>
   </div>
@@ -146,23 +147,44 @@ describe('selection, move and resize', () => {
     await p.close();
   });
 
-  it('drag moves by the delta: grid snapping, object snapping with a guide, and Cmd for none', async () => {
+  it('drag moves by the exact delta (no grid); smart guides snap within 5 screen px; Cmd for none', async () => {
     const p = await open(path.join(tmp, 'synthetic.html'));
     const from = await at(p, 150, 150);
     await drag(p, from, 37, 3);
     expect(await msgs(p)).toEqual([
       expect.objectContaining({ type: 'select', id: 'a' }),
-      { type: 'move', id: 'a', left: 140, top: 100 }, // 137,103 -> 10 px grid
+      { type: 'move', id: 'a', left: 137, top: 103 }, // nothing within 5 px: exactly where it was dropped
     ]);
-    expect(await style(p, 'a')).toMatchObject({ left: '140px', top: '100px' });
+    expect(await style(p, 'a')).toMatchObject({ left: '137px', top: '103px' });
 
     const from2 = await at(p, 190, 150);
-    await drag(p, from2, 253, 0); // right edge 140+200+253 = 593, 7 px from #b's left edge
+    await drag(p, from2, 260, -3); // right edge 137+200+260 = 597, 3 px from #b's left edge: snaps to it; top 103-3 = 100
     expect(await msgs(p)).toEqual([{ type: 'move', id: 'a', left: 400, top: 100 }]);
 
     const from3 = await at(p, 450, 150);
-    await drag(p, from3, 37, 3, true); // Cmd: no snapping
-    expect(await msgs(p)).toEqual([{ type: 'move', id: 'a', left: 437, top: 103 }]);
+    await drag(p, from3, 230, 3); // edges 630/730/830: 20 px from #b's, so no snap
+    expect(await msgs(p)).toEqual([{ type: 'move', id: 'a', left: 630, top: 103 }]);
+
+    const from4 = await at(p, 700, 150);
+    await drag(p, from4, -32, 0, true); // Cmd: left 598 stays, though #b's edge is 2 px away
+    expect(await msgs(p)).toEqual([{ type: 'move', id: 'a', left: 598, top: 103 }]);
+    await p.close();
+  });
+
+  it('Shift keeps a drag to one axis; the HUD shows the position while dragging', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    const from = await at(p, 150, 150);
+    await p.mouse.move(from.x, from.y);
+    await p.mouse.down();
+    await p.keyboard.down('Shift');
+    await p.mouse.move(from.x + 40, from.y + 12, { steps: 3 });
+    await p.mouse.move(from.x + 77, from.y + 21, { steps: 3 });
+    const hud = await p.evaluate(() => { const n = document.querySelector('.sage-canvas-overlay .sc-hud') as HTMLElement; return [n.style.display, n.textContent]; });
+    expect(hud).toEqual(['block', 'X 177   Y 100']);
+    await p.mouse.up();
+    await p.keyboard.up('Shift');
+    expect((await msgs(p)).at(-1)).toEqual({ type: 'move', id: 'a', left: 177, top: 100 });
+    expect(await p.evaluate(() => (document.querySelector('.sage-canvas-overlay .sc-hud') as HTMLElement).style.display)).toBe('none');
     await p.close();
   });
 
@@ -193,7 +215,7 @@ describe('selection, move and resize', () => {
     const pt = await at(p, 700, 500);
     await p.mouse.click(pt.x, pt.y);
     await msgs(p);
-    await drag(p, await handle(p, 'se'), 43, 21); // right 943 -> 940, bottom 621 -> 620
+    await drag(p, await handle(p, 'se'), 40, 20); // no grid: right 940, bottom 620 exactly
     expect(await msgs(p)).toEqual([{ type: 'resize', id: 'b', left: 600, top: 400, width: 340, height: 220 }]);
     await drag(p, await handle(p, 'nw'), -27, -13, true); // left 573, top 387; right 940 and bottom 620 stay
     expect(await msgs(p)).toEqual([{ type: 'resize', id: 'b', left: 573, top: 387, width: 367, height: 233 }]);
@@ -202,6 +224,50 @@ describe('selection, move and resize', () => {
     await drag(p, await handle(p, 'n'), 30, 20, true); // only the top edge moves
     expect(await msgs(p)).toEqual([{ type: 'resize', id: 'b', left: 573, top: 407, width: 327, height: 213 }]);
     expect(await style(p, 'b')).toEqual({ left: '573px', top: '407px', width: '327px', height: '213px' });
+    await p.close();
+  });
+
+  it('Shift on a corner keeps the aspect ratio; Option resizes about the centre; the HUD shows the size', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    await p.evaluate(() => (window as any).SageCanvas.select('b')); // 300 x 200 at 600,400
+    await msgs(p);
+    await p.keyboard.down('Shift');
+    await drag(p, await handle(p, 'se'), 60, 10, true); // width +20% leads: 360 x 240
+    await p.keyboard.up('Shift');
+    expect(await msgs(p)).toEqual([{ type: 'resize', id: 'b', left: 600, top: 400, width: 360, height: 240 }]);
+    await p.keyboard.down('Alt');
+    const se = await handle(p, 'se');
+    await p.mouse.move(se.x, se.y);
+    await p.mouse.down();
+    await p.keyboard.down('Meta');
+    await p.mouse.move(se.x + 10, se.y + 5, { steps: 3 });
+    await p.mouse.move(se.x + 20, se.y + 10, { steps: 3 }); // both sides move: 400 x 260 about the centre (780, 520)
+    expect(await p.evaluate(() => document.querySelector('.sage-canvas-overlay .sc-hud')!.textContent)).toBe('W 400   H 260');
+    await p.mouse.up();
+    await p.keyboard.up('Meta');
+    await p.keyboard.up('Alt');
+    expect(await msgs(p)).toEqual([{ type: 'resize', id: 'b', left: 580, top: 390, width: 400, height: 260 }]);
+    await p.close();
+  });
+
+  it('draws a 1 px outline and small handles with larger hit zones, and a hover outline', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'), { width: 960, height: 540 }); // stage at 0.5
+    await p.evaluate(() => (window as any).SageCanvas.select('b'));
+    const chrome = await p.evaluate(() => {
+      const box = document.querySelector('.sage-canvas-overlay .sc-box')!, h = document.querySelector('.sage-canvas-overlay .sc-h[data-h="se"]')!;
+      const dot = getComputedStyle(h, '::after');
+      return { line: parseFloat(getComputedStyle(box).outlineWidth) * 0.5, zone: h.getBoundingClientRect().width, dot: parseFloat(dot.width) * 0.5 };
+    });
+    expect(chrome).toEqual({ line: 1, zone: 14, dot: 7 }); // screen px
+    const pt = await at(p, 150, 150);
+    await p.mouse.move(pt.x, pt.y);
+    await p.waitForTimeout(50);
+    const hover = () => p.evaluate(() => { const n = document.querySelector('.sage-canvas-overlay .sc-hover') as HTMLElement; return [n.style.display, n.style.left, n.style.width]; });
+    expect(await hover()).toEqual(['block', '100px', '200px']); // #a, which a click would select
+    const ob = await at(p, 700, 500);
+    await p.mouse.move(ob.x, ob.y);
+    await p.waitForTimeout(50);
+    expect((await hover())[0]).toBe('none'); // over the selection itself
     await p.close();
   });
 
@@ -225,6 +291,66 @@ describe('selection, move and resize', () => {
     const pt = await at(p, 150, 150);
     await p.mouse.click(pt.x, pt.y);
     expect((await msgs(p)).map((m) => m.type)).toEqual(['select']);
+    await p.close();
+  });
+});
+
+describe('drill-down (Keynote groups)', () => {
+  const T = [1520, 525] as const, D = [1520, 575] as const, BG = [1520, 680] as const; // title, description, card background
+  const click = async (p: Page, pt: readonly [number, number]) => { const c = await at(p, ...pt); await p.mouse.click(c.x, c.y); await p.waitForTimeout(350); };
+  const current = (p: Page) => p.evaluate(() => (window as any).SageCanvas.selection());
+
+  it('a click selects the card; a click on it goes to the title; a click on the title edits it', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    expect(await hit(p, ...T)).toBe('card');
+    expect(await p.evaluate(([x, y]) => (window as any).SageCanvas.chainAt(x, y).map((e: Element) => (window as any).SageCanvas.keyOf(e)), T)).toEqual(['card', 'card>div.ttl']);
+    await click(p, T);
+    expect(await current(p)).toBe('card');
+    await click(p, T);
+    expect(await current(p)).toBe('card>div.ttl');
+    const m = (await msgs(p)).at(-1)!;
+    expect(sel(m)).toMatchObject({ type: 'select', id: 'card>div.ttl', tag: 'div', editable: true, html: 'Card title', movable: false });
+    await click(p, T);
+    expect(await p.evaluate(() => document.querySelector('#card .ttl')!.getAttribute('contenteditable'))).toBe('true');
+    await p.keyboard.type('!'); // at the click point
+    await p.keyboard.press('Escape');
+    const texts = (await msgs(p)).filter((x) => x.type === 'text');
+    expect(texts.map((x) => [x.id, String(x.html).replace('!', '')])).toEqual([['card>div.ttl', 'Card title']]);
+    expect(texts[0]!.html).not.toBe('Card title!'); // the caret went where the click was, not to the end
+    await p.close();
+  });
+
+  it('inside the card a click on a sibling selects the sibling; Escape goes up, then deselects', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    await p.evaluate(() => (window as any).SageCanvas.select('card>div.ttl'));
+    await click(p, D);
+    expect(await current(p)).toBe('card>div.dsc');
+    await click(p, BG); // the card's own background: back to the card
+    expect(await current(p)).toBe('card');
+    await p.evaluate(() => (window as any).SageCanvas.select('card>div.dsc'));
+    await p.keyboard.press('Escape');
+    expect(await current(p)).toBe('card');
+    await p.keyboard.press('Escape');
+    expect(await current(p)).toBeNull();
+    await p.close();
+  });
+
+  it('a double-click goes straight to the deepest text with the caret', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    const c = await at(p, 1545, 575); // on "Card" in the description
+    await p.mouse.dblclick(c.x, c.y);
+    expect(await current(p)).toBe('card>div.dsc');
+    expect(await p.evaluate(() => getSelection()!.toString().trim())).toBe('Card');
+    await p.close();
+  });
+
+  it('adopt() gives the element the id the edit assigned, and the selection follows', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    await p.evaluate(() => (window as any).SageCanvas.select('card>div.ttl'));
+    expect(await p.evaluate(() => (window as any).SageCanvas.adopt('card>div.ttl', 'card-ttl'))).toBe(true);
+    expect(await current(p)).toBe('card-ttl');
+    expect(await p.evaluate(() => document.querySelector('#card .ttl')!.id)).toBe('card-ttl');
+    expect(await p.evaluate(() => (window as any).SageCanvas.keyOf(document.querySelector('#card .dsc')))).toBe('card>div.dsc');
     await p.close();
   });
 });
@@ -303,12 +429,16 @@ describe('in-place text, without any mode', () => {
     await p.close();
   });
 
-  it('refuses elements with block children', async () => {
+  it('refuses elements with block children; a double-click edits the block without an id inside', async () => {
     const p = await open(path.join(tmp, 'synthetic.html'));
-    const pt = await at(p, 1010, 910);
-    await p.mouse.dblclick(pt.x, pt.y);
+    await p.evaluate(() => (window as any).SageCanvas.beginText('blk', 'end'));
     expect((await msgs(p)).at(-1)).toEqual({ type: 'refused', id: 'blk', reason: 'block-children' });
     expect(await p.evaluate(() => document.getElementById('blk')!.hasAttribute('contenteditable'))).toBe(false);
+    const pt = await at(p, 1010, 910);
+    await p.mouse.dblclick(pt.x, pt.y);
+    await p.keyboard.type('X');
+    await p.keyboard.press('Escape');
+    expect((await msgs(p)).filter((m) => m.type === 'text')).toEqual([{ type: 'text', id: 'blk>p', html: 'X child' }]); // the double-click selected the word
     await p.close();
   });
 
