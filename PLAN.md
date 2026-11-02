@@ -536,7 +536,16 @@ Exit: `talkc build fixtures/issta26 && talkc shoot` reproduces the golden frames
 presents in Chrome from `build/index.html` exactly as before. Core unit, property, and
 source-edit round-trip suites (Section 12.2) are green in CI.
 
-### Phase 2 — Mac app, read-only
+### Phase 2 — Mac app, read-only (done 2026-11-02, except real-display checks)
+
+Status: the app supervises the sidecar (restart once on crash; the sidecar exits when the app
+dies), opens sage-talk/1 folders through it and legacy decks directly, reloads the canvas at
+the same time after external edits, and shows a chapter-grouped navigator with thumbnails
+(about 3 s for 61 holds, no private API; after a rebuild only holds whose frame changed are
+re-rendered). Transport bar, Present and Rehearse with a presenter window relayed by the app.
+Legacy decks are never written to: their thumbnail cache lives in ~/Library/Caches. 62 Swift
+tests and a 19-check self-test. Not yet verified: a real external display, Space/→/Enter
+playback while presenting (the self-test runs off screen), Recent talks.
 
 Open a talk folder, navigator with cached thumbnails, canvas with scrub and transport, notes
 view, Present mode with presenter display, Rehearse mode, Reveal in Finder, recent talks.
