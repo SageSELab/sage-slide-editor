@@ -17,3 +17,4 @@ export * from './edit.ts';
 export { sceneElements, type SceneElement } from './html.ts';
 export { parseJsonAst, JsonSyntaxError, type JsonNode } from './jsonast.ts';
 export { main as talkc } from './cli.ts';
+export * from './theme.ts';
