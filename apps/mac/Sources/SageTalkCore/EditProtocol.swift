@@ -51,10 +51,12 @@ extension SidecarProtocol {
         public var diagnostics: [Diagnostic]
         public var holds: [WireHold]?
         public var stretch: StretchInfo?
+        /// An element op on an address (`g1>div.t`, an element without an id): the id the edit gave it.
+        public var assigned: String?
         public init(inverse: Inverse, changed: [String], ok: Bool = true, diagnostics: [Diagnostic] = [],
-                    holds: [WireHold]? = nil, stretch: StretchInfo? = nil) {
+                    holds: [WireHold]? = nil, stretch: StretchInfo? = nil, assigned: String? = nil) {
             self.inverse = inverse; self.changed = changed; self.ok = ok; self.diagnostics = diagnostics
-            self.holds = holds; self.stretch = stretch
+            self.holds = holds; self.stretch = stretch; self.assigned = assigned
         }
     }
 }
@@ -233,6 +235,14 @@ public enum EditOp: Codable, Equatable, Sendable {
     case stretchBeat(ref: String, factor: Double)
     case setBeat(ref: String, props: BeatProps)
     case setChapter(chapter: String, props: ChapterProps)
+
+    /// The element an element op (setText, setStyle, setAttr) edits: an id or an address.
+    public var elementId: String? {
+        switch self {
+        case .setText(let id, _, _), .setStyle(let id, _, _), .setAttr(let id, _, _, _): id
+        default: nil
+        }
+    }
 
     public var name: String {
         switch self {

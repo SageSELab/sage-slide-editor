@@ -42,6 +42,9 @@ final class TalkWindowModel {
     /// The format bar's Font button: set by whoever provides a font picker (pickFont(for:)).
     @ObservationIgnored var onPickFont: ((CanvasObject) -> Void)?
     @ObservationIgnored var pendingColor: Task<Void, Never>?
+    /// Edits the canvas made itself (a drag, typed text, a format command) that are in flight:
+    /// their rebuild does not reload the canvas, which already shows the change.
+    @ObservationIgnored var canvasEditsInFlight = 0
     /// The human's undo stack and the edit pipeline to the sidecar.
     let edits = EditSession()
     /// talk.json as last read (beat labels, notes, holds, flags for the inspector and menus).
@@ -221,7 +224,9 @@ final class TalkWindowModel {
                 status = "Rebuilt in \(Int(built.ms)) ms"
                 if let wire = built.holds { holds = wire.map(\.hold) }
                 reloadSpine()
-                reloadCanvas()
+                // The canvas's own edits are already on screen: no reload (and no flash), the
+                // selection and the caret stay. Anything else (inspector, undo, Claude) reloads.
+                if built.trigger == .edit && canvasEditsInFlight > 0 { refreshThumbnails() } else { reloadCanvas() }
             } else {
                 // Keep showing the last good film.
                 status = "Build failed"
@@ -273,12 +278,16 @@ final class TalkWindowModel {
         duration = info.duration
         t = canvas.t
         selectedHold = HoldTimeline(holds: holds, duration: duration).current(at: t)?.id
-        if let filmURL, let filmRoot {
-            let cacheDir = talk.map { ThumbnailCache.directory(for: $0, caches: ThumbnailCache.userCaches) }
-                ?? filmRoot.appendingPathComponent(".sage/thumbs", isDirectory: true)
-            thumbnails.setFilm(filmURL, talkRoot: filmRoot, cacheDirectory: cacheDir, holds: holds)
-        }
+        refreshThumbnails()
         Task { await restoreEditing() } // the overlay, on an editable talk
+    }
+
+    /// Points the navigator's thumbnails at the film as built now (they re-render what changed).
+    func refreshThumbnails() {
+        guard let filmURL, let filmRoot else { return }
+        let cacheDir = talk.map { ThumbnailCache.directory(for: $0, caches: ThumbnailCache.userCaches) }
+            ?? filmRoot.appendingPathComponent(".sage/thumbs", isDirectory: true)
+        thumbnails.setFilm(filmURL, talkRoot: filmRoot, cacheDirectory: cacheDir, holds: holds)
     }
 
     private func filmMoved(_ t: Double, _ playing: Bool) {

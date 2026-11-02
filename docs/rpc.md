@@ -243,7 +243,9 @@ pauses, so scrubbing brings the overlay back at the new time, keeping the select
 element still shows). It posts `{kind: 'canvas', ...}` to the `sage` message handler; the app
 turns each edit into a `talk.edit`. Numbers are stage px (1920x1080), whole px; `left`/`top`
 are the element's CSS left/top; `rect` is `{x, y, w, h}` in the page's client px (the web
-view's points), where the app floats its format bar.
+view's points), where the app floats its format bar. Every `id` is an element id or, for an
+element without an id that the user drilled into (a card's title), its element address
+(`g1>div.t`, see talk.edit above); the app passes it to `talk.edit` unchanged.
 
 | `type` | Fields | App does |
 |---|---|---|
@@ -255,13 +257,18 @@ view's points), where the app floats its format bar.
 | `editing` | `{id}` (the caret went into #id's text) or `{id: null}` (left it) | routes ⌘Z to the text's own undo |
 | `format` | `{id, bold, italic, underline, color, range}` (the text selection's formatting while editing) | the format bar's state |
 | `rect` | `{id, rect}` (the selection's box on screen changed) | moves the format bar |
-| `refused` | `{id, reason: 'block-children'}` | says why the text cannot be edited in place |
+| `refused` | `{id, reason: 'block-children'}` | says to click again to select the text inside |
 
 The app drives it with `SageCanvas.enable()`, `disable()`, `select(id, {silent})` (restores
 the selection after a reload), `key(name, {shift})` (keys the app's menus catch first),
 `format(cmd, value)` (the format bar: inline on a selected range while editing, else the whole
 element) and `takeText()` (ends text editing and returns its `text` message instead of posting
-it, so the app can save it before an edit of its own).
+it, so the app can save it before an edit of its own), and `adopt(address, id)` (the edit
+gave the addressed element the id `assigned`: the page's element takes it and the selection
+follows). The app does not reload the canvas for the rebuild after an edit the canvas made
+itself (`move`, `resize`, `text`, `style`: already on screen, so no flash and the selection
+stays); it reads the selection back with `select(id, {silent})`. Inspector edits, undo, redo,
+Claude's and external changes, and a failed edit reload it.
 `packages/engine/test/canvas.test.ts` records these messages in Playwright WebKit.
 
 ## Claude (Phase 4)

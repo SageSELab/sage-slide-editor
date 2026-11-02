@@ -52,7 +52,7 @@ private struct ObjectInspector: View {
         } else if let o = model.selection {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 8) {
-                    Text("#\(o.id)").font(.system(.body, design: .monospaced).weight(.medium)).textSelection(.enabled)
+                    Text(CanvasObject.describe(o.id)).font(.system(.body, design: .monospaced).weight(.medium)).textSelection(.enabled)
                         .lineLimit(1).truncationMode(.middle)
                     Spacer()
                     Text(o.tag).font(.caption.monospaced().weight(.medium)).foregroundStyle(.secondary)

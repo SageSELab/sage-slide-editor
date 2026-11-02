@@ -52,6 +52,11 @@ extension FilmView {
         return o
     }
 
+    /// The edit gave the element at `key` (an address) the id `id`: the page's element takes it.
+    func canvasAdopt(_ key: String, _ id: String) async {
+        _ = try? await call("return !!(window.SageCanvas && SageCanvas.adopt(key, id));", ["key": key, "id": id])
+    }
+
     /// Offers a key the app's menus caught to the overlay; false when it did not handle it.
     func canvasKey(_ name: String, shift: Bool = false) async -> Bool {
         let r = try? await call("return !!(window.SageCanvas && SageCanvas.on && SageCanvas.key(name, { shift }));", ["name": name, "shift": shift])

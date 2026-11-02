@@ -5,8 +5,9 @@ import SageTalkCore
 // for, the format bar, beat operations, undo/redo, and external changes. There is no edit
 // mode: on a beat-format talk the canvas is editable whenever the film is paused (the overlay
 // steps aside by itself while it plays) and never while presenting. Every edit goes to the
-// sidecar at once (talk.edit); the sidecar rebuilds and the canvas reloads at the same time
-// with the same selection (filmBooted -> restoreEditing).
+// sidecar at once (talk.edit); the sidecar rebuilds. An edit the canvas made itself (it is
+// already on screen) does not reload the canvas; any other edit reloads it with the same
+// selection (filmBooted -> restoreEditing).
 extension TalkWindowModel {
     var canEdit: Bool { talk?.kind == .beatFormat && filmURL != nil }
 
@@ -64,14 +65,17 @@ extension TalkWindowModel {
         case .rect(let id, let rect):
             if selection?.id == id { selection?.rect = rect }
         case .editing(let id):
+            // ⌘Z inside the text undoes this session's typing only: the page's editing history
+            // (kept now that the canvas's own edits do not reload it) starts fresh each time.
+            canvas.webView.undoManager?.removeAllActions()
             textEditing = id
             if id == nil { textState = nil }
         case .format(let state):
             if state.id == textEditing { textState = state }
         case .refused(let id, _):
-            status = "#\(id) has block content; edit its text in the source or ask Claude."
+            status = "\(CanvasObject.describe(id)) holds other blocks: click it again to select the text inside, or double-click the text."
         default:
-            if let op = msg.editOp { apply(op) }
+            if let op = msg.editOp { Task { await applyNow(op, fromCanvas: true) } }
         }
     }
 
@@ -82,12 +86,34 @@ extension TalkWindowModel {
         Task { await applyNow(op) }
     }
 
+    /// `fromCanvas`: the canvas made this change itself and already shows it, so its rebuild
+    /// does not reload the canvas.
     @discardableResult
-    func applyNow(_ op: EditOp) async -> SidecarProtocol.EditResult? {
+    func applyNow(_ op: EditOp, fromCanvas: Bool = false) async -> SidecarProtocol.EditResult? {
         await saveCanvasText()
+        return await perform(op, fromCanvas: fromCanvas)
+    }
+
+    private func perform(_ op: EditOp, fromCanvas: Bool) async -> SidecarProtocol.EditResult? {
+        if fromCanvas { canvasEditsInFlight += 1 }
         let r = await edits.perform(op)
+        if fromCanvas { canvasEditsInFlight -= 1 }
         if r == nil, let e = edits.lastError { error = e; reloadCanvas() } // drop the overlay's optimistic change
+        if let r { await adoptAssigned(op, r) }
+        // No reload brings the selection's new box: read it back (the inspector shows it).
+        if fromCanvas, r != nil, let id = selection?.id, let fresh = await canvas.canvasSelect(id, silent: true), fresh.id == selection?.id {
+            selection = fresh
+        }
         return r
+    }
+
+    /// The edit gave an element without an id one (`assigned`): the canvas element takes it
+    /// and the selection follows, so later edits name it by its id.
+    private func adoptAssigned(_ op: EditOp, _ r: SidecarProtocol.EditResult) async {
+        guard let new = r.assigned, let old = op.elementId, old != new else { return }
+        await canvas.canvasAdopt(old, new)
+        if selection?.id == old { selection?.id = new }
+        if textEditing == old { textEditing = new }
     }
 
     /// Text being edited in place is saved before any other edit (whose rebuild reloads the
@@ -96,10 +122,7 @@ extension TalkWindowModel {
         guard textEditing != nil else { return }
         let msg = await canvas.takeCanvasText()
         textEditing = nil; textState = nil
-        if let op = msg?.editOp {
-            let r = await edits.perform(op)
-            if r == nil, let e = edits.lastError { error = e }
-        }
+        if let op = msg?.editOp { await perform(op, fromCanvas: true) }
     }
 
     func undo() {

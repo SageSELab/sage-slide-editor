@@ -411,6 +411,7 @@
     select(id, { silent = false } = {}) {
       if (!this.on) return null;
       if (id && !this.el(id)) id = null;
+      if (id && id.includes('>') && this.el(id).id) id = this.el(id).id; // it has an id now (after a reload)
       if (id !== this.sel) { this.flushNudge(); if (this.editing) this.commitText(); }
       this.sel = id;
       this._selecting = true; // the select message carries the rect: no separate rect message

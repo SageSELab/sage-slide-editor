@@ -104,6 +104,14 @@ public struct CanvasObject: Codable, Equatable, Sendable {
         self.fontSize = fontSize; self.movable = movable; self.editable = editable; self.html = html; self.src = src
         self.rect = rect; self.text = text
     }
+
+    /// How the inspector names an object: `#c1-eye`, or for an element without an id (an
+    /// address, `g1>div.t`) the last step inside its named ancestor: `div.t in #g1`.
+    public static func describe(_ id: String) -> String {
+        let parts = id.split(separator: ">", omittingEmptySubsequences: false)
+        guard parts.count > 1, let base = parts.first, let last = parts.last else { return "#\(id)" }
+        return "\(last.split(separator: ":").first ?? last) in #\(base)"
+    }
 }
 
 /// A box in the canvas web view's coordinates (CSS px = points, top-left origin).
