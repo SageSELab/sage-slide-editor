@@ -40,12 +40,39 @@ public enum ClaudeProtocol {
         }
     }
 
+    /// The models the pane's menu offers (claude.send `model`), most capable first.
+    public enum Model: String, Codable, CaseIterable, Sendable {
+        case fable51 = "claude-fable-5-1"
+        case opus55 = "claude-opus-5-5"
+        case sonnet55 = "claude-sonnet-5-5"
+        case haiku55 = "claude-haiku-5-5"
+        /// The sidecar's default.
+        public static let standard: Model = .opus55
+        public var label: String {
+            switch self {
+            case .fable51: "Fable 5.1"
+            case .opus55: "Opus 5.5"
+            case .sonnet55: "Sonnet 5.5"
+            case .haiku55: "Haiku 5.5"
+            }
+        }
+        public var detail: String {
+            switch self {
+            case .fable51: "Most capable, highest cost"
+            case .opus55: "Strong and balanced (default)"
+            case .sonnet55: "Faster, lower cost"
+            case .haiku55: "Fastest, lowest cost"
+            }
+        }
+    }
+
     public struct SendParams: Codable, Equatable, Sendable {
         public var text: String
         public var attachments: [String]?
         public var effort: Effort?
-        public init(text: String, attachments: [String]? = nil, effort: Effort? = nil) {
-            self.text = text; self.attachments = attachments; self.effort = effort
+        public var model: String?
+        public init(text: String, attachments: [String]? = nil, effort: Effort? = nil, model: String? = nil) {
+            self.text = text; self.attachments = attachments; self.effort = effort; self.model = model
         }
     }
     public struct SendResult: Codable, Equatable, Sendable { public var turn: Int }

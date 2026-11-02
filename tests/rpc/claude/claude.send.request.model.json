@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "method": "claude.send",
+  "params": {
+    "text": "Build the results chapter.",
+    "effort": "high",
+    "model": "claude-fable-5-1"
+  }
+}

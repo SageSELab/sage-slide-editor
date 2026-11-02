@@ -83,7 +83,7 @@ import Testing
         await chat.send()
         let sent = await box.params
         // The first message is the fixture tests/rpc/claude/claude.send.request.attachments.json.
-        #expect(sent.first == ClaudeProtocol.SendParams(text: "Use the numbers in this table.", attachments: ["../paper/tables/results.tex"], effort: .high))
+        #expect(sent.first == ClaudeProtocol.SendParams(text: "Use the numbers in this table.", attachments: ["../paper/tables/results.tex"], effort: .high, model: "claude-opus-5-5"))
         #expect(sent.last?.attachments == nil)
         #expect(chat.attachments.isEmpty)
         if case .user(_, let t) = chat.entries.first { #expect(t == "Use the numbers in this table.\n\nAttached: ../paper/tables/results.tex") }

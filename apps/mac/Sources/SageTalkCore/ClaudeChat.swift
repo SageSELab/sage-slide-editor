@@ -69,6 +69,12 @@ public final class ClaudeChat {
     public var draft = ""
     /// Reasoning effort sent with every message (the footer control; the Agent SDK `effort` option).
     public var effort: ClaudeProtocol.Effort = .high
+    /// The model sent with every message (the pane's model menu), remembered across launches when
+    /// the chat was made with a defaults store.
+    public var chosenModel: ClaudeProtocol.Model = .standard {
+        didSet { defaults?.set(chosenModel.rawValue, forKey: Self.modelKey) }
+    }
+    public static let modelKey = "claude.model"
     /// Files attached to the next message (paths as the prompt will name them).
     public private(set) var attachments: [String] = []
     /// The talk folder: attachments inside it or next to it are named relative to it.
@@ -83,7 +89,13 @@ public final class ClaudeChat {
     @ObservationIgnored private var nextId = 0
     @ObservationIgnored private var waiting: [Int: CheckedContinuation<ClaudeProtocol.AskDecision, Never>] = [:]
 
-    public init() {}
+    @ObservationIgnored private let defaults: UserDefaults?
+
+    /// `defaults` remembers the chosen model (the app passes .standard; tests pass none or their own).
+    public init(defaults: UserDefaults? = nil) {
+        self.defaults = defaults
+        if let raw = defaults?.string(forKey: Self.modelKey), let m = ClaudeProtocol.Model(rawValue: raw) { chosenModel = m }
+    }
 
     public var isBusy: Bool { state == .running || state == .starting }
     public var pendingPermission: PermissionRequest? { permissions.first }
@@ -187,7 +199,7 @@ public final class ClaudeChat {
         attachments = []
         entries.append(.user(id: take(), text: files.isEmpty ? text : text + "\n\nAttached: " + files.joined(separator: ", ")))
         state = .running
-        do { try await commands.send(ClaudeProtocol.SendParams(text: text, attachments: files.isEmpty ? nil : files, effort: effort)) } catch {
+        do { try await commands.send(ClaudeProtocol.SendParams(text: text, attachments: files.isEmpty ? nil : files, effort: effort, model: chosenModel.rawValue)) } catch {
             state = .error
             notice("Could not send: \(error.localizedDescription)", isError: true)
         }

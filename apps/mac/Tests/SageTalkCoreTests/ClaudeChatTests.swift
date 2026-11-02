@@ -156,6 +156,27 @@ private actor SentParams {
         #expect(ClaudeProtocol.Effort.allCases.map(\.rawValue) == ["low", "medium", "high", "xhigh", "max"])
     }
 
+    @Test func sendCarriesTheChosenModelAndRemembersIt() async throws {
+        let suite = "sage-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let chat = ClaudeChat(defaults: defaults)
+        let box = SentParams()
+        chat.commands = .init(send: { p in await box.add(p) }, interrupt: {}, reset: {})
+        #expect(chat.chosenModel == .opus55)
+        chat.draft = "first"
+        await chat.send()
+        chat.chosenModel = .fable51
+        chat.draft = "second"
+        await chat.send()
+        #expect(await box.params.map(\.model) == ["claude-opus-5-5", "claude-fable-5-1"])
+        #expect(ClaudeChat(defaults: defaults).chosenModel == .fable51) // the next window starts on it
+        #expect(ClaudeChat().chosenModel == .opus55)
+        // On the wire: the fixture tests/rpc/claude/claude.send.request.model.json.
+        let wire = try JSONValue.encoding(ClaudeProtocol.SendParams(text: "Build the results chapter.", effort: .high, model: "claude-fable-5-1"))
+        #expect(wire == .object(["text": .string("Build the results chapter."), "effort": .string("high"), "model": .string("claude-fable-5-1")]))
+    }
+
     @Test func sendFailureIsShown() async {
         struct Down: Error {}
         let chat = ClaudeChat()
