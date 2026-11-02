@@ -12,6 +12,8 @@ export interface StoredSession {
   /** The talk folder (canonical) the session ran in. */
   cwd: string;
   updatedAt: string;
+  /** The session's running total_cost_usd at its last result (a resumed session continues from it). */
+  totalCostUsd?: number;
 }
 
 export interface ResumePlan {
@@ -27,14 +29,17 @@ export function loadSession(talkRoot: string): StoredSession | null {
   try {
     const j = JSON.parse(fs.readFileSync(sessionFile(talkRoot), 'utf8')) as Partial<StoredSession>;
     if (typeof j.sessionId !== 'string' || !j.sessionId || typeof j.cwd !== 'string') return null;
-    return { sessionId: j.sessionId, cwd: j.cwd, updatedAt: typeof j.updatedAt === 'string' ? j.updatedAt : '' };
+    const rec: StoredSession = { sessionId: j.sessionId, cwd: j.cwd, updatedAt: typeof j.updatedAt === 'string' ? j.updatedAt : '' };
+    if (typeof j.totalCostUsd === 'number' && j.totalCostUsd >= 0) rec.totalCostUsd = j.totalCostUsd;
+    return rec;
   } catch { return null; }
 }
 
-export function saveSession(talkRoot: string, sessionId: string, now = new Date()) {
+export function saveSession(talkRoot: string, sessionId: string, o: { totalCostUsd?: number | undefined; now?: Date } = {}) {
   const f = sessionFile(talkRoot);
   fs.mkdirSync(path.dirname(f), { recursive: true });
-  const rec: StoredSession = { sessionId, cwd: talkRoot, updatedAt: now.toISOString() };
+  const rec: StoredSession = { sessionId, cwd: talkRoot, updatedAt: (o.now ?? new Date()).toISOString() };
+  if (o.totalCostUsd !== undefined) rec.totalCostUsd = o.totalCostUsd;
   const tmp = `${f}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, JSON.stringify(rec, null, 2) + '\n');
   fs.renameSync(tmp, f);

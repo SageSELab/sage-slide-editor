@@ -9,9 +9,11 @@
 //   'default' with canUseTool (policy.ts), PostToolUse to label Claude's writes, partial
 //   messages for streaming, maxBudgetUsd per request, resume/fork from .sage/session.json.
 //
-// Budget: maxBudgetUsd caps a query process, and total_cost_usd is cumulative per process, so
+// Budget: maxBudgetUsd counts the spend since its query() call started (the CLI's own docs), so
 // a process that has spent anything is recycled after its request (closed, and resumed in a
-// fresh process with a fresh cap). The conversation and the prompt cache carry over.
+// fresh process with a fresh cap). The conversation and the prompt cache carry over. A
+// resumed session's total_cost_usd continues from its saved total; translate.ts reports each
+// request's growth, seeded from the total kept in .sage/session.json.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -214,13 +216,18 @@ export class ClaudeBridge {
 
   handleMessage(msg: SDKMessage) {
     this.opts.trace?.({ kind: 'sdk', msg });
-    if ((msg as { type?: string }).type === 'result') {
-      this.sawResult = true;
-      this.running = false;
-      const total = (msg as { total_cost_usd?: number }).total_cost_usd;
-      if (this.live && typeof total === 'number') this.live.spent = total;
-    }
+    const isResult = (msg as { type?: string }).type === 'result';
+    if (isResult) { this.sawResult = true; this.running = false; }
     this.translator.handle(msg);
+    if (isResult) {
+      if (this.live) this.live.spent += this.translator.lastCost;
+      const sid = (msg as { session_id?: string }).session_id;
+      if (sid) this.saveSession(sid);
+    }
+  }
+
+  private saveSession(sessionId: string) {
+    try { saveSession(this.host.root, sessionId, { totalCostUsd: this.translator.sessionTotal }); } catch (e) { this.host.log('warn', `could not save the session: ${(e as Error).message}`); }
   }
 
   /** canUseTool, exposed for the policy and replay tests. */
@@ -258,9 +265,7 @@ export class ClaudeBridge {
   }
 
   private onInit(info: InitInfo) {
-    if (info.sessionId) {
-      try { saveSession(this.host.root, info.sessionId); } catch (e) { this.host.log('warn', `could not save the session: ${(e as Error).message}`); }
-    }
+    if (info.sessionId) this.saveSession(info.sessionId);
     const others = info.mcpServers.filter((s) => s.name !== 'talk').map((s) => s.name);
     if (others.length) this.host.log('warn', `MCP servers other than talk are loaded: ${others.length}`);
     if (!info.skillLoaded) this.host.log('warn', 'the bundled academic-talk-film skill is not listed in init');
@@ -345,7 +350,10 @@ export class ClaudeBridge {
 
   private async ensureLive(): Promise<Live> {
     if (this.live) return this.live;
-    const plan = planResume(loadSession(this.host.root), this.host.root);
+    const stored = loadSession(this.host.root);
+    const plan = planResume(stored, this.host.root);
+    // The first process of this sidecar resuming a session: its results continue from the saved total.
+    if (plan.resume && this.translator.sessionTotal === 0) this.translator.seedTotal(stored?.totalCostUsd ?? 0);
     const options = await this.options(plan);
     const notes = [
       ...(plan.mode === 'resume' ? ['Resuming the conversation'] : plan.mode === 'fork' ? ['The talk moved; continuing its conversation as a fork'] : []),
@@ -355,7 +363,6 @@ export class ClaudeBridge {
     const input = new InputQueue();
     const q = (this.opts.queryFn ?? (sdkQuery as unknown as QueryFn))({ prompt: input, options });
     const live: Live = { q, input, plan, spent: 0, done: Promise.resolve() };
-    this.translator.newProcess();
     live.done = this.pump(live);
     this.live = live;
     return live;

@@ -92,17 +92,27 @@ export class Translator {
   private last: 'text' | 'tool' | null = null;
   private pendingSeparator = false;
   private lastUsage: ClaudeUsage | null = null;
-  /** total_cost_usd is cumulative per SDK process; the cost already reported from this process. */
-  private processBase = 0;
+  /**
+   * total_cost_usd is the session's running total: cumulative across the turns of a process,
+   * and a resumed or forked session starts from the total its transcript saved (the CLI's own
+   * field docs). A request costs the growth since the last total seen; a total below it means
+   * the running total restarted (a transcript without a saved total), and then all of it is
+   * this request's.
+   */
+  private lastTotal = 0;
   private conversationTotal = 0;
+  /** The cost of the last result. */
+  lastCost = 0;
   /** Set by the bridge before an interrupt, so the error result reads as 'interrupted'. */
   interrupting = false;
 
   constructor(private o: TranslatorOptions) {}
 
-  /** The bridge started a new SDK process (resume after a recycle or a crash). */
-  newProcess() { this.processBase = 0; }
+  /** The running total of the session about to be resumed (from .sage/session.json). */
+  seedTotal(total: number) { this.lastTotal = total; }
 
+  /** The session's running total at the last result. */
+  get sessionTotal() { return this.lastTotal; }
   get totalCost() { return this.conversationTotal; }
 
   /** A call canUseTool denied; its tool_result arrives later as an error and keeps the 'denied' status. */
@@ -221,8 +231,9 @@ export class Translator {
 
   private result(m: Record<string, unknown>) {
     const total = typeof m.total_cost_usd === 'number' ? m.total_cost_usd : 0;
-    const cost = Math.max(0, total - this.processBase);
-    this.processBase = Math.max(this.processBase, total);
+    const cost = total >= this.lastTotal ? total - this.lastTotal : total;
+    this.lastTotal = total;
+    this.lastCost = cost;
     this.conversationTotal += cost;
     const usage = asObj(m.usage);
     const n = (k: string) => (typeof usage[k] === 'number' ? (usage[k] as number) : 0);

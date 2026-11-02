@@ -18,8 +18,8 @@ describe('session store', () => {
     fs.mkdirSync(talk);
     expect(loadSession(talk)).toBeNull();
     expect(planResume(loadSession(talk), talk)).toEqual({ mode: 'new' });
-    saveSession(talk, 'abc-123', new Date('2026-11-02T00:00:00Z'));
-    expect(JSON.parse(fs.readFileSync(sessionFile(talk), 'utf8'))).toEqual({ sessionId: 'abc-123', cwd: talk, updatedAt: '2026-11-02T00:00:00.000Z' });
+    saveSession(talk, 'abc-123', { now: new Date('2026-11-02T00:00:00Z'), totalCostUsd: 0.25 });
+    expect(JSON.parse(fs.readFileSync(sessionFile(talk), 'utf8'))).toEqual({ sessionId: 'abc-123', cwd: talk, updatedAt: '2026-11-02T00:00:00.000Z', totalCostUsd: 0.25 });
     expect(planResume(loadSession(talk), talk)).toEqual({ mode: 'resume', resume: 'abc-123' });
   });
 

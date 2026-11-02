@@ -131,7 +131,8 @@ describe('ClaudeBridge', () => {
   });
 
   it('recycles a process that spent money, resuming the same session with a fresh cap', async () => {
-    const s = setup([() => [result(0.3)], () => [result(0.2)]]);
+    // A resumed session's running total continues from the saved one: 0.3, then 0.5.
+    const s = setup([() => [result(0.3)], () => [result(0.5)]]);
     await s.bridge.send({ text: 'one' });
     await s.waitResult(1);
     await s.bridge.send({ text: 'two' });
@@ -197,13 +198,16 @@ describe('ClaudeBridge', () => {
   });
 
   it('resumes the stored session on the next open, and forks it when the talk moved', async () => {
-    const s = setup([() => [result(0.1)]]);
+    const s = setup([() => [result(1.25)]]);
     fs.mkdirSync(path.join(s.t.root, '.sage'), { recursive: true });
-    fs.writeFileSync(path.join(s.t.root, '.sage/session.json'), JSON.stringify({ sessionId: 'old-id', cwd: '/somewhere/else/talk', updatedAt: '' }));
+    fs.writeFileSync(path.join(s.t.root, '.sage/session.json'), JSON.stringify({ sessionId: 'old-id', cwd: '/somewhere/else/talk', updatedAt: '', totalCostUsd: 1 }));
     await s.bridge.send({ text: 'hi' });
     await s.waitResult();
     expect(s.q.calls[0]!.options).toMatchObject({ resume: 'old-id', forkSession: true });
     expect(s.notes[0]).toEqual({ method: 'claude.status', params: { state: 'starting', message: 'The talk moved; continuing its conversation as a fork' } });
+    // The forked session's total continues from the saved 1.00 USD: this request cost 0.25.
+    expect(s.notes.find((n) => n.method === 'claude.result')!.params).toMatchObject({ cost: 0.25, totalCost: 0.25 });
+    expect(JSON.parse(fs.readFileSync(path.join(s.t.root, '.sage/session.json'), 'utf8'))).toMatchObject({ sessionId: SID, cwd: s.t.root, totalCostUsd: 1.25 });
   });
 
   it('serves the app tools: talk_goto and talk_frame move the canvas; talk_layout lists holds', async () => {
