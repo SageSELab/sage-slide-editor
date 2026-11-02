@@ -1,0 +1,57 @@
+  <!-- Document types and exported UTTypes, shared by scripts/package.sh and scripts/bundle.sh
+       (docs/packaging.md). Inserted into Info.plist's top-level dict. -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <!-- A .talk package: a sage-talk/1 folder that Finder shows as one document. -->
+      <key>CFBundleTypeName</key><string>SAGE Talk</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>LSTypeIsPackage</key><true/>
+      <key>CFBundleTypeIconFile</key><string>TalkDocument</string>
+      <key>LSItemContentTypes</key><array><string>io.sagelab.talk</string></array>
+    </dict>
+    <dict>
+      <!-- A .talktheme package: a folder holding theme.json, theme.css and fonts/. -->
+      <key>CFBundleTypeName</key><string>SAGE Talk Theme</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>LSTypeIsPackage</key><true/>
+      <key>CFBundleTypeIconFile</key><string>ThemeDocument</string>
+      <key>LSItemContentTypes</key><array><string>io.sagelab.talktheme</string></array>
+    </dict>
+    <dict>
+      <!-- A plain talk folder holding talk.json (sage-talk/1) or a legacy index.html deck:
+           folders dropped on the app or opened with it. -->
+      <key>CFBundleTypeName</key><string>Talk Folder</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key><array><string>public.folder</string></array>
+    </dict>
+    <dict>
+      <!-- A talk's spine: opening talk.json opens its folder. -->
+      <key>CFBundleTypeName</key><string>Talk Spine (talk.json)</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key><array><string>public.json</string></array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>io.sagelab.talk</string>
+      <key>UTTypeDescription</key><string>SAGE Talk</string>
+      <key>UTTypeConformsTo</key><array><string>com.apple.package</string><string>public.composite-content</string></array>
+      <key>UTTypeIconFile</key><string>TalkDocument</string>
+      <key>UTTypeTagSpecification</key>
+      <dict><key>public.filename-extension</key><array><string>talk</string></array></dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key><string>io.sagelab.talktheme</string>
+      <key>UTTypeDescription</key><string>SAGE Talk Theme</string>
+      <key>UTTypeConformsTo</key><array><string>com.apple.package</string><string>public.composite-content</string></array>
+      <key>UTTypeIconFile</key><string>ThemeDocument</string>
+      <key>UTTypeTagSpecification</key>
+      <dict><key>public.filename-extension</key><array><string>talktheme</string></array></dict>
+    </dict>
+  </array>

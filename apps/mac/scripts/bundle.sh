@@ -14,6 +14,12 @@ BIN="$(swift build -c "$CONF" --show-bin-path)/SageTalk"
 APP="build/SageTalk.app"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/SageTalk"
+# Icons and document types as in the release app (.talk / .talktheme packages), cached in build/cache.
+for art in AppIcon TalkDocument ThemeDocument; do
+  bash scripts/make-icns.sh "packaging/$art.svg" "build/cache/$art.icns" $([ "$art" = AppIcon ] || echo --document)
+  cp "build/cache/$art.icns" "$APP/Contents/Resources/"
+done
+DOCUMENT_TYPES="$(cat packaging/document-types.plist.xml)"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -23,10 +29,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>SageTalk</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.0.1</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>NSHighResolutionCapable</key><true/>
+$DOCUMENT_TYPES
 </dict></plist>
 PLIST
+plutil -lint "$APP/Contents/Info.plist" >/dev/null
 REPO="$(cd ../.. && pwd)"
 printf '%s\n' "$REPO" > "$APP/Contents/Resources/sage-repo-path"
 NODE="${SAGE_NODE:-$(command -v node || true)}"

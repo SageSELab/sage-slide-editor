@@ -113,12 +113,11 @@ CHROMIUM_REV="$("$NODE_X/bin/node" -p 'require(process.argv[1]).browsers.find((b
 
 # ---- Info.plist, icon ---------------------------------------------------------------------
 step "Info.plist and icon"
-if [ ! -f "$CACHE/AppIcon.icns" ] || [ packaging/make-icon.swift -nt "$CACHE/AppIcon.icns" ] || [ packaging/AppIcon.svg -nt "$CACHE/AppIcon.icns" ]; then
-  rm -rf "$CACHE/AppIcon.iconset"
-  swift packaging/make-icon.swift "$CACHE/AppIcon.iconset" >/dev/null
-  iconutil -c icns "$CACHE/AppIcon.iconset" -o "$CACHE/AppIcon.icns"
-fi
-cp "$CACHE/AppIcon.icns" "$RES/AppIcon.icns"
+bash scripts/make-icns.sh packaging/AppIcon.svg "$CACHE/AppIcon.icns"
+bash scripts/make-icns.sh packaging/TalkDocument.svg "$CACHE/TalkDocument.icns" --document
+bash scripts/make-icns.sh packaging/ThemeDocument.svg "$CACHE/ThemeDocument.icns" --document
+cp "$CACHE/AppIcon.icns" "$CACHE/TalkDocument.icns" "$CACHE/ThemeDocument.icns" "$RES/"
+DOCUMENT_TYPES="$(cat packaging/document-types.plist.xml)"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -141,24 +140,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticTermination</key><false/>
   <key>NSHumanReadableCopyright</key><string>SAGE Lab</string>
-  <key>CFBundleDocumentTypes</key>
-  <array>
-    <dict>
-      <!-- A talk is a folder holding talk.json (sage-talk/1) or a legacy index.html deck:
-           folders dropped on the app or opened with it. -->
-      <key>CFBundleTypeName</key><string>Talk Folder</string>
-      <key>CFBundleTypeRole</key><string>Editor</string>
-      <key>LSHandlerRank</key><string>Alternate</string>
-      <key>LSItemContentTypes</key><array><string>public.folder</string></array>
-    </dict>
-    <dict>
-      <!-- A talk's spine: opening talk.json opens its folder. -->
-      <key>CFBundleTypeName</key><string>Talk Spine (talk.json)</string>
-      <key>CFBundleTypeRole</key><string>Editor</string>
-      <key>LSHandlerRank</key><string>Alternate</string>
-      <key>LSItemContentTypes</key><array><string>public.json</string></array>
-    </dict>
-  </array>
+$DOCUMENT_TYPES
 </dict>
 </plist>
 PLIST
