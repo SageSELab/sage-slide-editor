@@ -202,6 +202,7 @@ talkc validate talk/ [--render] [--public] [--json] # diagnostics with codes; ex
 talkc layout talk/ [--json] [--public]             # the hold list: "n time label"
 talkc shoot talk/ [--holds] [--around 0.5] [--times 27.5,61.3] [--beats c2.layout] [--no-backups]
                                                    # PNGs in talk/build/shots (also takes an .html film)
+talkc theme talk/ <theme.talktheme>                # apply a theme (references/themes.md)
 talkc publish talk/ [slug]                         # build/public/<slug>.html, self-contained
 ```
 

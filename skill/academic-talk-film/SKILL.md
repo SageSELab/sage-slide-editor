@@ -47,6 +47,7 @@ This copies `assets/starter-v2/`: a minimal working talk (title, one chapter, th
 - **Real data only.** Counters count to the paper's numbers; charts are built from the package's CSVs; code panes show the actual test, patch, or trajectory. Keep the source path in a comment next to the data.
 - **Backups** are a chapter with `"backup": true, "private": true`; the counter shows "Backup n / m".
 - **Dark passages** ("One more thing") are a chapter with `"dark": true, "private": true` whose first beat fades in the `#black` scene; content scenes there carry class `dk`.
+- **Look and fonts come from a theme.** Write slides against the tokens (`var(--ink)`, `var(--a1)`, `var(--display)`, the `.h-*` classes), not literal colors or font names, so a theme can restyle the whole talk. To change the look, apply or create a theme (`references/themes.md`; in the SAGE app, the `talk_theme_*` tools); built-ins are in `assets/themes/`.
 
 ### 4. Check every beat before showing him
 
@@ -102,5 +103,6 @@ Kevin's slides say the fact. Headlines are short claims ("Effectiveness on real 
 - `references/storyboard.md` — the PLAN.md template, the hold budget, and the mapping from holds to beats.
 - `references/gotchas.md` — what the tools cannot catch, and the fixes.
 - `references/publishing.md` — public build, site locations, QR codes, PDF hosting.
+- `references/themes.md` — the `sage-theme/1` theme format, the built-in themes, and how to make one from a description.
 - `references/legacy/` — the v1 API, gotchas, and the finished single-file ISSTA deck and its plan.
 - `evals/` — eval cases for this skill (storyboard and scaffold, split a beat, fix a validator diagnostic, convert a hand-written hold into a beat).

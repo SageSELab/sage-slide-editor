@@ -101,7 +101,7 @@ describe('skill v2 files', () => {
   });
 
   it('every file SKILL.md and the references name exists', () => {
-    const docs = ['SKILL.md', 'references/engine-api.md', 'references/gotchas.md', 'references/storyboard.md', 'references/publishing.md'].map(read).join('\n');
+    const docs = ['SKILL.md', 'references/engine-api.md', 'references/gotchas.md', 'references/storyboard.md', 'references/publishing.md', 'references/themes.md'].map(read).join('\n');
     const named = new Set([...docs.matchAll(/`((?:references|scripts|assets|evals)\/[\w./-]+?)`/g)].map((m) => m[1]!.replace(/\/$/, '')));
     expect(named.size).toBeGreaterThan(8);
     for (const p of named) expect(fs.existsSync(path.join(SKILL, p)), p).toBe(true);
