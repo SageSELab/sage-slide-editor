@@ -24,6 +24,8 @@ struct SageTalkApp: App {
                 Button("Reveal in Finder") { model.revealInFinder() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                     .disabled(model.talk == nil)
+                Button("Convert to .talk Package…") { model.convertToPackage() }
+                    .disabled(!model.canConvertToPackage)
             }
             // Publish and export (PLAN 5.6; TalkWindowModel+Publish.swift).
             CommandGroup(after: .newItem) {
@@ -85,7 +87,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.post(name: .sageOpenPath, object: path)
         }
     }
-    /// Folders and talk.json files from Finder (Open With, a drop on the Dock icon).
+    /// .talk packages, folders and talk.json files from Finder (double-click, Open With, a drop on
+    /// the Dock icon).
     func application(_ application: NSApplication, open urls: [URL]) {
         if let url = urls.first { TalkWindowModel.shared.openDocument(url) }
     }

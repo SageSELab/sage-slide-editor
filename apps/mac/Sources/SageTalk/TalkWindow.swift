@@ -88,6 +88,7 @@ struct TalkWindow: View {
                 }
             }
             TransportBar(model: model)
+            if model.offersPackageConversion { PackageOfferBar(model: model) }
             if let status = model.status {
                 Text(status)
                     .font(.caption).foregroundStyle(.secondary)
@@ -105,5 +106,30 @@ struct TalkWindow: View {
             Text(detail).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity).padding()
+    }
+}
+
+/// The non-modal offer to turn a plain talk folder into a `.talk` package
+/// (TalkWindowModel+Package.swift). Nothing happens until Convert is clicked and confirmed.
+struct PackageOfferBar: View {
+    let model: TalkWindowModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "doc.badge.gearshape").foregroundStyle(.secondary)
+            Text("This talk is a plain folder. As a .talk package, Finder shows it as one document that opens in SAGE Talk.")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 8)
+            Button("Convert to .talk Package…") { model.convertToPackage() }
+                .controlSize(.small)
+                .accessibilityIdentifier("package.convert")
+            Button("Not Now") { model.dismissPackageOffer() }
+                .controlSize(.small).buttonStyle(.borderless)
+                .accessibilityIdentifier("package.dismiss")
+        }
+        .padding(.horizontal, 12).padding(.vertical, 4)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+        .accessibilityIdentifier("package.offer")
     }
 }
