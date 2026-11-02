@@ -12,3 +12,4 @@ spikes/**/logs/
 spikes/**/sandbox/
 tests/golden/out/
 spikes/**/out-*/
+.claude/worktrees/
