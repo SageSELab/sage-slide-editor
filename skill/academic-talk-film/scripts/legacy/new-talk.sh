@@ -1,18 +1,20 @@
 #!/bin/bash
-# Scaffold a talk folder from the skill's assets.
-#   bash new-talk.sh <target-dir> ["Short title"]
+# LEGACY (v1): scaffold a hand-written single-file deck (index.html + talk.js) from assets/legacy/.
+# New talks use ../new-talk.sh (a sage-talk/1 talk folder).
+#   bash legacy/new-talk.sh <target-dir> ["Short title"]
 set -e
-HERE="$(cd "$(dirname "$0")/.." && pwd)"
+HERE="$(cd "$(dirname "$0")/../.." && pwd)"
+LEG="$HERE/assets/legacy"
 DEST="${1:?target directory}"
 TITLE="${2:-Talk}"
 mkdir -p "$DEST/assets" "$DEST/public"
 for f in talk.js talk.css edit.js serve.py build-public.py "Edit talk.command"; do
-  cp "$HERE/assets/$f" "$DEST/$f"
+  cp "$LEG/$f" "$DEST/$f"
 done
 chmod +x "$DEST/serve.py" "$DEST/Edit talk.command" "$DEST/build-public.py"
-cp "$HERE/assets/manrope-latin.woff2" "$DEST/assets/"
+cp "$HERE/assets/starter-v2/assets/manrope-latin.woff2" "$DEST/assets/"
 if [ ! -f "$DEST/index.html" ]; then
-  sed "s/__TITLE__/$(printf '%s' "$TITLE" | sed 's/[&/\]/\\&/g')/g" "$HERE/assets/starter/index.html" > "$DEST/index.html"
+  sed "s/__TITLE__/$(printf '%s' "$TITLE" | sed 's/[&/\]/\\&/g')/g" "$LEG/starter/index.html" > "$DEST/index.html"
 fi
 if [ ! -f "$DEST/README.md" ]; then
 cat > "$DEST/README.md" <<EOF
