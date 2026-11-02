@@ -58,10 +58,13 @@ public struct Hold: Codable, Equatable, Identifiable, Sendable {
     public var chapter: String?
     /// Speaker notes (the engine's `T.cps[i].notes`).
     public var notes: String?
+    /// The beat ref 'chapter.beat' (beat-format talks); nil for legacy decks.
+    public var beat: String?
     public var id: Int { index }
-    public init(index: Int, at: Double, label: String, backup: Bool = false, chapter: String? = nil, notes: String? = nil) {
+    public init(index: Int, at: Double, label: String, backup: Bool = false, chapter: String? = nil, notes: String? = nil,
+                beat: String? = nil) {
         self.index = index; self.at = at; self.label = label; self.backup = backup
-        self.chapter = chapter; self.notes = notes
+        self.chapter = chapter; self.notes = notes; self.beat = beat
     }
 
     /// Parses the engine's `?cplist` output: lines of "n time label".

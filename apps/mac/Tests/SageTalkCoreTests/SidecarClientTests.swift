@@ -136,7 +136,7 @@ actor EventLog {
         let open = try await client.open(URL(fileURLWithPath: "/t"))
         #expect(open.kind == .beatFormat)
         #expect(open.filmURL.path == "/t/build/index.html")
-        #expect(open.holds?.map(\.hold) == [Hold(index: 1, at: 5, label: "Title", chapter: "line")])
+        #expect(open.holds?.map(\.hold) == [Hold(index: 1, at: 5, label: "Title", chapter: "line", beat: "line.title")])
         let sentOpen = try #require(f.last.sent.last)
         #expect(sentOpen.params == ["path": "/t", "watch": true])
     }
