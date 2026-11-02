@@ -1,10 +1,14 @@
 // make-icon.swift — renders packaging/AppIcon.svg (the SAGE Lab leaf on a slide stack) into an
 // .iconset folder at every macOS size; package.sh then runs iconutil. The SVG is full-bleed, so
 // it is inset to the macOS icon grid (the shape fills about 80 % of the canvas) with a soft shadow.
-//   swift packaging/make-icon.swift <out.iconset> [AppIcon.svg]
+// With --document the SVG is a document icon (TalkDocument.svg, ThemeDocument.svg) that already
+// leaves the page's margins, so it is drawn on the whole canvas, with the same shadow.
+//   swift packaging/make-icon.swift <out.iconset> [AppIcon.svg] [--document]
 import AppKit
 
-let args = Array(CommandLine.arguments.dropFirst())
+let argv = Array(CommandLine.arguments.dropFirst())
+let document = argv.contains("--document")
+let args = argv.filter { $0 != "--document" }
 let out = URL(fileURLWithPath: args.first ?? "AppIcon.iconset")
 let svgPath = args.count > 1 ? args[1]
     : URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("AppIcon.svg").path
@@ -21,10 +25,11 @@ func draw(_ px: Int) -> Data? {
     NSGraphicsContext.current = ctx
     ctx.imageInterpolation = .high
     let s = CGFloat(px), inset = s * 0.1
-    let rect = NSRect(x: inset, y: inset * 1.15, width: s - 2 * inset, height: s - 2 * inset)
+    let rect = document ? NSRect(x: 0, y: s * 0.01, width: s, height: s)
+        : NSRect(x: inset, y: inset * 1.15, width: s - 2 * inset, height: s - 2 * inset)
     if px >= 64 {
         let shadow = NSShadow()
-        shadow.shadowColor = NSColor(white: 0, alpha: 0.28)
+        shadow.shadowColor = NSColor(white: 0, alpha: document ? 0.22 : 0.28)
         shadow.shadowBlurRadius = s * 0.02
         shadow.shadowOffset = NSSize(width: 0, height: -s * 0.01)
         shadow.set()

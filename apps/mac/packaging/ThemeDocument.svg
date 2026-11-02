@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+ <!-- .talktheme document icon: the TalkDocument.svg page with the SAGE Lab leaf over a row of
+      palette swatches. Drawn on the full canvas; make-icon.swift adds the shadow. -->
+ <path d="M226 64 H664 L828 228 V932 Q828 960 800 960 H226 Q198 960 198 932 V92 Q198 64 226 64 Z" fill="#ffffff" stroke="#c9d3cd" stroke-width="6" stroke-linejoin="round"/>
+ <path d="M664 64 V200 Q664 228 692 228 H828 Z" fill="#e3efe8" stroke="#c9d3cd" stroke-width="6" stroke-linejoin="round"/>
+ <g transform="translate(345 250) scale(.52)">
+  <path d="M600 30 C520 120 490 200 470 290 C440 420 400 530 260 530 C150 530 80 490 50 430 C15 340 35 240 110 165 C220 60 400 35 600 30Z" fill="#016941" stroke="#111111" stroke-width="30" stroke-linejoin="round"/>
+  <path d="M30 610 C90 420 230 250 400 160" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+ </g>
+ <circle cx="294" cy="740" r="56" fill="#016941" stroke="#111111" stroke-width="8"/>
+ <circle cx="439" cy="740" r="56" fill="#b9d8c8" stroke="#111111" stroke-width="8"/>
+ <circle cx="584" cy="740" r="56" fill="#e3efe8" stroke="#111111" stroke-width="8"/>
+ <circle cx="729" cy="740" r="56" fill="#111111" stroke="#111111" stroke-width="8"/>
+</svg>
