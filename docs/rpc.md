@@ -389,6 +389,78 @@ All four methods run in the request queue, one at a time with builds and edits.
 | -32021 | NotPublished | `site.stage`: `build/public/<slug>.html` does not exist. `data.path` |
 | -32022 | SiteFailed | Not a repository's top folder, a version-control command failed, a YAML file does not parse, nothing to commit |
 
+## Themes and fonts
+
+A theme (`sage-theme/1`) is the look of a whole talk: light and dark palettes, the display, body
+and mono fonts, and an optional type scale. It is shared as a `.talktheme` folder (UTType
+`io.sagelab.talktheme`): `theme.json`, a generated `theme.css`, and `fonts/*.woff2`. The schema
+is `ThemeSchema` in `packages/core/src/theme.ts`; the skill's `references/themes.md` explains
+it for Claude. Its own section of `protocol.ts` (`ThemeMethods`, `ThemeErrorCode`) and of Swift
+(`ThemeProtocol.swift`); fixtures in `tests/rpc/themes/`, checked by `themes-protocol.test.ts`
+and `ThemeProtocolTests.swift`. Source: `packages/sidecar/src/themes/`.
+
+| Method | Params | Result | Errors |
+|---|---|---|---|
+| `theme.validate` | `{path}` (a `.talktheme`) or `{theme}` (a theme.json object) | `{ok, problems: string[], theme?, missingFonts: string[]}` | InvalidParams |
+| `theme.save` | `{path, theme}` | `{path, theme, fonts: string[]}` | InvalidParams, ThemeInvalid, FontFailed |
+| `theme.apply` | `{path}` | `{theme, fonts: string[], edit: EditResult}` | NoTalkOpen, UnsupportedForKind, InvalidParams, ThemeInvalid, FontFailed |
+| `theme.extract` | `{path?, id?, name?, description?}` | `{theme, path?, fonts: string[]}` | NoTalkOpen, UnsupportedForKind, InvalidParams, ThemeInvalid |
+| `fonts.search` | `{query, category?, limit?}` | `{fonts: FontInfo[], catalog: 'cache'\|'network'\|'stale'}` | InvalidParams, FontFailed |
+| `fonts.add` | `{id, weights?, styles?, subset?}` | `{family, fontFamily, files: string[], edit: EditResult}` | NoTalkOpen, UnsupportedForKind, InvalidParams, FontFailed |
+| `fonts.list` | none | `{fonts: {family, id, subset, weights, styles, files}[]}` | NoTalkOpen, UnsupportedForKind |
+
+```ts
+interface FontInfo { id: string /* Fontsource id */; family: string; category: string; weights: number[];
+                     styles: string[]; subsets: string[]; defSubset: string; variable: boolean; license: string }
+```
+
+- **Where the theme goes.** `theme.apply` copies the theme's font files to the talk's
+  `assets/fonts/` and rewrites two marked blocks at the top of the talk's theme file (`theme` in
+  talk.json, default `theme.css`): `/* sage-fonts:begin */ … /* sage-fonts:end */` with one
+  `@font-face` per file, then `/* sage-theme:begin {"id","name"} */ … /* sage-theme:end */` with
+  `:root` and `.dk` custom properties (`--bg`, `--ink`, `--ink-2`, `--ink-3`, `--line`, `--panel`,
+  `--a1..3`, `--display`, `--text`, `--mono`, the type scale `--t-xl … --t-eyebrow`,
+  `--heading-weight`, `--ls-xl … --ls-s`), the dark passage's `#black` backdrop, and the theme's
+  extra `css`. talk.css's type classes read those variables with today's sizes as fallbacks.
+  The theme file is inlined after talk.css, so the blocks override the engine's defaults, and
+  the talk's own rules below them still win. A talk without the blocks renders exactly as
+  before; the SAGE built-in restates talk.css and renders byte-identical frames. Publishing
+  inlines the fonts like any `assets/` file.
+- **Undo.** `theme.apply` and `fonts.add` write like `talk.edit`: every file is announced to the
+  watcher (`source: 'app'`) and written atomically, the talk rebuilds (`talk.built` with
+  `trigger: 'edit'`), and `edit.inverse` goes to `talk.revert`. The inverse restores the theme
+  file only; copied fonts stay in `assets/fonts/`, unreferenced. `edit.changed` lists the
+  fonts written and the theme file. Applying a theme drops the previous theme's `@font-face`
+  rules and keeps fonts added on their own with `fonts.add`. Applying the same theme twice
+  changes nothing (empty inverse).
+- **Fonts.** Google fonts come from the Fontsource API (no key): the catalog
+  `https://api.fontsource.org/v1/fonts`, files
+  `https://cdn.jsdelivr.net/fontsource/fonts/<id>@latest/<subset>-<weight>-<style>.woff2`,
+  saved as `<id>-<subset>-<weight>-<style>.woff2`. Only fonts the catalog reports as `OFL-1.1`
+  or `Apache-2.0` are offered. The catalog is cached for a week and files for good in
+  `~/Library/Caches/io.sagelab.talk/fonts` (`SAGE_FONT_CACHE`); offline, a stale catalog is
+  used. `theme.apply` takes fonts from the package and downloads only missing ones.
+  `fonts.add` defaults to weights 400 and 700 (where the family has them), `normal`, `latin`;
+  `fontFamily` is the CSS value to use, e.g. `Lora, Georgia, "Times New Roman", serif`.
+- **Packages.** `theme.save` writes `theme.json`, the generated `theme.css` (fonts from `fonts/`)
+  and `fonts/`, keeping files already there, downloading missing ones and deleting stale ones.
+  `theme.extract` reads the open talk's look (talk.css's tokens overridden by the theme file's
+  `:root` and `.dk` rules, hand-written or generated); with `path` it saves it, fonts copied
+  from `assets/fonts/`. `theme.validate` with a path also lists missing font files.
+- The library is the app's: built-ins in the skill (`assets/themes/`, read-only), the user's in
+  `~/Library/Application Support/SAGE Talk/Themes` (`SAGE_THEME_LIBRARY` for the sidecar, which
+  saves there for Claude's `talk_theme_create`). `theme.validate`, `theme.save` and
+  `fonts.search` need no open talk and skip the request queue; the others are queued with edits.
+- Claude's tools (`talk_theme_list`, `talk_theme_create`, `talk_theme_apply`,
+  `talk_fonts_search`, `talk_fonts_add`) call the same code with author `claude`, so their
+  changes are reported as `source: 'claude'`.
+- `talkc theme <talk> <theme.talktheme>` applies a package from the command line (no downloads).
+
+| Code | Name | Meaning |
+|---|---|---|
+| -32030 | ThemeInvalid | The theme does not validate. `data.problems`: `field.path: message` |
+| -32031 | FontFailed | A font is not in the catalog (or not embeddable), lacks the weight/style/subset, could not be downloaded, or is not woff2. `data.code`: `unknown-font`, `variant`, `network`, `not-woff2` |
+
 ## Setup (Phase 6)
 
 The onboarding sheet's checks and the render browser download (docs/packaging.md). Source:
