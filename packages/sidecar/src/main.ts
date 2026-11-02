@@ -2,10 +2,13 @@
 // main.ts — the SAGE sidecar process. Speaks NDJSON JSON-RPC 2.0 on stdin/stdout (docs/rpc.md);
 // logs to stderr only. Exits 0 on app.shutdown or when stdin closes (the app quit or crashed).
 //
-// Phase 4 adds the Agent SDK bridge here: a `claude.*` method family (send, interrupt,
-// approve) and `claude.*` notifications (stream deltas, tool rows, cost), plus sidecar -> app
-// requests (`app.ask` for the approval sheet, `app.frame` for talk_frame) through peer.request().
-import { PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, type MethodName, type OpenParams, type WatchParams, type EditParams, type Inverse } from './protocol.ts';
+// Phase 4: the Agent SDK bridge (src/claude/bridge.ts) answers the `claude.*` methods, reports
+// `claude.*` notifications, and asks the app through `app.ask|state|goto` requests.
+import { ClaudeBridge } from './claude/bridge.ts';
+import {
+  PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, claudeParamCheckers,
+  type ClaudeMethodName, type ClaudeSendParams, type MethodName, type OpenParams, type WatchParams, type EditParams, type Inverse,
+} from './protocol.ts';
 import { RpcPeer, type Log } from './rpc.ts';
 import { Session } from './session.ts';
 
@@ -41,7 +44,7 @@ async function shutdown(reason: string, code = 0) {
   // after the input side closes). Requests arriving from here on get ShuttingDown.
   await Promise.race([peer.drain(), deadline]);
   shuttingDown = true;
-  await Promise.race([session.close().then(() => session.idle()), deadline]);
+  await Promise.race([closeBridge().then(() => session.close()).then(() => session.idle()), deadline]);
   process.stdout.write('', () => process.exit(code));
 }
 
@@ -60,14 +63,50 @@ method('app.shutdown', () => {
   setImmediate(() => void shutdown('app.shutdown'));
   return {};
 });
-method('talk.open', (p: OpenParams) => session.open(p));
-method('talk.close', async () => { await session.close(); return {}; });
+method('talk.open', async (p: OpenParams) => { await closeBridge(); return session.open(p); });
+method('talk.close', async () => { await closeBridge(); await session.close(); return {}; });
 method('talk.build', () => session.build());
 method('talk.layout', () => session.layout());
 method('talk.watch', (p: WatchParams) => ({ watching: session.setWatching(p.enabled) }));
 // Editing (Phase 3)
 method('talk.edit', (p: EditParams) => session.edit(p));
 method('talk.revert', (p: Inverse) => session.revert(p));
+
+// --- Claude bridge (Phase 4) ---------------------------------------------------------------
+// One bridge per open talk, created on the first claude.* call and closed with the talk.
+let bridge: ClaudeBridge | null = null;
+async function closeBridge() {
+  const b = bridge;
+  bridge = null;
+  await b?.close().catch((e: Error) => log('warn', `closing the Claude bridge: ${e.message}`));
+}
+function claudeBridge(): ClaudeBridge {
+  const root = session.root;
+  if (!root) throw new RpcError(ErrorCode.NoTalkOpen, 'no talk is open');
+  if (session.kind !== 'beatFormat') throw new RpcError(ErrorCode.UnsupportedForKind, 'Claude works on sage-talk/1 talks', { kind: session.kind });
+  bridge ??= new ClaudeBridge({
+    root,
+    spine: () => session.spine(),
+    layout: () => session.layout(),
+    build: () => session.build(),
+    expectWrite: (rel, content, author) => session.expectWrite(rel, content, author),
+    notify: (m, p) => peer.notify(m, p),
+    request: (m, p, timeoutMs) => peer.request(m, p, timeoutMs),
+    log,
+  });
+  return bridge;
+}
+function claudeMethod<M extends ClaudeMethodName>(name: M, fn: (params: never) => unknown) {
+  peer.handle(name, (params) => {
+    if (shuttingDown) throw new RpcError(ErrorCode.ShuttingDown, 'sidecar is shutting down');
+    const problems = claudeParamCheckers[name](params);
+    if (problems.length) throw new RpcError(ErrorCode.InvalidParams, problems.join('; '), { problems });
+    return fn(params as never);
+  }, { concurrent: true }); // never queued behind a build, so Stop works mid-request
+}
+claudeMethod('claude.send', (p: ClaudeSendParams) => claudeBridge().send(p));
+claudeMethod('claude.interrupt', () => (bridge ? bridge.interrupt() : { interrupted: false }));
+claudeMethod('claude.reset', async () => { await claudeBridge().reset(); return {}; });
 
 peer.onClose(() => void shutdown('stdin closed'));
 process.stdout.on('error', () => void shutdown('stdout closed', 0));
