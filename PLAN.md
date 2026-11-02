@@ -574,6 +574,23 @@ appears as a clean diff in git.
 
 ### Phase 4 — Claude pane and skill v2
 
+Status (2026-11-02, Claude pane done; skill v2, Materials sidebar and the exit run remain):
+the sidecar bridge (`packages/sidecar/src/claude/`) runs one streaming-input `query()` per
+talk with the Phase 0 options; a live run confirmed that `strictMcpConfig` plus
+`settingSources: []` leaves only the app's `talk` server (no claude.ai connectors), that
+`createSdkMcpServer({alwaysLoad: true})` puts the app tools in the first prompt (no
+ToolSearch turn), and that the repo's skill loads as `sage-talk:academic-talk-film` from
+`packages/sidecar/plugin` (a symlink to `skill/academic-talk-film`; a bundled app must copy it
+with symlinks resolved). `maxBudgetUsd` counts spend since its `query()` started and
+`total_cost_usd` is the session's running total (it continues after resume), so a process that
+spent money is recycled after its request. Claude's writes are labelled `claude` by the watcher
+and clear the human's undo stack. The Claude tab streams Markdown, tool rows, inline permission
+cards, cost and context, and the canvas follows Claude's edits unless pinned. Tests: protocol
+fixtures, policy, sessions and fork, a replayed live recording (`tests/claude/`), Swift chat
+model tests, the self-test pane, and an opt-in live smoke (`SAGE_LIVE_CLAUDE=1`). Not done:
+effort control, attachments by drag from a Materials sidebar, `talk_insert_beat` and
+`talk_set_notes`.
+
 Agent SDK bridge, chat UI, permissions sheet, sessions per talk, app tools including
 `talk_frame`, Materials sidebar, live follow of Claude's edits, skill v2 with evals.
 
