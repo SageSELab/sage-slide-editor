@@ -77,6 +77,18 @@ export interface Film {
   close(): Promise<void>;
 }
 
+/**
+ * Which Chromium to launch. Default: Playwright's own build (the golden frames are pinned to it).
+ * The packaged app's sidecar points this elsewhere through the environment (docs/packaging.md):
+ * `SAGE_RENDER_CHANNEL=chrome` uses an installed Google Chrome, `SAGE_RENDER_EXECUTABLE` a
+ * browser binary by path; with neither, Playwright looks in `PLAYWRIGHT_BROWSERS_PATH`.
+ */
+export function browserLaunchOptions(env: NodeJS.ProcessEnv = process.env): { channel?: string; executablePath?: string } {
+  if (env.SAGE_RENDER_EXECUTABLE) return { executablePath: env.SAGE_RENDER_EXECUTABLE };
+  if (env.SAGE_RENDER_CHANNEL) return { channel: env.SAGE_RENDER_CHANNEL };
+  return {};
+}
+
 /** A long-lived headless Chromium. Open many films; close once. */
 export class Renderer {
   readonly browser: Browser;
@@ -86,7 +98,7 @@ export class Renderer {
 
   static async launch(opts: RendererOptions = {}): Promise<Renderer> {
     const o = { width: opts.width ?? 1920, height: opts.height ?? 1080, offline: opts.offline ?? true };
-    const browser = await chromium.launch();
+    const browser = await chromium.launch(browserLaunchOptions());
     const ctx = await browser.newContext({ viewport: { width: o.width, height: o.height }, deviceScaleFactor: 1 });
     if (o.offline) await ctx.route(/^(?!file:|data:|blob:)/, (route) => route.abort('blockedbyclient'));
     return new Renderer(browser, ctx, o);
