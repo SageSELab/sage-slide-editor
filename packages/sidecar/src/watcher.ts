@@ -18,7 +18,9 @@ export function isIgnored(rel: string): boolean {
   const parts = rel.split('/');
   if (parts.some((p) => IGNORED_DIRS.has(p))) return true;
   const base = parts[parts.length - 1] ?? '';
-  return base === '.DS_Store' || base.endsWith('~') || base.endsWith('.swp') || base.endsWith('.swx') || base.startsWith('.#') || /\.tmp-\d+/.test(base);
+  return base === '.DS_Store' || base.endsWith('~') || base.endsWith('.swp') || base.endsWith('.swx') || base.startsWith('.#') || /\.tmp-\d+/.test(base)
+    // Claude's Write/Edit tools write `<file>.tmp.<pid>.<hex>` and rename it over the file.
+    || /\.tmp\.\d+\.[0-9a-f]+$/.test(base);
 }
 
 const hash = (data: Buffer | string) => createHash('sha256').update(data).digest('hex');

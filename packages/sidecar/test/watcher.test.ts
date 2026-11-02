@@ -7,7 +7,7 @@ import { eventually, tempTalk } from './helpers.ts';
 describe('isIgnored', () => {
   it.each([
     ['build/index.html', true], ['.sage/thumbs/1.png', true], ['node_modules/x/y.js', true], ['scenes/.DS_Store', true],
-    ['beats/line.js~', true], ['beats/.line.js.swp', true], ['.sage/tmp/a.tmp-1-2', true],
+    ['beats/line.js~', true], ['beats/.line.js.swp', true], ['.sage/tmp/a.tmp-1-2', true], ['scenes/line.html.tmp.84781.bc19e2d964ab', true], ['scenes/a.tmp.html', false],
     ['scenes/line.html', false], ['talk.json', false], ['assets/faces/a.jpg', false], ['lib/builder.js', false],
   ])('%s -> %s', (rel, want) => expect(isIgnored(rel)).toBe(want));
 });
