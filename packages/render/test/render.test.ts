@@ -56,6 +56,22 @@ describe('openFilm', () => {
   }, 60_000);
 });
 
+describe('offline and live loads', () => {
+  it('blocks network requests and reports them; capture can be turned off', async () => {
+    const f = path.join(tmp, 'net.html');
+    fs.writeFileSync(f, '<!doctype html><img src="https://example.invalid/x.png"><img src="missing.png"><script>window.T = { cps: [], duration: 1, seek() {} }; document.title = location.search;</script>');
+    const film = await renderer.openFilm(f, { capture: false, query: { a: '1' } });
+    try {
+      expect(film.url).toMatch(/net\.html\?a=1$/);
+      const reqs = film.requests();
+      expect(reqs.find((r) => r.url.startsWith('https:'))).toMatchObject({ ok: false, blocked: true });
+      expect(reqs.find((r) => r.url.endsWith('missing.png'))).toMatchObject({ ok: false, blocked: false });
+      expect(reqs.find((r) => r.url.endsWith('net.html?a=1'))).toMatchObject({ ok: true });
+    } finally { await film.close(); }
+    expect(film.url).not.toMatch(/capture/);
+  }, 30_000);
+});
+
 describe('planFrames', () => {
   const holds = [{ index: 1, at: 5, label: 'A', backup: false, id: 'c.a' }, { index: 2, at: 9, label: 'B', backup: true, id: 'c.b' }];
   it('holds, around, times, beats; deduplicated, clamped and sorted', () => {

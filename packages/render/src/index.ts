@@ -19,14 +19,26 @@ export interface RendererOptions {
   /** Viewport, default 1920x1080 (the stage size). */
   width?: number;
   height?: number;
+  /**
+   * Block every request that is not file:, data: or blob: (default true): a frame must never
+   * depend on the network. Blocked and failed requests are listed by Film.requests().
+   */
+  offline?: boolean;
 }
 
 export interface OpenOptions extends RendererOptions {
   /** Share a long-lived browser; without one the film launches its own and closes it on close(). */
   renderer?: Renderer;
-  /** Extra query parameters (`capture` is always set). */
+  /** Extra query parameters. */
   query?: Record<string, string>;
+  /**
+   * Load with ?capture (default true: controls hidden, no autoplay, the deterministic path).
+   * false loads the film as a viewer sees it, for behaviour tests.
+   */
+  capture?: boolean;
 }
+
+export interface RequestRecord { url: string; ok: boolean; blocked: boolean; failure?: string }
 
 export interface Hold {
   /** 1-based hold number, as in `?cplist` and `?cp=N`. */
@@ -58,6 +70,8 @@ export interface Film {
   evaluate<R, A>(fn: (arg: A) => R | Promise<R>, arg: A): Promise<R>;
   /** Uncaught page errors since load (cleared by reload). */
   errors(): string[];
+  /** Every request since load except data: URLs, with whether it failed or was blocked. */
+  requests(): RequestRecord[];
   /** Reload the film (after a rebuild); holds and duration are re-read. */
   reload(): Promise<void>;
   close(): Promise<void>;
@@ -71,9 +85,10 @@ export class Renderer {
   private constructor(browser: Browser, ctx: BrowserContext, opts: Required<RendererOptions>) { this.browser = browser; this.ctx = ctx; this.opts = opts; }
 
   static async launch(opts: RendererOptions = {}): Promise<Renderer> {
-    const o = { width: opts.width ?? 1920, height: opts.height ?? 1080 };
+    const o = { width: opts.width ?? 1920, height: opts.height ?? 1080, offline: opts.offline ?? true };
     const browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: o.width, height: o.height }, deviceScaleFactor: 1 });
+    if (o.offline) await ctx.route(/^(?!file:|data:|blob:)/, (route) => route.abort('blockedbyclient'));
     return new Renderer(browser, ctx, o);
   }
 
@@ -82,7 +97,7 @@ export class Renderer {
   async openFilm(htmlPath: string, opts: Omit<OpenOptions, 'renderer'> = {}): Promise<Film> {
     const page = await this.ctx.newPage();
     if (opts.width || opts.height) await page.setViewportSize({ width: opts.width ?? this.opts.width, height: opts.height ?? this.opts.height });
-    const film = new PageFilm(page, path.resolve(htmlPath), opts.query ?? {});
+    const film = new PageFilm(page, path.resolve(htmlPath), opts.query ?? {}, opts.capture ?? true);
     try { await film.load(); } catch (e) { await page.close(); throw e; }
     return film;
   }
@@ -90,10 +105,9 @@ export class Renderer {
   async close(): Promise<void> { await this.browser.close(); }
 }
 
-export const filmUrl = (htmlPath: string, query: Record<string, string> = {}): string => {
-  const q = new URLSearchParams(query);
-  const rest = q.toString();
-  return pathToFileURL(path.resolve(htmlPath)).href + '?capture' + (rest ? '&' + rest : '');
+export const filmUrl = (htmlPath: string, query: Record<string, string> = {}, capture = true): string => {
+  const q = [capture ? 'capture' : '', new URLSearchParams(query).toString()].filter(Boolean).join('&');
+  return pathToFileURL(path.resolve(htmlPath)).href + (q ? '?' + q : '');
 };
 
 class PageFilm implements Film {
@@ -101,19 +115,26 @@ class PageFilm implements Film {
   duration = 0;
   private cps: Hold[] = [];
   private errs: string[] = [];
+  private reqs: RequestRecord[] = [];
   onClose: (() => Promise<void>) | null = null;
 
   readonly htmlPath: string;
   private readonly page: Page;
-  constructor(page: Page, htmlPath: string, query: Record<string, string>) {
+  constructor(page: Page, htmlPath: string, query: Record<string, string>, capture: boolean) {
     this.page = page; this.htmlPath = htmlPath;
-    this.url = filmUrl(htmlPath, query);
+    this.url = filmUrl(htmlPath, query, capture);
     page.on('pageerror', (e) => this.errs.push(String(e)));
+    page.on('requestfailed', (r) => {
+      if (r.url().startsWith('data:')) return;
+      const failure = r.failure()?.errorText ?? 'failed';
+      this.reqs.push({ url: r.url(), ok: false, blocked: /blockedbyclient|BLOCKED_BY_CLIENT/i.test(failure), failure });
+    });
+    page.on('requestfinished', (r) => { if (!r.url().startsWith('data:')) this.reqs.push({ url: r.url(), ok: true, blocked: false }); });
   }
 
   async load(): Promise<void> {
     if (!fs.existsSync(this.htmlPath)) throw new Error(`no such film: ${this.htmlPath}`);
-    this.errs = [];
+    this.errs = []; this.reqs = [];
     await this.page.goto(this.url, { waitUntil: 'load' });
     const info = await this.page.evaluate(() => {
       const T = (window as unknown as { T?: { cps: { at: number; label: string; backup?: boolean; id?: string }[]; duration: number } }).T;
@@ -128,6 +149,7 @@ class PageFilm implements Film {
 
   holds(): Hold[] { return this.cps.map((c) => ({ ...c })); }
   errors(): string[] { return [...this.errs]; }
+  requests(): RequestRecord[] { return this.reqs.map((r) => ({ ...r })); }
 
   private async settle(): Promise<void> {
     await this.page.evaluate(async () => {
