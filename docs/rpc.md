@@ -266,7 +266,7 @@ The chat pane's protocol. It lives in its own section of `protocol.ts` (`ClaudeM
 
 | Method | Params | Result | Errors |
 |---|---|---|---|
-| `claude.send` | `{text: string, attachments?: string[], effort?: 'low'\|'medium'\|'high'\|'xhigh'\|'max'}` | `{turn}` | NoTalkOpen, UnsupportedForKind (legacy), InvalidParams |
+| `claude.send` | `{text: string, attachments?: string[], effort?: 'low'\|'medium'\|'high'\|'xhigh'\|'max', model?: string}` | `{turn}` | NoTalkOpen, UnsupportedForKind (legacy), InvalidParams |
 | `claude.interrupt` | none | `{interrupted: boolean}` | |
 | `claude.reset` | none | `{}` | NoTalkOpen |
 
@@ -277,6 +277,10 @@ The chat pane's protocol. It lives in its own section of `protocol.ts` (`ClaudeM
   and later requests: a new process starts with it; an idle live one switches with
   `Query.applyFlagSettings({effortLevel})` (no restart, so the conversation and cache stay); a
   change sent while a request runs waits for the next idle send.
+- `model` is a Claude model id (`claude-fable-5-1`, `claude-opus-5-5`, `claude-sonnet-5-5`,
+  `claude-haiku-5-5`; any `claude-…` id passes validation). It applies the same way: a new process
+  starts with it, an idle live one switches with `Query.setModel` (else it restarts and resumes
+  the conversation), and a change sent mid-request waits. The default is `claude-opus-5-5`.
 - The `claude.*` methods skip the request queue (like `app.ping`), so Stop works while a build
   runs. The bridge is created on the first `claude.*` call and closed by `talk.open`,
   `talk.close` and shutdown.

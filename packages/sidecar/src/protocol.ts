@@ -582,7 +582,14 @@ export interface ClaudeSendParams {
    * `effort` option; a running conversation switches with Query.applyFlagSettings. Absent: unchanged.
    */
   effort?: ClaudeEffort;
+  /**
+   * Model for this and later requests (the pane's model menu): a Claude model id such as
+   * `claude-fable-5-1`. A running conversation switches with Query.setModel. Absent: unchanged.
+   */
+  model?: string;
 }
+/** The models the pane offers, most capable first (any `claude-` id is accepted). */
+export const CLAUDE_MODELS = ['claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'] as const;
 export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ClaudeEffort = (typeof CLAUDE_EFFORTS)[number];
 export interface ClaudeSendResult {
@@ -723,8 +730,9 @@ function shape(v: unknown, at: string, required: string[], optional: string[], b
 }
 
 export const claudeParamCheckers: { [M in ClaudeMethodName]: (p: unknown) => Problems } = {
-  'claude.send': (p) => shape(p, 'params', ['text'], ['attachments', 'effort'], (v) => [
+  'claude.send': (p) => shape(p, 'params', ['text'], ['attachments', 'effort', 'model'], (v) => [
     ...want(typeof v.text === 'string' && v.text.trim().length > 0, 'params.text: expected a non-empty string'),
+    ...(v.model === undefined ? [] : want(typeof v.model === 'string' && /^claude-[a-z0-9.-]+(\[1m\])?$/.test(v.model), 'params.model: expected a Claude model id (claude-...)')),
     ...(v.effort === undefined ? [] : oneOf(v.effort, CLAUDE_EFFORTS, 'params.effort')),
     ...(v.attachments === undefined ? [] : checkList(v.attachments, 'params.attachments', (x, at) => want(typeof x === 'string' && x.length > 0, `${at}: expected a path`))),
   ]),

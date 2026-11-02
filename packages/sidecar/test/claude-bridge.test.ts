@@ -16,7 +16,7 @@ const toolResult = (id: string, text: string, isError = false): SDKMessage => ({
 const result = (total: number, extra: object = {}): SDKMessage => ({ type: 'result', subtype: 'success', is_error: false, total_cost_usd: total, duration_ms: 1200, num_turns: 2, usage: { input_tokens: 10, output_tokens: 60, cache_read_input_tokens: 2000, cache_creation_input_tokens: 300 }, session_id: SID, ...extra } as unknown as SDKMessage);
 
 /** A query() whose output per user message is scripted; records options and prompts. */
-function scripted(turns: ((o: Options) => SDKMessage[] | Promise<SDKMessage[]>)[], opts: { throwAfter?: string; flags?: unknown[] } = {}) {
+function scripted(turns: ((o: Options) => SDKMessage[] | Promise<SDKMessage[]>)[], opts: { throwAfter?: string; flags?: unknown[]; models?: unknown[] } = {}) {
   const calls: { options: Options; prompts: string[]; closed: boolean }[] = [];
   let turn = 0;
   const fn: QueryFn = ({ prompt, options }) => {
@@ -39,6 +39,7 @@ function scripted(turns: ((o: Options) => SDKMessage[] | Promise<SDKMessage[]>)[
     const g = gen();
     const q: QueryLike = { [Symbol.asyncIterator]: () => g, interrupt: async () => undefined, close: () => { rec.closed = true; void it.return?.(); } };
     if (opts.flags) q.applyFlagSettings = async (f) => { opts.flags!.push(f); };
+    if (opts.models) q.setModel = async (m) => { opts.models!.push(m); };
     return q;
   };
   return { fn, calls };
@@ -49,7 +50,7 @@ const noFrames: FrameRenderer = { render: async (_h, shots) => { for (const s of
 let cleanup: (() => void) | null = null;
 afterEach(() => { cleanup?.(); cleanup = null; });
 
-function setup(turns: Parameters<typeof scripted>[0], o: { throwAfter?: string; ask?: string; flags?: unknown[] } = {}) {
+function setup(turns: Parameters<typeof scripted>[0], o: { throwAfter?: string; ask?: string; flags?: unknown[]; models?: unknown[] } = {}) {
   const t = tempTalk();
   cleanup = t.cleanup;
   const notes: { method: string; params: Record<string, unknown> }[] = [];
@@ -240,6 +241,34 @@ describe('ClaudeBridge', () => {
     expect(s.q.calls).toHaveLength(2);
     expect(s.q.calls[0]!.closed).toBe(true);
     expect(s.q.calls[1]!.options).toMatchObject({ effort: 'low', resume: SID });
+  });
+
+  it('model: the default on the first query, setModel on a live one, a restart without it', async () => {
+    const models: unknown[] = [];
+    const s = setup([() => [result(0)], () => [result(0)], () => [result(0)]], { models });
+    await s.bridge.send({ text: 'one' });
+    await s.waitResult(1);
+    expect(s.q.calls[0]!.options.model).toBe('claude-opus-5-5');
+    await s.bridge.send({ text: 'two', model: 'claude-opus-5-5' });
+    await s.waitResult(2);
+    expect(models).toEqual([]);
+    await s.bridge.send({ text: 'three', model: 'claude-fable-5-1' });
+    await s.waitResult(3);
+    expect(models).toEqual(['claude-fable-5-1']);
+    expect(s.q.calls).toHaveLength(1);
+    expect(s.bridge.model).toBe('claude-fable-5-1');
+  });
+
+  it('model: a query without setModel is restarted on the new model, resuming', async () => {
+    const s = setup([() => [result(0)], () => [result(0)]]);
+    await s.bridge.send({ text: 'one', model: 'claude-fable-5-1' });
+    await s.waitResult(1);
+    expect(s.q.calls[0]!.options.model).toBe('claude-fable-5-1');
+    await s.bridge.send({ text: 'two', model: 'claude-sonnet-5-5' });
+    await s.waitResult(2);
+    expect(s.q.calls).toHaveLength(2);
+    expect(s.q.calls[0]!.closed).toBe(true);
+    expect(s.q.calls[1]!.options).toMatchObject({ model: 'claude-sonnet-5-5', resume: SID });
   });
 
   it('serves the app tools: talk_goto and talk_frame move the canvas; talk_layout lists holds', async () => {

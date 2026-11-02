@@ -75,6 +75,8 @@ export interface QueryLike extends AsyncIterable<SDKMessage> {
   close(): void;
   /** Session-scoped settings overlay (SDK Query.applyFlagSettings): used to switch effort live. */
   applyFlagSettings?(settings: { effortLevel?: ClaudeEffort | null }): Promise<void>;
+  /** SDK Query.setModel: used to switch the model live (the conversation stays). */
+  setModel?(model?: string): Promise<void>;
 }
 export type QueryFn = (p: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => QueryLike;
 
@@ -127,10 +129,10 @@ export class InputQueue implements AsyncIterable<SDKUserMessage> {
   }
 }
 
-interface Live { q: QueryLike; input: InputQueue; plan: ResumePlan; spent: number; done: Promise<void>; effort: ClaudeEffort | undefined }
+interface Live { q: QueryLike; input: InputQueue; plan: ResumePlan; spent: number; done: Promise<void>; effort: ClaudeEffort | undefined; model: string }
 
 export class ClaudeBridge {
-  readonly model: string;
+  private modelId: string;
   readonly budgetUsd: number;
   readonly pluginDir: string;
   private live: Live | null = null;
@@ -147,7 +149,7 @@ export class ClaudeBridge {
   private effortLevel: ClaudeEffort | undefined;
 
   constructor(private host: BridgeHost, private opts: BridgeOptions = {}) {
-    this.model = opts.model ?? DEFAULT_MODEL;
+    this.modelId = opts.model ?? DEFAULT_MODEL;
     const envBudget = Number(process.env.SAGE_CLAUDE_BUDGET_USD);
     this.budgetUsd = opts.budgetUsd ?? (envBudget > 0 ? envBudget : DEFAULT_BUDGET_USD);
     this.pluginDir = opts.pluginDir ?? process.env.SAGE_PLUGIN_DIR ?? DEFAULT_PLUGIN_DIR;
@@ -180,6 +182,8 @@ export class ClaudeBridge {
   }
 
   get isRunning() { return this.running; }
+  /** The model the next request runs on (claude.send's `model` changes it). */
+  get model() { return this.modelId; }
   /** The effort the next request runs at (undefined: the model's default). */
   get effort() { return this.effortLevel; }
   get totalCost() { return this.translator.totalCost; }
@@ -196,6 +200,8 @@ export class ClaudeBridge {
     if (p.effort) this.effortLevel = p.effort;
     // Mid-request the change waits for the next message (a restart would end the running request).
     if (this.live && !this.running && this.live.effort !== this.effortLevel) await this.switchEffort(this.live);
+    if (p.model) this.modelId = p.model;
+    if (this.live && !this.running && this.live.model !== this.modelId) await this.switchModel(this.live);
     const live = await this.ensureLive();
     const text = p.attachments?.length
       ? `${p.text}\n\nAttached files:\n${p.attachments.map((a) => `- ${absFrom(this.host.root, a)}`).join('\n')}`
@@ -206,6 +212,24 @@ export class ClaudeBridge {
     this.host.notify('claude.status', { state: 'running' });
     live.input.push({ type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null, origin: { kind: 'human' } } as SDKUserMessage);
     return { turn: this.turns };
+  }
+
+  /**
+   * Moves a live process to the requested model: Query.setModel when the query supports it
+   * (no restart), else the process is recycled and the next one starts with the `model` option
+   * (the conversation resumes).
+   */
+  private async switchModel(live: Live) {
+    const model = this.modelId;
+    if (live.q.setModel) {
+      try {
+        await live.q.setModel(model);
+        live.model = model;
+        this.host.log('info', `model set to ${model}`);
+        return;
+      } catch (e) { this.host.log('warn', `setModel failed (${(e as Error).message}); restarting the query`); }
+    }
+    await this.stopLive();
   }
 
   /**
@@ -360,7 +384,7 @@ export class ClaudeBridge {
       tools: this.tools.map((t) => tool(t.name, t.description, t.shape, (args) => t.handler(args as Record<string, unknown>) as never)),
     });
     const o: Options = {
-      model: this.model,
+      model: this.modelId,
       cwd: this.host.root,
       additionalDirectories: this.materials.dirs,
       env: { ...(this.opts.env ?? process.env), CLAUDE_AGENT_SDK_CLIENT_APP: 'sage-talk-editor/0.1.0' },
@@ -399,7 +423,7 @@ export class ClaudeBridge {
     this.host.notify('claude.status', { state: 'starting', ...(notes.length ? { message: notes.join('; ') } : {}) });
     const input = new InputQueue();
     const q = (this.opts.queryFn ?? (sdkQuery as unknown as QueryFn))({ prompt: input, options });
-    const live: Live = { q, input, plan, spent: 0, done: Promise.resolve(), effort: this.effortLevel };
+    const live: Live = { q, input, plan, spent: 0, done: Promise.resolve(), effort: this.effortLevel, model: this.modelId };
     live.done = this.pump(live);
     this.live = live;
     return live;

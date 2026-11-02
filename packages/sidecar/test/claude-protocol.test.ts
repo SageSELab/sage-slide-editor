@@ -58,6 +58,8 @@ describe('Claude validators reject drift', () => {
     expect(claudeParamCheckers['claude.send']({ text: '  ' })).toEqual(['params.text: expected a non-empty string']);
     expect(claudeParamCheckers['claude.send']({ text: 'x', files: [] })).toEqual(["params: unexpected 'files'"]);
     expect(claudeParamCheckers['claude.send']({ text: 'x', effort: 'huge' })).toEqual(['params.effort: bad value']);
+    expect(claudeParamCheckers['claude.send']({ text: 'x', model: 'gpt-5' })).toEqual(['params.model: expected a Claude model id (claude-...)']);
+    expect(claudeParamCheckers['claude.send']({ text: 'x', model: 'claude-fable-5-1' })).toEqual([]);
     expect(claudeNotificationCheckers['claude.tool']({ id: 'a', name: 'Edit', summary: '', status: 'ok' })).toEqual(['params.status: bad value']);
     expect(claudeNotificationCheckers['claude.tool']({ id: 'a', name: 'Edit', summary: '', status: 'done', path: '/abs' })).toEqual(['params.path: expected a relative path']);
     expect(appRequestResultCheckers['app.ask']({ decision: 'always' })).toEqual(['result.decision: bad value']);
