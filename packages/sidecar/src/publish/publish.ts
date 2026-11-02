@@ -6,7 +6,7 @@
 // is not a leak.
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_ENGINE_DIR, ENGINE_FILES, loadTalk, privateNeedles, publishTalk, type Diagnostic as CoreDiagnostic } from '@sage/core';
+import { defaultEngineDir, ENGINE_FILES, loadTalk, privateNeedles, publishTalk, type Diagnostic as CoreDiagnostic } from '@sage/core';
 import { RpcError, PublishErrorCode, type Diagnostic, type PublishResult } from '../protocol.ts';
 
 /** `My Talk (v2)` -> `my-talk-v2`. */
@@ -29,7 +29,7 @@ export function publishOpenTalk(root: string, slug = slugify(path.basename(root)
   const warnings = diagnostics.filter((d) => d.severity !== 'error');
   const html = fs.readFileSync(r.outFile, 'utf8');
   const reported = new Set(warnings.map((w) => w.message));
-  const engine = ENGINE_FILES.map((f) => { try { return fs.readFileSync(path.join(DEFAULT_ENGINE_DIR, f), 'utf8'); } catch { return ''; } }).join('\n');
+  const engine = ENGINE_FILES.map((f) => { try { return fs.readFileSync(path.join(defaultEngineDir(), f), 'utf8'); } catch { return ''; } }).join('\n');
   for (const n of privateNeedles(loadTalk(root))) {
     if (!html.includes(n.text) || engine.includes(n.text)) continue;
     const message = `${n.what} "${n.text}" appears in the published page`;
