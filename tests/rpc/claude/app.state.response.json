@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "t": 5,
+    "playing": false,
+    "hold": 1,
+    "beat": "line.title",
+    "label": "Title",
+    "selection": [],
+    "pinned": false
+  }
+}

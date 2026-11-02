@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "claude.status",
+  "params": {
+    "state": "running",
+    "sessionId": "6f1c2c1e-3c1b-4f53-9a51-0c6f0e9a1d10",
+    "model": "claude-opus-5-5",
+    "skillLoaded": true
+  }
+}

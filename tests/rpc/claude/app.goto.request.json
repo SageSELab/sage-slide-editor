@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "app.goto",
+  "params": {
+    "t": 13.5,
+    "beat": "line.fifteen"
+  }
+}

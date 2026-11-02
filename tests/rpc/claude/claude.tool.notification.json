@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "claude.tool",
+  "params": {
+    "id": "toolu_01Frame",
+    "name": "talk_frame",
+    "summary": "beat line.title",
+    "status": "running",
+    "beat": "line.title"
+  }
+}

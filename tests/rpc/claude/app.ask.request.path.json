@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "app.ask",
+  "params": {
+    "tool": "Write",
+    "title": "Claude wants to use Write: /Users/someone/paper/notes.txt",
+    "summary": "/Users/someone/paper/notes.txt",
+    "path": "/Users/someone/paper/notes.txt",
+    "reason": "Writes outside the talk folder need your approval.",
+    "scope": "Write in ../paper"
+  }
+}

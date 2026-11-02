@@ -1,0 +1,148 @@
+import Foundation
+
+// The Claude section of the sidecar protocol (Phase 4; packages/sidecar/src/protocol.ts,
+// docs/rpc.md "Claude"). Kept apart from SidecarProtocol so other protocol additions merge
+// cleanly. Fixtures: tests/rpc/claude/*.json, decoded by ClaudeProtocolTests.
+
+public enum ClaudeProtocol {
+    public enum Method {
+        public static let send = "claude.send"
+        public static let interrupt = "claude.interrupt"
+        public static let reset = "claude.reset"
+    }
+
+    public enum Notification {
+        public static let status = "claude.status"
+        public static let delta = "claude.delta"
+        public static let tool = "claude.tool"
+        public static let result = "claude.result"
+        public static let all = [status, delta, tool, result]
+    }
+
+    /// Requests the sidecar sends to the app.
+    public enum AppRequest {
+        public static let ask = "app.ask"
+        public static let state = "app.state"
+        public static let goto = "app.goto"
+    }
+
+    public struct SendParams: Codable, Equatable, Sendable {
+        public var text: String
+        public var attachments: [String]?
+        public init(text: String, attachments: [String]? = nil) { self.text = text; self.attachments = attachments }
+    }
+    public struct SendResult: Codable, Equatable, Sendable { public var turn: Int }
+    public struct InterruptResult: Codable, Equatable, Sendable { public var interrupted: Bool }
+
+    public enum State: String, Codable, Sendable { case idle, starting, running, error }
+
+    public struct StatusParams: Codable, Equatable, Sendable {
+        public var state: State
+        public var sessionId: String?
+        public var model: String?
+        public var message: String?
+        public var skillLoaded: Bool?
+        public init(state: State, sessionId: String? = nil, model: String? = nil, message: String? = nil, skillLoaded: Bool? = nil) {
+            self.state = state; self.sessionId = sessionId; self.model = model; self.message = message; self.skillLoaded = skillLoaded
+        }
+    }
+
+    public struct DeltaParams: Codable, Equatable, Sendable {
+        public var text: String
+        public init(text: String) { self.text = text }
+    }
+
+    public enum ToolStatus: String, Codable, Sendable { case running, done, error, denied }
+
+    public struct ToolParams: Codable, Equatable, Sendable {
+        public var id: String
+        public var name: String
+        public var summary: String
+        public var status: ToolStatus
+        public var detail: String?
+        public var path: String?
+        public var beat: String?
+        public init(id: String, name: String, summary: String, status: ToolStatus, detail: String? = nil, path: String? = nil, beat: String? = nil) {
+            self.id = id; self.name = name; self.summary = summary; self.status = status; self.detail = detail; self.path = path; self.beat = beat
+        }
+    }
+
+    public struct Usage: Codable, Equatable, Sendable {
+        public var inputTokens: Int
+        public var outputTokens: Int
+        public var cacheReadTokens: Int
+        public var cacheCreationTokens: Int
+        public var contextTokens: Int
+    }
+
+    public enum ErrorKind: String, Codable, Sendable { case budget, maxTurns = "max_turns", execution, interrupted, process }
+
+    public struct ResultError: Codable, Equatable, Sendable {
+        public var kind: ErrorKind
+        public var message: String
+    }
+
+    public struct ResultParams: Codable, Equatable, Sendable {
+        public var cost: Double
+        public var totalCost: Double
+        public var usage: Usage
+        public var sessionId: String
+        public var durationMs: Double
+        public var turns: Int
+        public var error: ResultError?
+    }
+
+    public struct AskParams: Codable, Equatable, Sendable {
+        public var tool: String
+        public var title: String
+        public var summary: String
+        public var path: String?
+        public var reason: String
+        public var scope: String
+        public init(tool: String, title: String, summary: String, path: String? = nil, reason: String, scope: String) {
+            self.tool = tool; self.title = title; self.summary = summary; self.path = path; self.reason = reason; self.scope = scope
+        }
+    }
+
+    public enum AskDecision: String, Codable, Sendable { case allow, allowTalk, deny }
+    public struct AskResult: Codable, Equatable, Sendable {
+        public var decision: AskDecision
+        public init(decision: AskDecision) { self.decision = decision }
+    }
+
+    public struct StateResult: Codable, Equatable, Sendable {
+        public var t: Double
+        public var playing: Bool
+        public var hold: Int?
+        public var beat: String?
+        public var label: String?
+        public var selection: [String]
+        public var pinned: Bool
+        public init(t: Double, playing: Bool, hold: Int? = nil, beat: String? = nil, label: String? = nil, selection: [String] = [], pinned: Bool) {
+            self.t = t; self.playing = playing; self.hold = hold; self.beat = beat; self.label = label; self.selection = selection; self.pinned = pinned
+        }
+    }
+
+    public struct GotoParams: Codable, Equatable, Sendable {
+        public var t: Double
+        public var beat: String?
+    }
+    public struct GotoResult: Codable, Equatable, Sendable {
+        public var t: Double
+        public init(t: Double) { self.t = t }
+    }
+}
+
+extension SidecarClient {
+    public func claudeSend(_ text: String, attachments: [String]? = nil) async throws -> ClaudeProtocol.SendResult {
+        try await call(ClaudeProtocol.Method.send, ClaudeProtocol.SendParams(text: text, attachments: attachments))
+    }
+
+    public func claudeInterrupt() async throws -> ClaudeProtocol.InterruptResult {
+        try await call(ClaudeProtocol.Method.interrupt)
+    }
+
+    public func claudeReset() async throws {
+        let _: SidecarProtocol.Empty = try await call(ClaudeProtocol.Method.reset)
+    }
+}

@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "talk.changed",
+  "params": {
+    "paths": [
+      "scenes/line.html"
+    ],
+    "source": "claude"
+  }
+}

@@ -14,12 +14,12 @@ has a fixture in `tests/rpc/`, and both test suites decode the same files (PLAN 
   and never protocol messages. `SAGE_LOG=debug|info|warn|error` sets the level.
 - Swift encodes with sorted keys and unescaped slashes. Key order carries no meaning.
 - `jsonrpc` is always `"2.0"`. Ids are integers chosen by the requester.
-- Either side may send requests. In protocol 1 only the app does. From Phase 4 the sidecar also
-  sends requests to the app (approval sheet, frame capture). The Swift client answers them
+- Either side may send requests. The sidecar sends `app.ask`, `app.state` and `app.goto` for the
+  Claude pane (section "Claude"). The Swift client answers them
   through `setRequestHandler`, or with `-32601` when no handler is set.
 - Every result is a JSON object, never `null`. Empty results are `{}`.
 - Requests are handled one at a time in arrival order, so `talk.open` followed by `talk.layout`
-  without waiting is safe. `app.ping` skips the queue.
+  without waiting is safe. `app.ping` and the `claude.*` methods skip the queue.
 
 | Message | Shape |
 |---|---|
@@ -95,7 +95,7 @@ Notes:
 
 | Notification | Params |
 |---|---|
-| `talk.changed` | `{paths: string[], source: 'app' \| 'external'}` |
+| `talk.changed` | `{paths: string[], source: 'app' \| 'claude' \| 'external'}` |
 | `talk.built` | `{ok, diagnostics, ms, trigger: 'open' \| 'request' \| 'change' \| 'edit', holds?}` |
 
 The folder watcher uses `fs.watch` with `recursive`, which is FSEvents on macOS. It debounces
@@ -117,8 +117,9 @@ it calls `expectWrite(path, content)` and then writes atomically: a temp file un
 `.sage/tmp/`, then a rename (`atomicAppWrite` in `watcher.ts`). The watcher labels a changed
 path `app` only when its current content hashes to the announced content, within 5 s. Anything
 else is `external`, including a terminal edit that lands right after an app write. Phase 3
-edits use this path. Phase 4 Claude edits arrive through the Agent SDK's Edit tool and are
-`external` to the watcher. The bridge can label them separately from its `PostToolUse` hook.
+edits use this path. Claude's edits arrive through the Agent SDK's Write and Edit tools; the
+bridge announces them with author `claude` (the predicted content from `canUseTool`, then the
+actual content from its `PostToolUse` hook), so they are reported as `source: "claude"`.
 
 ## Error codes
 
@@ -237,12 +238,72 @@ The app drives it with `SageCanvas.enable()`, `disable()`, `select(id, {silent})
 the selection after a reload) and `key(name, {shift})` (keys the app's menus catch first).
 `packages/engine/test/canvas.test.ts` records these messages in Playwright WebKit.
 
-## Phase 4 additions (not in protocol 1)
+## Claude (Phase 4)
 
-- Methods: `claude.send {text, attachments}`, `claude.interrupt`, `claude.respond {requestId,
-  allow, scope}`.
-- Notifications: `claude.delta` (text and tool-input deltas from `includePartialMessages`),
-  `claude.tool` (tool rows, including `PostToolUse` edits with `structuredPatch`),
-  `claude.result` (cost, `permission_denials`, errors such as `error_max_budget_usd`).
-- Sidecar-to-app requests: `app.ask` (the approval sheet behind `canUseTool`), `app.state`
-  (for `talk_state`), `app.frame` and `app.goto` (for `talk_frame` and `talk_goto`).
+The chat pane's protocol. It lives in its own section of `protocol.ts` (`ClaudeMethods`,
+`ClaudeNotifications`, `AppRequests`) and of Swift (`ClaudeProtocol` in
+`ClaudeProtocol.swift`); fixtures are in `tests/rpc/claude/`, checked by
+`claude-protocol.test.ts` and `ClaudeProtocolTests.swift`. The bridge is
+`packages/sidecar/src/claude/` (PLAN 6).
+
+### Methods (app to sidecar)
+
+| Method | Params | Result | Errors |
+|---|---|---|---|
+| `claude.send` | `{text: string, attachments?: string[]}` | `{turn}` | NoTalkOpen, UnsupportedForKind (legacy), InvalidParams |
+| `claude.interrupt` | none | `{interrupted: boolean}` | |
+| `claude.reset` | none | `{}` | NoTalkOpen |
+
+- `claude.send` replies at once; the answer streams as notifications and ends with one
+  `claude.result`. A send while a request is running is queued by the SDK and answered after it.
+  Attachments are absolute or talk-relative paths, listed under the message text.
+- The `claude.*` methods skip the request queue (like `app.ping`), so Stop works while a build
+  runs. The bridge is created on the first `claude.*` call and closed by `talk.open`,
+  `talk.close` and shutdown.
+- `claude.reset` ends the conversation and deletes `.sage/session.json`.
+
+### Notifications (sidecar to app)
+
+| Notification | Params |
+|---|---|
+| `claude.status` | `{state: 'idle'\|'starting'\|'running'\|'error', sessionId?, model?, message?, skillLoaded?}` |
+| `claude.delta` | `{text}`: Markdown to append to the current assistant message |
+| `claude.tool` | `{id, name, summary, status: 'running'\|'done'\|'error'\|'denied', detail?, path?, beat?}` |
+| `claude.result` | `{cost, totalCost, usage: {inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, contextTokens}, sessionId, durationMs, turns, error?: {kind: 'budget'\|'max_turns'\|'execution'\|'interrupted'\|'process', message}}` |
+
+- `claude.tool` is sent when a call starts (`running`) and again when it ends, with the same
+  `id`. `name` drops the app server prefix (`talk_frame`). `path` is talk-relative, for file
+  tools inside the talk. `beat` is the beat a Write or Edit touched (or the beat `talk_goto` and
+  `talk_frame` moved to): the canvas follows it unless the user pinned the canvas.
+- `cost` is this request's spend; `totalCost` is the conversation's spend since the sidecar
+  started. `contextTokens` is the context size of the request's last model call.
+- `error.kind: 'budget'` is the SDK's `error_max_budget_usd`: the request hit `maxBudgetUsd`
+  (default 2 USD, `SAGE_CLAUDE_BUDGET_USD`). `process` means the SDK process failed before it
+  produced a result.
+
+### Requests (sidecar to app)
+
+| Request | Params | Result |
+|---|---|---|
+| `app.ask` | `{tool, title, summary, path?, reason, scope}` | `{decision: 'allow'\|'allowTalk'\|'deny'}` |
+| `app.state` | none | `{t, playing, hold?, beat?, label?, selection: string[], pinned}` |
+| `app.goto` | `{t, beat?}` | `{t}` |
+
+- `app.ask` is the approval card behind `canUseTool`. `scope` describes what `allowTalk` saves
+  in `.sage/permissions.json` (for example `Bash commands starting with "npx talkc"`). It waits
+  up to 30 minutes; an interrupt or a timeout counts as deny.
+- `app.state` answers `talk_state`; `app.goto` moves the canvas for `talk_goto` and `talk_frame`.
+  Both time out after 15 s.
+
+### Permission policy (`claude/policy.ts`)
+
+| Call | Outcome |
+|---|---|
+| Read, Glob, Grep, LS inside the talk or a materials folder | allowed |
+| Write, Edit, MultiEdit, NotebookEdit inside the talk | allowed, announced to the watcher as `claude` |
+| `mcp__talk__*`, Skill, ToolSearch, TodoWrite | allowed |
+| AskUserQuestion | denied (Claude asks in its reply) |
+| anything else: Bash, writes or reads elsewhere, web, subagents | `app.ask`, unless a saved rule matches |
+
+Saved rules: Bash by its first two words (commands with shell metacharacters always ask), file
+tools by folder, WebFetch by host, other tools by name.

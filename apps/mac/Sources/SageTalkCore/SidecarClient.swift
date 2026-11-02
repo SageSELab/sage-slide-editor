@@ -40,7 +40,7 @@ public enum SidecarProtocol {
 
     public enum TalkKind: String, Codable, Sendable { case beatFormat, legacy }
     public enum Severity: String, Codable, Sendable { case error, warning, info }
-    public enum ChangeSource: String, Codable, Sendable { case app, external }
+    public enum ChangeSource: String, Codable, Sendable { case app, external, claude }
     public enum BuildTrigger: String, Codable, Sendable { case open, request, change, edit }
 
     public struct Empty: Codable, Equatable, Sendable { public init() {} }

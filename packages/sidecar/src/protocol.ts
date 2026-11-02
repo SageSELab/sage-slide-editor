@@ -160,12 +160,12 @@ export type ResultOf<M extends MethodName> = Methods[M]['result'];
 // Notifications (sidecar -> app)
 // ---------------------------------------------------------------------------------------
 
-export type ChangeSource = 'app' | 'external';
+export type ChangeSource = 'app' | 'external' | 'claude';
 
 export interface ChangedParams {
   /** Talk-relative POSIX paths, sorted, deduplicated. build/, .sage/ and node_modules/ are never reported. */
   paths: string[];
-  /** 'app' when every path matches a write the sidecar made itself (expected writes); else 'external'. */
+  /** 'app' or 'claude' when every path matches a write the sidecar announced for that author (expected writes); else 'external'. */
   source: ChangeSource;
 }
 
@@ -501,7 +501,7 @@ export const notificationCheckers: { [N in NotificationName]: (p: unknown) => Pr
     return [
       ...keys(p, 'params', ['paths', 'source']),
       ...checkList(p.paths, 'params.paths', (x, at) => want(typeof x === 'string' && !x.startsWith('/'), `${at}: expected a relative path`)),
-      ...want(p.source === 'app' || p.source === 'external', 'params.source: bad value'),
+      ...want(p.source === 'app' || p.source === 'external' || p.source === 'claude', 'params.source: bad value'),
     ];
   },
   'talk.built': (p) => {
@@ -552,3 +552,222 @@ export function classify(v: unknown): Classified | { type: 'invalid'; reason: st
   }
   return { type: 'invalid', reason: 'neither a request, notification nor response' };
 }
+
+// =======================================================================================
+// Claude bridge (Phase 4, PLAN 6). Kept in its own section so other protocol additions merge
+// cleanly. `claude.*` methods are app -> sidecar; `app.ask|state|goto` are sidecar -> app
+// requests the Swift client answers through setRequestHandler. Fixtures: tests/rpc/claude/.
+// =======================================================================================
+
+export interface ClaudeSendParams {
+  /** The user's message. */
+  text: string;
+  /** Absolute or talk-relative paths the user attached (from the Materials sidebar). */
+  attachments?: string[];
+}
+export interface ClaudeSendResult {
+  /** 1-based count of messages sent in this sidecar. */
+  turn: number;
+}
+export interface ClaudeInterruptResult {
+  /** False when nothing was running. */
+  interrupted: boolean;
+}
+
+export interface ClaudeMethods {
+  /** Queues a user message; replies at once. Output arrives as claude.* notifications. */
+  'claude.send': { params: ClaudeSendParams; result: ClaudeSendResult };
+  'claude.interrupt': { params: Empty | undefined; result: ClaudeInterruptResult };
+  /** Ends the conversation and forgets .sage/session.json; the next send starts fresh. */
+  'claude.reset': { params: Empty | undefined; result: Empty };
+}
+export type ClaudeMethodName = keyof ClaudeMethods;
+
+export type ClaudeState = 'idle' | 'starting' | 'running' | 'error';
+
+export interface ClaudeStatusParams {
+  state: ClaudeState;
+  sessionId?: string;
+  model?: string;
+  /** Human-readable detail: an error, a skipped materials folder, "resumed", "forked". */
+  message?: string;
+  /** True once the init message listed the bundled academic-talk-film skill. */
+  skillLoaded?: boolean;
+}
+
+export interface ClaudeDeltaParams {
+  /** Streamed assistant text (Markdown), appended to the current assistant message. */
+  text: string;
+}
+
+export type ClaudeToolStatus = 'running' | 'done' | 'error' | 'denied';
+
+export interface ClaudeToolParams {
+  /** The tool_use id; later notifications for the same call reuse it. */
+  id: string;
+  /** Tool name with the app server's prefix removed (`talk_frame`, not `mcp__talk__talk_frame`). */
+  name: string;
+  /** One line: a talk-relative path, a command, a beat. */
+  summary: string;
+  status: ClaudeToolStatus;
+  /** Expanded text for the row: the result or error, truncated. */
+  detail?: string;
+  /** Talk-relative path for file tools inside the talk. */
+  path?: string;
+  /** 'chapter.beat' the edit touched (Write/Edit in the talk) or the tool moved to. */
+  beat?: string;
+}
+
+export interface ClaudeUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  /** Context size after this request: input + cache read + cache creation of its last model call. */
+  contextTokens: number;
+}
+
+export type ClaudeErrorKind = 'budget' | 'max_turns' | 'execution' | 'interrupted' | 'process';
+
+export interface ClaudeResultParams {
+  /** USD spent by this request. */
+  cost: number;
+  /** USD spent in this conversation since the sidecar started. */
+  totalCost: number;
+  usage: ClaudeUsage;
+  sessionId: string;
+  durationMs: number;
+  turns: number;
+  error?: { kind: ClaudeErrorKind; message: string };
+}
+
+export interface ClaudeNotifications {
+  'claude.status': ClaudeStatusParams;
+  'claude.delta': ClaudeDeltaParams;
+  'claude.tool': ClaudeToolParams;
+  'claude.result': ClaudeResultParams;
+}
+export type ClaudeNotificationName = keyof ClaudeNotifications;
+
+/** sidecar -> app: the approval sheet behind canUseTool. */
+export interface AskParams {
+  tool: string;
+  /** The SDK's prompt sentence, or one the bridge composes. */
+  title: string;
+  summary: string;
+  /** Absolute path the tool would touch, when there is one. */
+  path?: string;
+  /** Why it is asking (outside the talk, a shell command, ...). */
+  reason: string;
+  /** What "Allow for this talk" would persist, e.g. "Bash: npx" or "Write in ../paper". */
+  scope: string;
+}
+export type AskDecision = 'allow' | 'allowTalk' | 'deny';
+export interface AskResult { decision: AskDecision }
+
+export interface AppStateResult {
+  /** Canvas time in seconds. */
+  t: number;
+  playing: boolean;
+  /** The hold at or before t (1-based), its beat and label. */
+  hold?: number;
+  beat?: string;
+  label?: string;
+  /** Selected object ids on the canvas (Phase 3). */
+  selection: string[];
+  /** True when the user pinned the canvas (it does not follow Claude). */
+  pinned: boolean;
+}
+export interface AppGotoParams { t: number; beat?: string }
+export interface AppGotoResult { t: number }
+
+export interface AppRequests {
+  'app.ask': { params: AskParams; result: AskResult };
+  'app.state': { params: Empty | undefined; result: AppStateResult };
+  'app.goto': { params: AppGotoParams; result: AppGotoResult };
+}
+export type AppRequestName = keyof AppRequests;
+
+export const CLAUDE_METHOD_NAMES: readonly ClaudeMethodName[] = ['claude.send', 'claude.interrupt', 'claude.reset'];
+export const CLAUDE_NOTIFICATION_NAMES: readonly ClaudeNotificationName[] = ['claude.status', 'claude.delta', 'claude.tool', 'claude.result'];
+export const APP_REQUEST_NAMES: readonly AppRequestName[] = ['app.ask', 'app.state', 'app.goto'];
+
+const optStrAt = (v: Record<string, unknown>, k: string, at: string) => want(v[k] === undefined || typeof v[k] === 'string', `${at}.${k}: expected a string`);
+const strs = (v: Record<string, unknown>, fields: string[], at: string) => fields.flatMap((f) => want(typeof v[f] === 'string', `${at}.${f}: expected a string`));
+const oneOf = (v: unknown, values: readonly string[], at: string) => want(typeof v === 'string' && values.includes(v), `${at}: bad value`);
+
+/** Runs `body` on an object after checking its keys, or reports that it is not an object. */
+function shape(v: unknown, at: string, required: string[], optional: string[], body: (o: Record<string, unknown>) => Problems): Problems {
+  if (!isObj(v)) return [`${at}: expected an object`];
+  return [...keys(v, at, required, optional), ...body(v)];
+}
+
+export const claudeParamCheckers: { [M in ClaudeMethodName]: (p: unknown) => Problems } = {
+  'claude.send': (p) => shape(p, 'params', ['text'], ['attachments'], (v) => [
+    ...want(typeof v.text === 'string' && v.text.trim().length > 0, 'params.text: expected a non-empty string'),
+    ...(v.attachments === undefined ? [] : checkList(v.attachments, 'params.attachments', (x, at) => want(typeof x === 'string' && x.length > 0, `${at}: expected a path`))),
+  ]),
+  'claude.interrupt': (p) => checkEmpty(p),
+  'claude.reset': (p) => checkEmpty(p),
+};
+
+export const claudeResultCheckers: { [M in ClaudeMethodName]: (r: unknown) => Problems } = {
+  'claude.send': (r) => shape(r, 'result', ['turn'], [], (v) => want(isInt(v.turn) && v.turn >= 1, 'result.turn: expected a positive integer')),
+  'claude.interrupt': (r) => shape(r, 'result', ['interrupted'], [], (v) => want(typeof v.interrupted === 'boolean', 'result.interrupted: expected a boolean')),
+  'claude.reset': (r) => checkEmpty(r ?? null, 'result'),
+};
+
+const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheCreationTokens', 'contextTokens'];
+const checkUsage = (u: unknown, at: string) =>
+  shape(u, at, USAGE_FIELDS, [], (v) => USAGE_FIELDS.flatMap((f) => want(isInt(v[f]) && (v[f] as number) >= 0, `${at}.${f}: expected a non-negative integer`)));
+
+export const claudeNotificationCheckers: { [N in ClaudeNotificationName]: (p: unknown) => Problems } = {
+  'claude.status': (p) => shape(p, 'params', ['state'], ['sessionId', 'model', 'message', 'skillLoaded'], (v) => [
+    ...oneOf(v.state, ['idle', 'starting', 'running', 'error'], 'params.state'),
+    ...optStrAt(v, 'sessionId', 'params'), ...optStrAt(v, 'model', 'params'), ...optStrAt(v, 'message', 'params'),
+    ...want(v.skillLoaded === undefined || typeof v.skillLoaded === 'boolean', 'params.skillLoaded: expected a boolean'),
+  ]),
+  'claude.delta': (p) => shape(p, 'params', ['text'], [], (v) => strs(v, ['text'], 'params')),
+  'claude.tool': (p) => shape(p, 'params', ['id', 'name', 'summary', 'status'], ['detail', 'path', 'beat'], (v) => [
+    ...want(typeof v.id === 'string' && v.id.length > 0, 'params.id: expected a non-empty string'),
+    ...strs(v, ['name', 'summary'], 'params'),
+    ...oneOf(v.status, ['running', 'done', 'error', 'denied'], 'params.status'),
+    ...optStrAt(v, 'detail', 'params'), ...optStrAt(v, 'beat', 'params'),
+    ...want(v.path === undefined || (typeof v.path === 'string' && !v.path.startsWith('/')), 'params.path: expected a relative path'),
+  ]),
+  'claude.result': (p) => shape(p, 'params', ['cost', 'totalCost', 'usage', 'sessionId', 'durationMs', 'turns'], ['error'], (v) => [
+    ...want(isNum(v.cost) && v.cost >= 0, 'params.cost: expected a non-negative number'),
+    ...want(isNum(v.totalCost) && v.totalCost >= 0, 'params.totalCost: expected a non-negative number'),
+    ...checkUsage(v.usage, 'params.usage'),
+    ...strs(v, ['sessionId'], 'params'),
+    ...want(isNum(v.durationMs) && v.durationMs >= 0, 'params.durationMs: expected a non-negative number'),
+    ...want(isInt(v.turns) && v.turns >= 0, 'params.turns: expected a non-negative integer'),
+    ...(v.error === undefined ? [] : shape(v.error, 'params.error', ['kind', 'message'], [], (e) => [
+      ...oneOf(e.kind, ['budget', 'max_turns', 'execution', 'interrupted', 'process'], 'params.error.kind'),
+      ...strs(e, ['message'], 'params.error'),
+    ])),
+  ]),
+};
+
+export const appRequestParamCheckers: { [M in AppRequestName]: (p: unknown) => Problems } = {
+  'app.ask': (p) => shape(p, 'params', ['tool', 'title', 'summary', 'reason', 'scope'], ['path'], (v) => [
+    ...strs(v, ['tool', 'title', 'summary', 'reason', 'scope'], 'params'), ...optStrAt(v, 'path', 'params'),
+  ]),
+  'app.state': (p) => checkEmpty(p),
+  'app.goto': (p) => shape(p, 'params', ['t'], ['beat'], (v) => [
+    ...want(isNum(v.t) && v.t >= 0, 'params.t: expected a non-negative number'), ...optStrAt(v, 'beat', 'params'),
+  ]),
+};
+
+export const appRequestResultCheckers: { [M in AppRequestName]: (r: unknown) => Problems } = {
+  'app.ask': (r) => shape(r, 'result', ['decision'], [], (v) => oneOf(v.decision, ['allow', 'allowTalk', 'deny'], 'result.decision')),
+  'app.state': (r) => shape(r, 'result', ['t', 'playing', 'selection', 'pinned'], ['hold', 'beat', 'label'], (v) => [
+    ...want(isNum(v.t) && v.t >= 0, 'result.t: expected a non-negative number'),
+    ...want(typeof v.playing === 'boolean', 'result.playing: expected a boolean'),
+    ...want(typeof v.pinned === 'boolean', 'result.pinned: expected a boolean'),
+    ...checkList(v.selection, 'result.selection', (x, at) => want(typeof x === 'string', `${at}: expected a string`)),
+    ...want(v.hold === undefined || (isInt(v.hold) && v.hold >= 1), 'result.hold: expected a positive integer'),
+    ...optStrAt(v, 'beat', 'result'), ...optStrAt(v, 'label', 'result'),
+  ]),
+  'app.goto': (r) => shape(r, 'result', ['t'], [], (v) => want(isNum(v.t) && v.t >= 0, 'result.t: expected a non-negative number')),
+};

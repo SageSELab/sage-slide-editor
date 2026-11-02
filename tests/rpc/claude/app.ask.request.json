@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "app.ask",
+  "params": {
+    "tool": "Bash",
+    "title": "Claude wants to use Bash: Build the talk",
+    "summary": "npx talkc build .",
+    "reason": "Shell commands can change files anywhere.",
+    "scope": "Bash commands starting with \"npx talkc\""
+  }
+}

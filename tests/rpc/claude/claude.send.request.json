@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 20,
+  "method": "claude.send",
+  "params": {
+    "text": "Add a caption under the title that says \"Preliminary results\"."
+  }
+}

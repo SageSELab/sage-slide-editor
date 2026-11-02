@@ -87,7 +87,7 @@ describe('validators reject drift', () => {
     expect(resultCheckers['talk.open']({ ...rest, filmUrl: filmURL })).toEqual(expect.arrayContaining(["result: missing 'filmURL'", "result: unexpected 'filmUrl'"]));
   });
   it('a bad enum value', () => {
-    expect(notificationCheckers['talk.changed']({ paths: [], source: 'claude' })).toEqual(['params.source: bad value']);
+    expect(notificationCheckers['talk.changed']({ paths: [], source: 'robot' })).toEqual(['params.source: bad value']);
   });
   it('a malformed hold', () => {
     const p = resultCheckers['talk.layout']({ holds: [{ index: 0, at: -1, label: 'x', backup: false, beat: 'a.b', chapter: 'a', auto: false }], duration: 1, diagnostics: [] });

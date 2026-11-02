@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "claude.tool",
+  "params": {
+    "id": "toolu_01Bash",
+    "name": "Bash",
+    "summary": "Build the talk",
+    "status": "denied",
+    "detail": "The user declined this action in SAGE."
+  }
+}

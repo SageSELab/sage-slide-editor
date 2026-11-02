@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "method": "claude.tool",
+  "params": {
+    "id": "toolu_01Edit",
+    "name": "Edit",
+    "summary": "scenes/line.html",
+    "status": "done",
+    "detail": "The file scenes/line.html has been updated.",
+    "path": "scenes/line.html",
+    "beat": "line.title"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "claude.send",
+  "params": {
+    "text": "Use the numbers in this table.",
+    "attachments": [
+      "../paper/tables/results.tex"
+    ]
+  }
+}

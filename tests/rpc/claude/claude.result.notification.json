@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "method": "claude.result",
+  "params": {
+    "cost": 0.4123,
+    "totalCost": 0.4123,
+    "usage": {
+      "inputTokens": 12,
+      "outputTokens": 640,
+      "cacheReadTokens": 61234,
+      "cacheCreationTokens": 2100,
+      "contextTokens": 31877
+    },
+    "sessionId": "6f1c2c1e-3c1b-4f53-9a51-0c6f0e9a1d10",
+    "durationMs": 41250,
+    "turns": 6
+  }
+}

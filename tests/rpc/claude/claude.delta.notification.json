@@ -1,0 +1,7 @@
+{
+  "jsonrpc": "2.0",
+  "method": "claude.delta",
+  "params": {
+    "text": "I'll add the caption under the title"
+  }
+}
