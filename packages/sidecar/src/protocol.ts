@@ -975,3 +975,122 @@ export const publishNotificationCheckers: { [N in PublishNotificationName]: (p: 
     ...want(isInt(v.done) && isInt(v.total) && v.done >= 0 && v.total >= 1 && v.done <= v.total, 'params.done/total: expected 0 <= done <= total, total >= 1'),
   ]),
 };
+
+// =======================================================================================
+// Setup (Phase 6, docs/packaging.md): the onboarding sheet's checks and the render browser
+// download. `setup.*` methods skip the request queue and need no open talk. Fixtures:
+// tests/rpc/setup/, checked by setup.test.ts and SetupProtocolTests.swift.
+// =======================================================================================
+
+export type RuntimeModeName = 'bundled' | 'development';
+export type AuthState = 'login' | 'apiKey' | 'external' | 'none' | 'unknown';
+export type BrowserStateName = 'chrome' | 'installed' | 'missing';
+
+export interface AuthStatus {
+  /** login: a Claude login (claude.ai or Console); apiKey: an API key; external: Bedrock, Vertex and the like. */
+  state: AuthState;
+  /** The account's email, when logged in. */
+  account?: string;
+  organization?: string;
+  /** Subscription, e.g. "Claude Max". */
+  plan?: string;
+  /** Where the key or token comes from (ANTHROPIC_API_KEY, apiKeyHelper, ...). */
+  source?: string;
+  provider?: string;
+  message?: string;
+}
+
+export interface BrowserStatus {
+  state: BrowserStateName;
+  /** The browser binary, or the folder a download goes to. */
+  path?: string;
+  /** True when setup.installBrowser can fetch it. */
+  canInstall: boolean;
+}
+
+export interface SetupCheckParams {
+  /** Also ask the Claude CLI for the account (a few seconds; never a model call). */
+  auth?: boolean;
+}
+
+export interface SetupCheckResult {
+  mode: RuntimeModeName;
+  /** The app build (`git describe`), or 'development'. */
+  version: string;
+  /** process.version of the node running the sidecar, and its path. */
+  node: string;
+  nodePath: string;
+  /** Missing engine, plugin or talkc files, as sentences. Empty when complete. */
+  problems: string[];
+  /** The Agent SDK's native claude binary; absent when not installed. */
+  claudeBinary?: string;
+  /** The talkc Claude runs (bin/talkc in the app; core's cli.ts in development). */
+  talkc: string;
+  browser: BrowserStatus;
+  auth?: AuthStatus;
+}
+
+export interface SetupInstallResult {
+  ok: boolean;
+  message?: string;
+  browser: BrowserStatus;
+}
+
+export interface SetupProgressParams {
+  task: 'browser';
+  /** 0...1 */
+  fraction: number;
+  message: string;
+}
+
+export interface SetupMethods {
+  'setup.check': { params: SetupCheckParams | undefined; result: SetupCheckResult };
+  /** Downloads Playwright's headless Chromium into Application Support; progress as setup.progress. */
+  'setup.installBrowser': { params: Empty | undefined; result: SetupInstallResult };
+}
+export type SetupMethodName = keyof SetupMethods;
+export interface SetupNotifications { 'setup.progress': SetupProgressParams }
+export type SetupNotificationName = keyof SetupNotifications;
+
+export const SETUP_METHOD_NAMES: readonly SetupMethodName[] = ['setup.check', 'setup.installBrowser'];
+export const SETUP_NOTIFICATION_NAMES: readonly SetupNotificationName[] = ['setup.progress'];
+
+const checkBrowserStatus = (b: unknown, at: string) => shape(b, at, ['state', 'canInstall'], ['path'], (v) => [
+  ...oneOf(v.state, ['chrome', 'installed', 'missing'], `${at}.state`),
+  ...want(typeof v.canInstall === 'boolean', `${at}.canInstall: expected a boolean`),
+  ...optStrAt(v, 'path', at),
+]);
+const AUTH_OPTIONAL = ['account', 'organization', 'plan', 'source', 'provider', 'message'];
+const checkAuthStatus = (a: unknown, at: string) => shape(a, at, ['state'], AUTH_OPTIONAL, (v) => [
+  ...oneOf(v.state, ['login', 'apiKey', 'external', 'none', 'unknown'], `${at}.state`),
+  ...AUTH_OPTIONAL.flatMap((k) => optStrAt(v, k, at)),
+]);
+
+export const setupParamCheckers: { [M in SetupMethodName]: (p: unknown) => Problems } = {
+  'setup.check': (p) => (p === undefined ? [] : shape(p, 'params', [], ['auth'], (v) => want(v.auth === undefined || typeof v.auth === 'boolean', 'params.auth: expected a boolean'))),
+  'setup.installBrowser': (p) => checkEmpty(p),
+};
+
+export const setupResultCheckers: { [M in SetupMethodName]: (r: unknown) => Problems } = {
+  'setup.check': (r) => shape(r, 'result', ['mode', 'version', 'node', 'nodePath', 'problems', 'talkc', 'browser'], ['claudeBinary', 'auth'], (v) => [
+    ...oneOf(v.mode, ['bundled', 'development'], 'result.mode'),
+    ...strs(v, ['version', 'node', 'nodePath', 'talkc'], 'result'),
+    ...checkList(v.problems, 'result.problems', (x, at) => want(typeof x === 'string', `${at}: expected a string`)),
+    ...optStrAt(v, 'claudeBinary', 'result'),
+    ...checkBrowserStatus(v.browser, 'result.browser'),
+    ...(v.auth === undefined ? [] : checkAuthStatus(v.auth, 'result.auth')),
+  ]),
+  'setup.installBrowser': (r) => shape(r, 'result', ['ok', 'browser'], ['message'], (v) => [
+    ...want(typeof v.ok === 'boolean', 'result.ok: expected a boolean'),
+    ...optStrAt(v, 'message', 'result'),
+    ...checkBrowserStatus(v.browser, 'result.browser'),
+  ]),
+};
+
+export const setupNotificationCheckers: { [N in SetupNotificationName]: (p: unknown) => Problems } = {
+  'setup.progress': (p) => shape(p, 'params', ['task', 'fraction', 'message'], [], (v) => [
+    ...oneOf(v.task, ['browser'], 'params.task'),
+    ...want(isNum(v.fraction) && v.fraction >= 0 && v.fraction <= 1, 'params.fraction: expected a number in 0...1'),
+    ...strs(v, ['message'], 'params'),
+  ]),
+};

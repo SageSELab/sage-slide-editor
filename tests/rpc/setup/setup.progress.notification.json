@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "method": "setup.progress",
+  "params": {
+    "task": "browser",
+    "fraction": 0.4,
+    "message": "Downloading 91.2 MiB"
+  }
+}

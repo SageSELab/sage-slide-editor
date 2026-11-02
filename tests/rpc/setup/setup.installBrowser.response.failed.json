@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "ok": false,
+    "message": "The download failed (exit 1): Error: getaddrinfo ENOTFOUND cdn.playwright.dev",
+    "browser": {
+      "state": "missing",
+      "path": "/Users/someone/Library/Application Support/io.sagelab.talk/ms-playwright/chromium_headless_shell-1248",
+      "canInstall": true
+    }
+  }
+}

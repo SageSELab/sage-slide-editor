@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "ok": true,
+    "browser": {
+      "state": "installed",
+      "path": "/Users/someone/Library/Application Support/io.sagelab.talk/ms-playwright/chromium_headless_shell-1248",
+      "canInstall": false
+    }
+  }
+}

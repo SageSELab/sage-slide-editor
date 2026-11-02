@@ -372,3 +372,45 @@ All four methods run in the request queue, one at a time with builds and edits.
 | -32020 | PublishFailed | The public cut or the build failed. `data.diagnostics` |
 | -32021 | NotPublished | `site.stage`: `build/public/<slug>.html` does not exist. `data.path` |
 | -32022 | SiteFailed | Not a repository's top folder, a version-control command failed, a YAML file does not parse, nothing to commit |
+
+## Setup (Phase 6)
+
+The onboarding sheet's checks and the render browser download (docs/packaging.md). Source:
+the Setup section of `protocol.ts`, `src/setup.ts` and `src/runtime.ts`; Swift types in
+`SetupProtocol.swift`; fixtures in `tests/rpc/setup/`, checked by `setup.test.ts` and
+`SetupProtocolTests.swift`. The `setup.*` methods skip the request queue and need no open talk.
+
+| Method | Params | Result |
+|---|---|---|
+| `setup.check` | `{auth?: boolean}` | `SetupCheckResult` |
+| `setup.installBrowser` | none | `{ok, message?, browser: BrowserStatus}` |
+
+```ts
+interface BrowserStatus { state: 'chrome' | 'installed' | 'missing'; path?: string; canInstall: boolean }
+interface AuthStatus { state: 'login' | 'apiKey' | 'external' | 'none' | 'unknown';
+                       account?, organization?, plan?, source?, provider?, message?: string }
+interface SetupCheckResult {
+  mode: 'bundled' | 'development'; version: string /* git describe, or 'development' */;
+  node: string; nodePath: string;       // the node running the sidecar
+  problems: string[];                   // missing engine / plugin / skill / talkc files
+  claudeBinary?: string;                // the Agent SDK's native claude, when installed
+  talkc: string;                        // bin/talkc in the app (first on Claude's PATH)
+  browser: BrowserStatus; auth?: AuthStatus;
+}
+```
+
+| Notification | Params |
+|---|---|
+| `setup.progress` | `{task: 'browser', fraction: 0...1, message}` |
+
+- `auth: true` asks the Claude CLI for `accountInfo()` through the Agent SDK: `query()` is
+  started in streaming-input mode with an input stream that never yields, so the CLI only does
+  its local initialize handshake and no prompt or model call is ever sent. It takes a few
+  seconds (the CLI starts). `unknown` means the CLI could not be asked (it is reported, not
+  treated as logged out).
+- The browser is an installed Google Chrome when there is one, else Playwright's
+  chromium-headless-shell in `~/Library/Application Support/io.sagelab.talk/ms-playwright`.
+  In development the report is Playwright's own Chromium (what the tests use) and
+  `setup.installBrowser` refuses (`canInstall: false`).
+- `setup.installBrowser` runs `playwright install chromium --only-shell` with the bundled
+  node. A second call while one runs returns the same result.

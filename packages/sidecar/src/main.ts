@@ -5,15 +5,23 @@
 // Phase 5: talk.publish, talk.export, site.stage and site.commit (src/publish/).
 // Phase 4: the Agent SDK bridge (src/claude/bridge.ts) answers the `claude.*` methods, reports
 // `claude.*` notifications, and asks the app through `app.ask|state|goto` requests.
+import { fileURLToPath } from 'node:url';
 import { ClaudeBridge } from './claude/bridge.ts';
 import {
-  PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, claudeParamCheckers,
-  type ClaudeMethodName, type ClaudeSendParams, type MethodName, type OpenParams, type WatchParams, type EditParams, type Inverse,
+  PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, claudeParamCheckers, setupParamCheckers,
+  type ClaudeMethodName, type ClaudeSendParams, type SetupMethodName, type SetupCheckParams, type MethodName, type OpenParams, type WatchParams, type EditParams, type Inverse,
 } from './protocol.ts';
 import { Publisher } from './publish/index.ts';
 import { publishParamCheckers, type PublishMethodName } from './protocol.ts';
 import { RpcPeer, type Log } from './rpc.ts';
 import { Session } from './session.ts';
+import { applyRuntime, resolveRuntime } from './runtime.ts';
+import { checkSetup, installBrowser } from './setup.ts';
+
+// Where engine, plugin, talkc and the render browser are: this repository, or SAGE Talk.app.
+// A bundled runtime is exported into the environment, which Claude and talkc inherit.
+const runtime = resolveRuntime({ entry: fileURLToPath(import.meta.url) });
+applyRuntime(runtime);
 
 const VERSION = '0.0.0';
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 } as const;
@@ -136,6 +144,22 @@ publishMethod('site.stage', (p) => publisher.stage(p));
 publishMethod('site.commit', (p) => publisher.commit(p));
 publishMethod('talk.qr', (p) => publisher.qr(p));
 
+// --- Setup (Phase 6): the onboarding sheet's checks; no talk needed -----------------------
+function setupMethod<M extends SetupMethodName>(name: M, fn: (params: never) => unknown) {
+  peer.handle(name, (params) => {
+    if (shuttingDown) throw new RpcError(ErrorCode.ShuttingDown, 'sidecar is shutting down');
+    const problems = setupParamCheckers[name](params);
+    if (problems.length) throw new RpcError(ErrorCode.InvalidParams, problems.join('; '), { problems });
+    return fn(params as never);
+  }, { concurrent: true });
+}
+setupMethod('setup.check', (p: SetupCheckParams | undefined) => checkSetup(runtime, { auth: p?.auth ?? false }));
+let installing: ReturnType<typeof installBrowser> | null = null;
+setupMethod('setup.installBrowser', () => {
+  installing ??= installBrowser(runtime, { onProgress: (p) => peer.notify('setup.progress', p) }).finally(() => { installing = null; });
+  return installing;
+});
+
 peer.onClose(() => void shutdown('stdin closed'));
 process.stdout.on('error', () => void shutdown('stdout closed', 0));
 // If the app died, its end of the log pipe is gone too. Without a listener every log line then
@@ -145,4 +169,4 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('uncaughtException', (e) => { log('error', `uncaught: ${e.stack ?? e}`); });
 process.on('unhandledRejection', (e) => { log('error', `unhandled rejection: ${(e as Error)?.stack ?? e}`); });
-log('info', `ready (protocol ${PROTOCOL_VERSION}, node ${process.version})`);
+log('info', `ready (protocol ${PROTOCOL_VERSION}, node ${process.version}, ${runtime.mode}${runtime.manifest ? ' ' + runtime.manifest.version : ''})`);

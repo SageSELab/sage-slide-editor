@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "mode": "bundled",
+    "version": "v0.6.0-12-g1a2b3c4",
+    "node": "v24.11.1",
+    "nodePath": "/Applications/SAGE Talk.app/Contents/Resources/node/bin/node",
+    "problems": [],
+    "claudeBinary": "/Applications/SAGE Talk.app/Contents/Resources/sidecar/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude",
+    "talkc": "/Applications/SAGE Talk.app/Contents/Resources/sidecar/bin/talkc",
+    "browser": {
+      "state": "chrome",
+      "path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "canInstall": false
+    },
+    "auth": {
+      "state": "login",
+      "account": "someone@example.edu",
+      "organization": "Example Lab",
+      "plan": "Claude Max",
+      "provider": "firstParty"
+    }
+  }
+}

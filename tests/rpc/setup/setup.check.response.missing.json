@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "mode": "bundled",
+    "version": "v0.6.0",
+    "node": "v24.11.1",
+    "nodePath": "/Applications/SAGE Talk.app/Contents/Resources/node/bin/node",
+    "problems": [
+      "the academic-talk-film skill is missing from /Applications/SAGE Talk.app/Contents/Resources/sidecar/plugin"
+    ],
+    "talkc": "/Applications/SAGE Talk.app/Contents/Resources/sidecar/bin/talkc",
+    "browser": {
+      "state": "missing",
+      "path": "/Users/someone/Library/Application Support/io.sagelab.talk/ms-playwright/chromium_headless_shell-1248",
+      "canInstall": true
+    },
+    "auth": {
+      "state": "none",
+      "provider": "firstParty",
+      "message": "No Claude login or API key was found."
+    }
+  }
+}
