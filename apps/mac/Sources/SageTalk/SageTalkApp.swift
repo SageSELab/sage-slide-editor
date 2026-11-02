@@ -20,6 +20,18 @@ struct SageTalkApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                     .disabled(model.talk == nil)
             }
+            // Publish and export (PLAN 5.6; TalkWindowModel+Publish.swift).
+            CommandGroup(after: .newItem) {
+                Divider()
+                Button("Publish…") { model.showPublish() }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                    .disabled(!model.canPublish)
+                Menu("Export") {
+                    Button("PNGs of Holds…") { model.startExport(.png) }
+                    Button("PDF of Holds…") { model.startExport(.pdf) }
+                }
+                .disabled(!model.canPublish || model.publishing.exporting)
+            }
             // Undo/redo of the app's own edits (inverses kept by EditSession). A focused text
             // field keeps its own undo.
             CommandGroup(replacing: .undoRedo) {
@@ -49,6 +61,7 @@ struct SageTalkApp: App {
                 Button("Play Through") { model.through() }.keyboardShortcut(.return, modifiers: [])
             }
         }
+        Settings { SettingsView() }
     }
 }
 

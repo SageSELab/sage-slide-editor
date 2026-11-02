@@ -51,6 +51,11 @@ final class TalkWindowModel {
     /// The navigator column's tab.
     var navigatorTab: NavigatorTab = .beats
 
+    /// Publish and export (TalkWindowModel+Publish.swift).
+    let publishing = PublishModel()
+    var showingPublish = false
+    var showingExport = false
+
     let canvas = FilmView()
     let thumbnails: ThumbnailStore
     let presentation: PresentationController
@@ -107,6 +112,7 @@ final class TalkWindowModel {
         selection = nil; spine = nil; changedBeats = []; spineBeforeExternal = nil; materials = []
         edits.reset()
         edits.service = nil
+        resetPublishing(folder)
         thumbnails.close()
         switch folder.kind {
         case .legacy:
@@ -135,6 +141,7 @@ final class TalkWindowModel {
             let root = URL(fileURLWithPath: r.root, isDirectory: true)
             filmRoot = root
             edits.service = sup.client
+            publishing.service = sup.client
             spine = SpineSnapshot.load(root)
             chat.attachmentBase = root
             reloadMaterials()
@@ -186,7 +193,7 @@ final class TalkWindowModel {
                 externalChange(c.paths)
             }
         case .notification(let method, let params):
-            _ = handleClaudeNotification(method, params)
+            _ = handleClaudeNotification(method, params) || handlePublishNotification(method, params)
         case .crashed(_, let willRestart):
             status = willRestart ? "The sidecar stopped; restarting it…" : "The sidecar stopped."
         case .restarted:

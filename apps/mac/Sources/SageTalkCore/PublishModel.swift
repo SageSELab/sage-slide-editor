@@ -175,7 +175,7 @@ public final class PublishModel {
 
     public var defaultCommitMessage: String {
         let what = talkTitle.isEmpty ? slug : talkTitle
-        return "Add the talk slides: \(what)\n\npublic/talks/\(slug).html, staged by SAGE Talk."
+        return "Add talk slides (\(slug)): \(what)"
     }
 
     public func setCommitMessage(_ m: String, for site: PublishProtocol.Site) {

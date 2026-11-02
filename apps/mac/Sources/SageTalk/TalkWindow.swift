@@ -34,6 +34,8 @@ struct TalkWindow: View {
             .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
         }
         .navigationTitle(model.talk?.displayName ?? "SAGE Talk")
+        .sheet(isPresented: $model.showingPublish) { PublishSheet(model: model) { model.showingPublish = false } }
+        .sheet(isPresented: $model.showingExport) { ExportSheet(model: model) { model.showingExport = false } }
         .toolbar {
             ToolbarItemGroup {
                 Button { model.prev() } label: { Label("Previous", systemImage: "backward.end.fill") }

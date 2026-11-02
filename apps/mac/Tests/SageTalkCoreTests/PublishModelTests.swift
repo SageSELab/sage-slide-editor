@@ -128,7 +128,7 @@ import Testing
         #expect(await fake.stageParams == [P.StageParams(site: .personal, repo: "/tmp/personal-site", slug: "issta26", paperEntry: "pub-079")])
         let s = m.stage(for: .personal)
         #expect(s.phase == .done && s.result?.changed == ["public/talks/issta26.html", "src/content/talks.yaml"])
-        #expect(s.message.hasPrefix("Add the talk slides: UI Repair"))
+        #expect(s.message == "Add talk slides (issta26): UI Repair")
         #expect(await !fake.calls.contains { $0.hasPrefix("commit") }) // staging never commits
 
         #expect(m.canCommit(.personal))
