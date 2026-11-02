@@ -13,6 +13,9 @@ import WebKit
 ///   roundtrip.txt      beat-format talks: an external edit to a temp copy's scene text, then
 ///                      checks that the canvas reloaded at the same time and showed the edit,
 ///                      and how many thumbnails were re-rendered vs adopted
+///   edit-*.png, edit.txt  beat-format talks: the edit round trip on another temp copy (select,
+///                      drag 40 px, retype a headline, set a hold, undo all three; files must be
+///                      byte-identical afterwards); see SelfTestEditing.swift
 ///   result.txt         PASS or FAIL lines for every check
 /// then quits. Used by scripts/selftest.sh. It only ever draws the app's own windows and web
 /// views: no screen capture of any kind.
@@ -68,7 +71,11 @@ enum SelfTest {
         }
 
         await presenter(model: model, out: out)
-        if talk.kind == .beatFormat { await roundTrip(model: model, out: out) }
+        if talk.kind == .beatFormat {
+            let source = talk.root
+            await roundTrip(model: model, out: out)
+            await editRoundTrip(model: model, source: source, out: out)
+        }
     }
 
     // MARK: Presenting
