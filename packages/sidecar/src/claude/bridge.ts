@@ -30,7 +30,7 @@ import { locateBeat } from './beat-locator.ts';
 import { chromiumFrames, type FrameRenderer } from './frames.ts';
 import { resolveMaterials, type Materials } from './materials.ts';
 import { absFrom, relInside, truncate } from './paths.ts';
-import { APP_TOOL_PREFIX, PermissionStore, WRITE_TOOLS, decide, type Decision } from './policy.ts';
+import { PermissionStore, WRITE_TOOLS, decide, type Decision } from './policy.ts';
 import { clearSession, loadSession, planResume, saveSession, type ResumePlan } from './session-store.ts';
 import { talkTools, type TalkTool, type ToolResult } from './tools.ts';
 import { Translator, summarize, type InitInfo } from './translate.ts';
@@ -332,7 +332,8 @@ export class ClaudeBridge {
       strictMcpConfig: true,
       plugins: [{ type: 'local', path: this.pluginDir }],
       mcpServers: { talk: server },
-      allowedTools: this.tools.map((t) => APP_TOOL_PREFIX + t.name),
+      // No allowedTools: bare entries would shadow canUseTool (CLAUDE_SDK_CAN_USE_TOOL_SHADOWED); the
+      // policy allows the app tools itself, so every call passes through one place.
       permissionMode: 'default',
       canUseTool: this.canUseTool,
       hooks: { PostToolUse: [{ matcher: 'Write|Edit|MultiEdit|NotebookEdit', hooks: [this.postToolUse] }] },

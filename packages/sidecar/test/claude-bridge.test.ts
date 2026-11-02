@@ -86,8 +86,8 @@ describe('ClaudeBridge', () => {
     expect(o).toMatchObject({
       model: 'claude-opus-5-5', cwd: s.t.root, additionalDirectories: [], settingSources: [], strictMcpConfig: true,
       permissionMode: 'default', includePartialMessages: true, maxBudgetUsd: 0.5,
-      allowedTools: ['mcp__talk__talk_state', 'mcp__talk__talk_layout', 'mcp__talk__talk_goto', 'mcp__talk__talk_frame', 'mcp__talk__talk_materials'],
     });
+    expect(o.allowedTools).toBeUndefined(); // the policy allows the app tools; bare entries would shadow canUseTool
     expect(o.plugins).toEqual([{ type: 'local', path: expect.stringMatching(/packages\/sidecar\/plugin$/) }]);
     expect(fs.existsSync(path.join((o.plugins![0] as { path: string }).path, 'skills/academic-talk-film/SKILL.md'))).toBe(true);
     expect(Object.keys(o.mcpServers!)).toEqual(['talk']);
