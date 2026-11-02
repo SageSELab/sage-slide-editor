@@ -25,8 +25,13 @@ extension TalkWindowModel {
         Task { await m?.close() }
     }
 
-    /// Opens a folder or talk.json handed to the app by Finder (document types in Info.plist).
+    /// Opens a .talk package, a talk folder or a talk.json handed to the app by Finder (double-click,
+    /// Open With, a drop on the Dock icon; document types in Info.plist) or by the open panel.
     func openDocument(_ url: URL) {
+        if url.pathExtension.lowercased() == TalkPackage.themeExtension {
+            error = "“\(url.lastPathComponent)” is a theme package (.talktheme). Open a talk to use a theme."
+            return
+        }
         open(url.lastPathComponent == "talk.json" ? url.deletingLastPathComponent() : url)
     }
 }

@@ -65,7 +65,9 @@ final class TalkWindowModel {
     let thumbnails: ThumbnailStore
     let presentation: PresentationController
     @ObservationIgnored private(set) var supervisor: SidecarSupervisor?
-    @ObservationIgnored private var openGeneration = 0
+    @ObservationIgnored private(set) var openGeneration = 0
+    /// Plain talk folders whose .talk conversion bar was dismissed (TalkWindowModel+Package.swift).
+    var dismissedPackageOffers = TalkWindowModel.loadDismissedOffers()
 
     init() {
         let thumbs = ThumbnailStore()
@@ -95,15 +97,19 @@ final class TalkWindowModel {
 
     func presentOpenPanel() {
         let panel = NSOpenPanel()
+        // .talk packages show as files (the only files offered); plain folders, beat-format or
+        // legacy, stay choosable as folders.
         panel.canChooseDirectories = true
-        panel.canChooseFiles = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [Self.talkType]
         panel.prompt = "Open Talk"
-        panel.message = "Choose a talk folder (talk.json, or a legacy index.html + talk.js)."
-        if panel.runModal() == .OK, let url = panel.url { open(url) }
+        panel.message = "Choose a .talk document or a talk folder (talk.json, or a legacy index.html + talk.js)."
+        if panel.runModal() == .OK, let url = panel.url { openDocument(url) }
     }
 
-    /// File ▸ New Talk…: a save panel names the new talk folder (its name becomes the title), the
-    /// starter talk is copied into it (SageTalkCore/NewTalk.swift), and the new talk opens.
+    /// File ▸ New Talk…: a save panel names the new `.talk` package (its name without the extension
+    /// becomes the title), the starter talk is copied into it (SageTalkCore/NewTalk.swift), and the
+    /// new talk opens.
     func presentNewTalkPanel() {
         guard let starter = NewTalk.starter() else { error = NewTalk.CreateError.noStarter.localizedDescription; return }
         let panel = NSSavePanel()
@@ -111,11 +117,13 @@ final class TalkWindowModel {
         panel.prompt = "Create"
         panel.nameFieldLabel = "Talk name:"
         panel.nameFieldStringValue = "Untitled Talk"
-        panel.message = "Choose where to create the talk folder. Its name becomes the talk's title."
+        panel.allowedContentTypes = [Self.talkType]
+        panel.message = "Choose where to create the talk. Its name becomes the talk's title."
         panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let picked = panel.url else { return }
+        let url = TalkPackage.packageURL(picked)
         do {
-            try NewTalk.create(at: url, title: url.lastPathComponent, starter: starter)
+            try NewTalk.create(at: url, starter: starter)
             open(url)
         } catch {
             self.error = error.localizedDescription
@@ -293,7 +301,7 @@ final class TalkWindowModel {
         guard let filmURL, let filmRoot, !holds.isEmpty else { return }
         canvas.pause()
         presentation.start(mode, film: filmURL, readAccess: filmRoot, holds: holds, duration: duration,
-                           at: t, title: talk?.root.lastPathComponent ?? "Talk", offscreen: offscreen)
+                           at: t, title: talk?.name ?? "Talk", offscreen: offscreen)
     }
 
     func revealInFinder() {
