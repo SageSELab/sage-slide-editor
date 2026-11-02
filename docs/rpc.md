@@ -225,21 +225,33 @@ Fixtures: `talk.edit.request.<op>[-variant].json` (one per op), `talk.edit.respo
 
 ### Canvas messages (WKScriptMessage, not RPC)
 
-In edit mode the app injects `packages/engine/src/canvas.js` into the canvas film (never into
-a build, a presentation or a published file). It posts `{kind: 'canvas', ...}` to the `sage`
-message handler; the app turns each into a `talk.edit`. Numbers are stage px (1920x1080),
-whole px; `left`/`top` are the element's CSS left/top.
+The app injects `packages/engine/src/canvas.js` into the canvas film of every editable
+(beat-format) talk, never into a build, a presentation or a published file. There is no edit
+mode: while the film is paused the canvas is directly editable, and while it plays the overlay
+hides and the engine gets every click and key (canvas.js wraps `T.play`/`T.pause`; a seek
+pauses, so scrubbing brings the overlay back at the new time, keeping the selection when the
+element still shows). It posts `{kind: 'canvas', ...}` to the `sage` message handler; the app
+turns each edit into a `talk.edit`. Numbers are stage px (1920x1080), whole px; `left`/`top`
+are the element's CSS left/top; `rect` is `{x, y, w, h}` in the page's client px (the web
+view's points), where the app floats its format bar.
 
 | `type` | Fields | App does |
 |---|---|---|
-| `select` | `{id: null}` or `{id, tag, left, top, width, height, fontSize, movable, editable, html, src}` | shows it in the inspector |
+| `select` | `{id: null}` or `{id, tag, left, top, width, height, fontSize, movable, editable, html, src, rect, text: {bold, italic, underline, color, align, family}}` | shows it in the inspector and the format bar |
 | `move` | `{id, left, top}` (drag end, or arrow nudges after 300 ms of quiet) | `setStyle {left, top}` |
 | `resize` | `{id, left, top, width, height}` | `setStyle {left, top, width, height}` |
-| `text` | `{id, html}` (in-place edit committed and changed) | `setText` |
+| `text` | `{id, html}` (in-place edit committed and changed; inline `<b>/<i>/<u>` and `<span style="color:…">` from the format bar included) | `setText` |
+| `style` | `{id, style}` (a format command for the whole element: `fontWeight`, `fontStyle`, `textDecoration`, `color`, `textAlign`, `fontSize`, `fontFamily`; already applied in the page) | `setStyle` |
+| `editing` | `{id}` (the caret went into #id's text) or `{id: null}` (left it) | routes ⌘Z to the text's own undo |
+| `format` | `{id, bold, italic, underline, color, range}` (the text selection's formatting while editing) | the format bar's state |
+| `rect` | `{id, rect}` (the selection's box on screen changed) | moves the format bar |
 | `refused` | `{id, reason: 'block-children'}` | says why the text cannot be edited in place |
 
 The app drives it with `SageCanvas.enable()`, `disable()`, `select(id, {silent})` (restores
-the selection after a reload) and `key(name, {shift})` (keys the app's menus catch first).
+the selection after a reload), `key(name, {shift})` (keys the app's menus catch first),
+`format(cmd, value)` (the format bar: inline on a selected range while editing, else the whole
+element) and `takeText()` (ends text editing and returns its `text` message instead of posting
+it, so the app can save it before an edit of its own).
 `packages/engine/test/canvas.test.ts` records these messages in Playwright WebKit.
 
 ## Claude (Phase 4)

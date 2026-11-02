@@ -1,28 +1,43 @@
 // canvas.js — the editing overlay for the app's canvas (PLAN 5.3, 12.4).
 //
-// Injected by the Mac app into the compiled film only in edit mode; never part of a build, a
-// presentation, or a published file. It selects, moves, resizes and edits the text of objects
-// (elements with an id) and reports every change to the host as one precise message; the host
-// writes the source through the sidecar (talk.edit) and reloads. Nothing here writes files.
+// Injected by the Mac app into the canvas film of an editable talk; never part of a build, a
+// presentation, or a published file. There is no edit mode: whenever the film is paused the
+// canvas is directly editable (Keynote-style), and while it plays the overlay steps aside and
+// lets the engine have every click and key. It selects, moves, resizes and edits the text of
+// objects (elements with an id) and reports every change to the host as one precise message;
+// the host writes the source through the sidecar (talk.edit) and reloads. Nothing here writes
+// files.
 //
 // Messages (posted to window.webkit.messageHandlers.sage as {kind: 'canvas', ...msg}, or to
 // opts.post(msg)). Numbers are stage px (the 1920x1080 stage); left/top are the element's
 // CSS left/top (its offset parent's coordinates, which for a top-level positioned object are
-// the stage's), rounded to whole px:
+// the stage's), rounded to whole px. `rect` is the element's box in the page's client px (where
+// the host floats its format bar):
 //   {type: 'select', id: null}                                  selection cleared
-//   {type: 'select', id, tag, left, top, width, height, fontSize, movable, editable, html, src}
+//   {type: 'select', id, tag, left, top, width, height, fontSize, movable, editable, html, src,
+//    rect, text}                  text: {bold, italic, underline, color, align, family} (computed)
 //   {type: 'move', id, left, top}                               drag ended, or nudges settled
 //   {type: 'resize', id, left, top, width, height}              handle drag ended
 //   {type: 'text', id, html}                                    in-place text committed (changed)
+//   {type: 'style', id, style}                                  a format change for the whole element
+//                                                               (setStyle keys: fontWeight, color, ...)
+//   {type: 'editing', id}                                       the caret went into #id's text (id null: left it)
+//   {type: 'format', id, bold, italic, underline, color, range} the text selection's formatting while editing
+//   {type: 'rect', id, rect}                                    the selected element's client box changed
 //   {type: 'refused', id, reason}                               'block-children': text edit refused
 //
 // Selection: the topmost element with an id at the point whose own effective opacity is at
 // least 0.05 (an element at opacity 0 is skipped and the one beneath considered). Scene
 // containers (.scene) and full-stage backgrounds (#black and the like) are never selected.
 // Snapping (hold Cmd to disable): to other visible objects' edges and centres and the stage's,
-// within 8 px, with guides; otherwise to a 10 px grid. Keys while something is selected:
-// arrows nudge 1 px (Shift: 10 px), Enter edits text, Escape deselects, Tab cycles objects.
-// While editing text: Escape cancels, Enter or a click elsewhere (blur) commits.
+// within 8 px, with guides; otherwise to a 10 px grid.
+// Clicks: a click selects; a click on the selected text object (or a double-click) puts the
+// caret there; a click on empty stage deselects. Keys while something is selected: arrows
+// nudge 1 px (Shift: 10 px), Enter edits its text (all selected), typing a character starts
+// editing with it, Cmd-B/I/U format it, Escape deselects, Tab cycles objects. While editing
+// text: Escape or Enter commits and leaves the text (the object stays selected), Shift-Enter is
+// a line break, a click elsewhere commits; Cmd-B/I/U format the selected range. Space is never
+// taken from the engine unless the caret is in text.
 (function () {
   'use strict';
   if (window.SageCanvas) return;
@@ -32,12 +47,22 @@
   const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
   const MIN_OPACITY = 0.05;
   const DRAG_START = 3; // screen px before a press becomes a drag
+  const INLINE_CMDS = { bold: 'bold', italic: 'italic', underline: 'underline', color: 'foreColor' };
 
   const round = (v) => Math.round(v);
   const r2 = (v) => Math.round(v * 100) / 100;
+  const hex2 = (n) => Math.max(0, Math.min(255, Math.round(+n))).toString(16).padStart(2, '0');
+  /** rgb()/rgba() with full alpha to #rrggbb; anything else unchanged. */
+  const toHex = (c) => {
+    const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)$/.exec(String(c || '').trim());
+    if (!m || (m[4] !== undefined && parseFloat(m[4]) < (m[4].endsWith('%') ? 100 : 1))) return c;
+    return '#' + hex2(m[1]) + hex2(m[2]) + hex2(m[3]);
+  };
 
   const C = {
     on: false,
+    /** The film is playing: the overlay is hidden and every event goes to the engine. */
+    suspended: false,
     sel: null,
     editing: null,
     opts: null,
@@ -46,7 +71,8 @@
     overlay: null,
     drag: null,
     nudge: null,
-    prevOnRender: null,
+    prev: null,
+    lastRect: '',
 
     // --- lifecycle ---------------------------------------------------------------------
 
@@ -57,39 +83,51 @@
       if (!this.stage || !this.film) return;
       this.opts = Object.assign({ grid: 10, snap: 8, nudgeDelay: 300, post: null }, opts);
       this.on = true;
-      window.T?.pause?.();
       this.buildOverlay();
-      for (const [type, fn] of this.listeners()) window.addEventListener(type, fn, true);
+      for (const [target, type, fn] of this.listeners()) target.addEventListener(type, fn, true);
       const T = window.T;
       if (T) {
-        this.prevOnRender = T.onRender;
-        T.onRender = (t) => { this.prevOnRender?.(t); this.update(); };
+        // Follow play state: playing hides the overlay, a pause (or seek) brings it back.
+        this.prev = { onRender: T.onRender, play: Object.prototype.hasOwnProperty.call(T, 'play') ? T.play : null,
+          pause: Object.prototype.hasOwnProperty.call(T, 'pause') ? T.pause : null };
+        const play = T.play, pause = T.pause;
+        T.onRender = (t) => { this.prev?.onRender?.(t); this.rendered(); };
+        T.play = function (...a) { C.leaveText(); const r = play.apply(this, a); C.follow(); return r; };
+        T.pause = function (...a) { const r = pause.apply(this, a); C.follow(); return r; };
       }
-      this.film.classList.add('sage-canvas-on');
+      this.suspended = !!T?.playing;
+      this.film.classList.toggle('sage-canvas-on', !this.suspended);
       this.update();
     },
 
     disable() {
       if (!this.on) return;
       this.flushNudge();
-      if (this.editing) this.cancelText();
-      for (const [type, fn] of this.listeners()) window.removeEventListener(type, fn, true);
-      if (window.T) window.T.onRender = this.prevOnRender;
-      this.prevOnRender = null;
+      if (this.editing) this.commitText();
+      for (const [target, type, fn] of this.listeners()) target.removeEventListener(type, fn, true);
+      const T = window.T;
+      if (T && this.prev) {
+        T.onRender = this.prev.onRender;
+        if (this.prev.play) T.play = this.prev.play; else delete T.play;
+        if (this.prev.pause) T.pause = this.prev.pause; else delete T.pause;
+      }
+      this.prev = null;
       this.overlay?.remove();
       this.overlay = null;
       this.film.classList.remove('sage-canvas-on');
       this.on = false;
+      this.suspended = false;
       this.sel = null;
       this.drag = null;
+      this.lastRect = '';
     },
 
     listeners() {
       if (!this._ls) {
         this._ls = [
-          ['pointerdown', (e) => this.onDown(e)], ['pointermove', (e) => this.onMove(e)], ['pointerup', (e) => this.onUp(e)],
-          ['click', (e) => this.onClick(e)], ['dblclick', (e) => this.onDblClick(e)], ['keydown', (e) => this.onKey(e)],
-          ['resize', () => this.update()],
+          [window, 'pointerdown', (e) => this.onDown(e)], [window, 'pointermove', (e) => this.onMove(e)], [window, 'pointerup', (e) => this.onUp(e)],
+          [window, 'click', (e) => this.onClick(e)], [window, 'dblclick', (e) => this.onDblClick(e)], [window, 'keydown', (e) => this.onKey(e)],
+          [window, 'resize', () => this.update()], [document, 'selectionchange', () => this.onSelectionChange()],
         ];
       }
       return this._ls;
@@ -98,6 +136,51 @@
     post(msg) {
       if (this.opts?.post) return this.opts.post(msg);
       try { window.webkit.messageHandlers.sage.postMessage(Object.assign({ kind: 'canvas' }, msg)); } catch (e) { /* no host */ }
+    },
+
+    // --- play state ------------------------------------------------------------------------
+
+    /** Called after play() and pause() (seek pauses too): hide or bring back the overlay. */
+    follow() {
+      if (!this.on) return;
+      const playing = !!window.T?.playing;
+      if (playing === this.suspended) return;
+      this.suspended = playing;
+      if (playing) {
+        this.leaveText();
+        this.drag = null;
+        this.guides(null, null);
+      }
+      this.film.classList.toggle('sage-canvas-on', !playing);
+      this.update();
+      if (!playing) this.revalidate();
+    },
+
+    /** Ends text editing (committing it) and settles nudges, before the film moves. */
+    leaveText() {
+      this.flushNudge();
+      if (this.editing) this.commitText();
+    },
+
+    /** After every engine render: redraw, and while paused keep the selection honest. */
+    rendered() {
+      this.update();
+      if (this.suspended || window.T?.playing) return;
+      clearTimeout(this._rv);
+      this._rv = setTimeout(() => this.revalidate(), 0);
+    },
+
+    /**
+     * The film moved while something was selected: keep the selection when the element still
+     * exists and shows, and report its state at the new time; otherwise clear it.
+     */
+    revalidate() {
+      if (!this.on || this.suspended || !this.sel || this.editing || this.drag) return;
+      const el = this.el(this.sel);
+      if (!el || !this.visible(el)) { this.select(null); return; }
+      const msg = this.info(this.sel);
+      const key = JSON.stringify(msg);
+      if (key !== this._lastInfo) { this._lastInfo = key; this.post(msg); }
     },
 
     // --- geometry ----------------------------------------------------------------------
@@ -111,6 +194,11 @@
     rectOf(el) {
       const g = this.geom(), b = el.getBoundingClientRect();
       return { x: (b.left - g.x) / g.k, y: (b.top - g.y) / g.k, w: b.width / g.k, h: b.height / g.k };
+    },
+    /** The element's box in client px (the web view's points). */
+    clientRect(el) {
+      const b = el.getBoundingClientRect();
+      return { x: r2(b.left), y: r2(b.top), w: r2(b.width), h: r2(b.height) };
     },
     /** Stage px per CSS px of the element's own coordinates (a scaled ancestor, e.g. a camera). */
     unit(el) {
@@ -188,6 +276,19 @@
 
     // --- selection -----------------------------------------------------------------------
 
+    /** The element's computed text formatting (the format bar's state when not editing). */
+    textInfo(el) {
+      const cs = getComputedStyle(el);
+      const w = parseInt(cs.fontWeight, 10);
+      return {
+        bold: (Number.isFinite(w) ? w : cs.fontWeight === 'bold' ? 700 : 400) >= 600,
+        italic: cs.fontStyle === 'italic' || cs.fontStyle.startsWith('oblique'),
+        underline: (cs.textDecorationLine || cs.textDecoration || '').includes('underline'),
+        color: toHex(cs.color), align: cs.textAlign === 'start' ? 'left' : cs.textAlign === 'end' ? 'right' : cs.textAlign,
+        family: cs.fontFamily,
+      };
+    },
+
     info(id) {
       const el = this.el(id);
       if (!el) return null;
@@ -197,6 +298,7 @@
         left: r2(b.left), top: r2(b.top), width: r2(b.width), height: r2(b.height),
         fontSize: r2(parseFloat(cs.fontSize) || 0), movable: this.movable(el), editable,
         html: editable ? el.innerHTML : null, src: el.tagName === 'IMG' ? el.getAttribute('src') : null,
+        rect: this.clientRect(el), text: this.textInfo(el),
       };
     },
 
@@ -206,8 +308,12 @@
       if (id && !this.el(id)) id = null;
       if (id !== this.sel) { this.flushNudge(); if (this.editing) this.commitText(); }
       this.sel = id;
+      this._selecting = true; // the select message carries the rect: no separate rect message
       this.update();
+      this._selecting = false;
       const msg = id ? this.info(id) : { type: 'select', id: null };
+      this.lastRect = id ? this.rectKey(msg.rect) : '';
+      this._lastInfo = JSON.stringify(msg);
       if (!silent) this.post(msg);
       return msg;
     },
@@ -225,6 +331,7 @@
       const css = document.createElement('style');
       css.textContent = `
         .sage-canvas-overlay .sc-box { position:absolute; display:none; box-sizing:border-box; outline:var(--sc-line) solid #0a84ff; }
+        .sage-canvas-overlay .sc-box.sc-editing { outline-style:dashed; outline-color:rgba(10,132,255,0.75); }
         .sage-canvas-overlay .sc-h { position:absolute; display:none; box-sizing:border-box; width:var(--sc-hs); height:var(--sc-hs); margin:calc(var(--sc-hs) / -2) 0 0 calc(var(--sc-hs) / -2); background:#fff; border:var(--sc-line) solid #0a84ff; border-radius:2px; pointer-events:auto; }
         .sage-canvas-overlay .sc-h[data-h=nw], .sage-canvas-overlay .sc-h[data-h=se] { cursor:nwse-resize; }
         .sage-canvas-overlay .sc-h[data-h=ne], .sage-canvas-overlay .sc-h[data-h=sw] { cursor:nesw-resize; }
@@ -233,7 +340,7 @@
         .sage-canvas-overlay .sc-gx, .sage-canvas-overlay .sc-gy { position:absolute; display:none; background:#ff2d78; }
         .sage-canvas-overlay .sc-gx { top:0; height:${H}px; width:var(--sc-line); }
         .sage-canvas-overlay .sc-gy { left:0; width:${W}px; height:var(--sc-line); }
-        .film.sage-canvas-on .stage [contenteditable] { outline: none; cursor: text; user-select: text; -webkit-user-select: text; }
+        .film.sage-canvas-on .stage [contenteditable] { outline: none; cursor: text; user-select: text; -webkit-user-select: text; caret-color: #0a84ff; }
         .film.sage-canvas-on .stage { cursor: default; }`;
       o.appendChild(css);
       this.film.appendChild(o);
@@ -244,15 +351,17 @@
     update() {
       const o = this.overlay;
       if (!o) return;
+      o.style.display = this.suspended ? 'none' : 'block';
       o.style.transform = this.stage.style.transform;
       const k = this.geom().k;
       o.style.setProperty('--sc-line', `${2 / k}px`);
       o.style.setProperty('--sc-hs', `${10 / k}px`);
       const el = this.el(this.sel), box = o.querySelector('.sc-box');
       const hs = o.querySelectorAll('.sc-h');
-      if (!el) { box.style.display = 'none'; hs.forEach((h) => (h.style.display = 'none')); return; }
+      if (!el) { box.style.display = 'none'; hs.forEach((h) => (h.style.display = 'none')); this.reportRect(null); return; }
       const r = this.rectOf(el);
       Object.assign(box.style, { display: 'block', left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+      box.classList.toggle('sc-editing', !!this.editing);
       const show = this.movable(el) && !this.editing;
       hs.forEach((h) => {
         const k2 = h.dataset.h;
@@ -260,6 +369,18 @@
         const y = k2.includes('n') ? r.y : k2.includes('s') ? r.y + r.h : r.y + r.h / 2;
         Object.assign(h.style, { display: show ? 'block' : 'none', left: `${x}px`, top: `${y}px` });
       });
+      if (!this.suspended && !this._selecting) this.reportRect(el);
+    },
+
+    rectKey(rect) { return rect ? `${this.sel} ${rect.x} ${rect.y} ${rect.w} ${rect.h}` : ''; },
+
+    /** Tells the host where the selected element is on screen, when that changed. */
+    reportRect(el) {
+      const rect = el ? this.clientRect(el) : null;
+      const key = this.rectKey(rect);
+      if (key === this.lastRect) return;
+      this.lastRect = key;
+      if (rect) this.post({ type: 'rect', id: this.sel, rect });
     },
 
     guides(gx, gy) {
@@ -302,7 +423,7 @@
     },
 
     onDown(e) {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || this.suspended) return;
       const handle = e.target?.closest?.('.sage-canvas-overlay .sc-h');
       if (this.editing) {
         if (this.editing.el.contains(e.target)) return; // caret placement inside the edited text
@@ -313,15 +434,16 @@
       e.stopPropagation();
       this.flushNudge();
       const p = this.toStage(e.clientX, e.clientY);
-      if (handle && this.sel) return this.startDrag(e, this.el(this.sel), handle.dataset.h);
+      if (handle && this.sel) return this.startDrag(e, this.el(this.sel), handle.dataset.h, true);
       const id = this.hitTest(p.x, p.y);
+      const was = !!id && id === this.sel;
       if (id !== this.sel) this.select(id);
-      if (id) this.startDrag(e, this.el(id), null);
+      if (id) this.startDrag(e, this.el(id), null, was);
     },
 
-    startDrag(e, el, handle) {
+    startDrag(e, el, handle, wasSelected) {
       this.drag = {
-        el, handle, x0: e.clientX, y0: e.clientY, moved: false, pointerId: e.pointerId,
+        el, handle, x0: e.clientX, y0: e.clientY, moved: false, pointerId: e.pointerId, wasSelected,
         box: this.box(el), rect: this.rectOf(el), unit: this.unit(el), canMove: this.movable(el),
       };
       try { e.target.setPointerCapture?.(e.pointerId); } catch (err) { /* synthetic events */ }
@@ -392,7 +514,11 @@
       e.stopPropagation();
       this.drag = null;
       this.guides(null, null);
-      if (!d.moved || !d.result) return;
+      if (!d.moved || !d.result) {
+        // A click on the already selected text object puts the caret there (Keynote).
+        if (!d.handle && d.wasSelected && !d.moved && this.editable(d.el)) this.beginText(d.el.id, { x: e.clientX, y: e.clientY });
+        return;
+      }
       const r = d.result, id = d.el.id;
       if (d.handle) this.post({ type: 'resize', id, left: r.left, top: r.top, width: r.width, height: r.height });
       else if (r.left !== round(d.box.left) || r.top !== round(d.box.top)) this.post({ type: 'move', id, left: r.left, top: r.top });
@@ -400,35 +526,95 @@
     },
 
     onClick(e) {
-      // The engine advances on a stage click; in edit mode a click only selects.
-      if (this.editing?.el.contains(e.target)) return;
+      // The engine advances on a stage click; while paused a click only selects.
+      if (this.suspended || this.editing?.el.contains(e.target)) return;
       if (this.inStage(e) || e.target?.closest?.('.sage-canvas-overlay')) { e.preventDefault(); e.stopPropagation(); }
     },
 
     onDblClick(e) {
-      if (!this.inStage(e) || this.editing) return;
+      if (this.suspended || !this.inStage(e)) return;
       e.preventDefault();
       e.stopPropagation();
+      if (this.editing) { this.selectWordAt(e.clientX, e.clientY); return; }
       const p = this.toStage(e.clientX, e.clientY);
       const id = this.hitTest(p.x, p.y);
-      if (id) { if (id !== this.sel) this.select(id); this.beginText(id); }
+      if (!id) return;
+      if (id !== this.sel) this.select(id);
+      if (this.beginText(id, { x: e.clientX, y: e.clientY })) this.selectWordAt(e.clientX, e.clientY);
+    },
+
+    selectWordAt(x, y) {
+      const s = getSelection(), r = this.caretAt(x, y);
+      if (!s || !r) return;
+      s.removeAllRanges();
+      s.addRange(r);
+      s.modify?.('move', 'backward', 'word');
+      s.modify?.('extend', 'forward', 'word');
+    },
+
+    /** A collapsed range at a client point inside the edited element, or null. */
+    caretAt(x, y) {
+      const el = this.editing?.el;
+      if (!el) return null;
+      const r = document.caretRangeFromPoint?.(x, y);
+      if (r && el.contains(r.startContainer)) return r;
+      // Something transparent lies on top (a full-stage background, the overlay): find the
+      // character under the point, or the nearest one, in the element's own text.
+      let best = null;
+      const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const probe = document.createRange();
+      for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+        for (let i = 0; i < t.data.length; i++) {
+          probe.setStart(t, i); probe.setEnd(t, i + 1);
+          const b = probe.getBoundingClientRect();
+          if (!b.width && !b.height) continue;
+          const dx = x < b.left ? b.left - x : x > b.right ? x - b.right : 0;
+          const dy = y < b.top ? b.top - y : y > b.bottom ? y - b.bottom : 0;
+          const d = dy * 1000 + dx; // same line first
+          if (!best || d < best.d) best = { d, t, i: x > (b.left + b.right) / 2 ? i + 1 : i };
+          if (!d) break;
+        }
+        if (best && !best.d) break;
+      }
+      if (!best) return null;
+      const out = document.createRange();
+      out.setStart(best.t, best.i);
+      out.collapse(true);
+      return out;
     },
 
     // --- keyboard -------------------------------------------------------------------------
 
     onKey(e) {
-      if (e.metaKey || e.ctrlKey) return; // app shortcuts
+      if (this.suspended) return;
+      if (e.metaKey || e.ctrlKey) {
+        // Cmd-B/I/U format the text (the selected range while editing, else the whole object).
+        const cmd = !e.altKey && !e.shiftKey && { b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()];
+        if (cmd && this.sel && this.editable(this.el(this.sel))) { e.preventDefault(); e.stopImmediatePropagation(); this.format(cmd); }
+        return; // other app shortcuts
+      }
       if (this.key(e.key, { shift: e.shiftKey, alt: e.altKey })) { e.preventDefault(); e.stopImmediatePropagation(); return; }
-      // Keep the engine's and edit.js's letter keys (E, N, F, H, T, ...) off while editing.
-      if (!this.editing && e.key.length === 1 && e.key !== ' ') e.stopImmediatePropagation();
+      if (this.editing || e.key.length !== 1) return;
+      // Typing with a text object selected starts editing it with that character (not Space: play).
+      const el = this.el(this.sel);
+      if (e.key !== ' ' && el && this.editable(el) && !e.altKey) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (this.beginText(this.sel, 'end')) document.execCommand('insertText', false, e.key);
+        return;
+      }
+      // Keep the engine's letter keys (E, N, F, H, T, ...) off while editing is possible.
+      if (e.key !== ' ') e.stopImmediatePropagation();
     },
 
     /** Handles a key (from the page, or forwarded by the host). Returns true when handled. */
     key(name, { shift = false } = {}) {
-      if (!this.on) return false;
+      if (!this.on || this.suspended) return false;
       if (this.editing) {
-        if (name === 'Escape') { this.cancelText(); return true; }
+        if (name === 'Escape') { this.commitText(); return true; }
         if (name === 'Enter' && !shift) { this.commitText(); return true; }
+        if (name === 'Enter' && shift) { document.execCommand('insertLineBreak'); return true; }
+        if (name === 'Tab') { this.commitText(); return this.key('Tab', { shift }); }
         if (name === 'ArrowLeft' || name === 'ArrowRight') {
           getSelection()?.modify?.(shift ? 'extend' : 'move', name === 'ArrowLeft' ? 'backward' : 'forward', 'character');
           return true;
@@ -445,10 +631,10 @@
       }
       if (!this.sel) return false;
       if (name === 'Escape') { this.select(null); return true; }
-      if (name === 'Enter') { this.beginText(this.sel); return true; }
+      if (name === 'Enter') return this.beginText(this.sel, 'all') || true;
       const step = shift ? 10 : 1;
       const dir = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[name];
-      if (!dir) return false;
+      if (!dir || !this.movable(this.el(this.sel))) return false; // arrows drive the film then
       this.nudgeBy(dir[0], dir[1]);
       return true;
     },
@@ -478,59 +664,223 @@
 
     // --- text -------------------------------------------------------------------------------
 
-    /** Starts in-place editing of #id. Refuses (with a message) text that has block children. */
-    beginText(id) {
+    /**
+     * Puts the caret into #id's text: at a client point ({x, y}), at the 'end', or with 'all'
+     * of it selected. Refuses (with a message) text that has block children.
+     */
+    beginText(id, at = 'all') {
       const el = this.el(id);
-      if (!el || this.editing) return false;
+      if (!el || this.suspended) return false;
+      if (this.editing) { if (this.editing.el === el) return true; this.commitText(); }
       if (!this.editable(el)) { this.post({ type: 'refused', id, reason: 'block-children' }); return false; }
+      if (id !== this.sel) this.select(id);
       this.flushNudge();
-      const ed = { el, orig: el.innerHTML };
-      ed.onBlur = () => { if (this.editing === ed) this.commitText(); };
-      el.setAttribute('contenteditable', 'plaintext-only');
+      const before = new Set(el.querySelectorAll('*'));
+      const ed = { el, orig: el.innerHTML, range: null, old: (n) => before.has(n) };
+      ed.onPaste = (e) => { e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData?.getData('text/plain') ?? '').replace(/\s*\n\s*/g, ' ')); };
+      ed.onDrop = (e) => e.preventDefault();
+      ed.onInput = () => this.update();
+      el.setAttribute('contenteditable', 'true');
       el.setAttribute('spellcheck', 'false');
-      el.addEventListener('blur', ed.onBlur);
+      el.addEventListener('paste', ed.onPaste);
+      el.addEventListener('drop', ed.onDrop);
+      el.addEventListener('input', ed.onInput);
       this.editing = ed;
       el.focus();
-      const r = document.createRange();
-      r.selectNodeContents(el);
+      try { document.execCommand('styleWithCSS', false, false); } catch (e) { /* older engines */ }
       const s = getSelection();
+      let r = at && typeof at === 'object' ? this.caretAt(at.x, at.y) : null;
+      if (!r) {
+        r = document.createRange();
+        r.selectNodeContents(el);
+        if (at !== 'all') r.collapse(false);
+      }
       s?.removeAllRanges();
       s?.addRange(r);
+      ed.range = r.cloneRange();
       this.update();
+      this.post({ type: 'editing', id });
+      this.postFormat();
       return true;
     },
 
     endText() {
       const ed = this.editing;
       this.editing = null;
-      ed.el.removeEventListener('blur', ed.onBlur);
+      ed.el.removeEventListener('paste', ed.onPaste);
+      ed.el.removeEventListener('drop', ed.onDrop);
+      ed.el.removeEventListener('input', ed.onInput);
       ed.el.removeAttribute('contenteditable');
       ed.el.removeAttribute('spellcheck');
       getSelection()?.removeAllRanges();
       if (document.activeElement === ed.el) ed.el.blur();
       this.update();
+      this.post({ type: 'editing', id: null });
       return ed;
     },
 
-    /** Ends editing; posts the new inner HTML when it changed and holds only inline markup. */
-    commitText() {
-      if (!this.editing) return;
-      const ed = this.endText(), el = ed.el;
-      const html = el.innerHTML;
-      if (html === ed.orig) return;
-      if ([...el.children].some((c) => !INLINE.has(c.tagName))) {
-        el.innerHTML = ed.orig;
-        this.post({ type: 'refused', id: el.id, reason: 'block-children' });
-        return;
+    /**
+     * Normalises what the browser's editing wrote: <font color> becomes a span with a color,
+     * rgb() colours become hex, empty style attributes go, a trailing <br> the browser added
+     * goes, and non-breaking spaces the browser used for typed spaces become spaces.
+     */
+    sanitize(el, { orig, old }) {
+      for (const f of [...el.querySelectorAll('font')]) {
+        const s = document.createElement('span');
+        if (f.getAttribute('color')) s.style.color = f.getAttribute('color');
+        s.append(...f.childNodes);
+        f.replaceWith(s);
       }
-      this.post({ type: 'text', id: el.id, html });
+      for (const n of [...el.querySelectorAll('[style]')]) {
+        const raw = n.getAttribute('style');
+        if (!raw.trim()) { n.removeAttribute('style'); continue; }
+        if (old(n) && !/rgba?\(/.test(raw)) continue; // as written in the source
+        const css = raw.replace(/rgba?\([^)]*\)/g, (m) => toHex(m)).replace(/\s*:\s*/g, ':').replace(/\s*;\s*/g, ';').replace(/;$/, '').trim();
+        if (!old(n) && n.tagName !== 'SPAN') {
+          // a style the browser put on a new <b>/<i>/<u>: keep the tag, carry the style on a span inside
+          const s = document.createElement('span');
+          s.setAttribute('style', css);
+          s.append(...n.childNodes);
+          n.append(s);
+          n.removeAttribute('style');
+        } else n.setAttribute('style', css);
+      }
+      for (const n of [...el.querySelectorAll('span')]) if (!old(n) && !n.attributes.length) n.replaceWith(...n.childNodes);
+      if (!/<br\s*\/?>\s*$/i.test(orig)) while (el.lastChild?.nodeName === 'BR') el.lastChild.remove();
+      if (!orig.includes('&nbsp;') && el.innerHTML.includes('&nbsp;')) {
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let t = walk.nextNode(); t; t = walk.nextNode()) t.data = t.data.replace(/\u00a0/g, ' ');
+      }
     },
+
+    /**
+     * Ends editing. Returns the text message when the inner HTML changed and holds only inline
+     * markup (posting it unless `post` is false), a refusal (posted), or null.
+     */
+    commitText({ post = true } = {}) {
+      if (!this.editing) return null;
+      const ed = this.endText(), el = ed.el;
+      this.sanitize(el, ed);
+      const html = el.innerHTML;
+      if (html === ed.orig) return null;
+      if ([...el.querySelectorAll('*')].some((c) => !INLINE.has(c.tagName))) {
+        el.innerHTML = ed.orig;
+        this.update();
+        this.post({ type: 'refused', id: el.id, reason: 'block-children' });
+        return null;
+      }
+      const msg = { type: 'text', id: el.id, html };
+      if (post) this.post(msg);
+      this.update();
+      return msg;
+    },
+
+    /** The host ends text editing before an edit of its own: the text message, or null. */
+    takeText() { return this.commitText({ post: false }); },
 
     cancelText() {
       if (!this.editing) return;
       const ed = this.endText();
       ed.el.innerHTML = ed.orig;
       this.update();
+    },
+
+    onSelectionChange() {
+      const ed = this.editing;
+      if (!ed) return;
+      const s = getSelection();
+      if (s?.rangeCount && ed.el.contains(s.getRangeAt(0).commonAncestorContainer)) ed.range = s.getRangeAt(0).cloneRange();
+      cancelAnimationFrame(this._fmt);
+      this._fmt = requestAnimationFrame(() => this.postFormat());
+    },
+
+    /** The formatting at the text selection (while editing). */
+    textState() {
+      const ed = this.editing;
+      if (!ed) return null;
+      const q = (c) => { try { return document.queryCommandState(c); } catch (e) { return false; } };
+      let color = '';
+      try { color = toHex(document.queryCommandValue('foreColor')); } catch (e) { /* none */ }
+      return { bold: q('bold'), italic: q('italic'), underline: q('underline'), color, range: !!ed.range && !ed.range.collapsed };
+    },
+
+    postFormat() {
+      const st = this.textState();
+      if (!st) return;
+      const msg = Object.assign({ type: 'format', id: this.editing.el.id }, st), key = JSON.stringify(msg);
+      if (key === this.editing.lastFormat) return; // unchanged
+      this.editing.lastFormat = key;
+      this.post(msg);
+    },
+
+    /** Puts the saved text selection back (a host control may have taken focus). */
+    restoreRange() {
+      const ed = this.editing;
+      if (!ed?.range) return null;
+      if (document.activeElement !== ed.el) ed.el.focus();
+      const s = getSelection();
+      s?.removeAllRanges();
+      s?.addRange(ed.range);
+      return ed.range;
+    },
+
+    /**
+     * Formats the selected object's text: `cmd` is bold, italic, underline, color (value a
+     * CSS colour), align (left/center/right/justify), fontSize (px) or fontFamily (CSS). While
+     * editing with a range selected, bold/italic/underline/color apply to that range in place
+     * (as <b>/<i>/<u> and a span with a color, committed with the text). Otherwise the whole
+     * element changes: the style is applied at once and posted as {type: 'style'} for setStyle.
+     * Returns 'inline', 'element', or null when nothing is selected.
+     */
+    format(cmd, value) {
+      const el = this.el(this.sel);
+      if (!el || this.suspended) return null;
+      if (this.editing?.el === el && INLINE_CMDS[cmd]) {
+        const r = this.restoreRange();
+        if (r && !r.collapsed) {
+          try {
+            document.execCommand('styleWithCSS', false, cmd === 'color');
+            document.execCommand(INLINE_CMDS[cmd], false, cmd === 'color' ? value : null);
+            document.execCommand('styleWithCSS', false, false);
+          } catch (e) { return null; }
+          const s = getSelection();
+          if (s?.rangeCount) this.editing.range = s.getRangeAt(0).cloneRange();
+          this.update();
+          this.postFormat();
+          return 'inline';
+        }
+      }
+      const style = this.elementStyle(el, cmd, value);
+      if (!style) return null;
+      for (const [k, v] of Object.entries(style)) el.style[k] = v === null ? '' : typeof v === 'number' && k !== 'fontWeight' ? `${v}px` : String(v);
+      this.update();
+      this.post({ type: 'style', id: el.id, style });
+      return 'element';
+    },
+
+    /** The setStyle change for a whole-element format command (null: no change). */
+    elementStyle(el, cmd, value) {
+      const toggle = (prop, isOn, on, off) => {
+        // Toggle against what the element shows; drop our own inline value when the stylesheet
+        // alone gives the wanted state.
+        const want = !isOn(getComputedStyle(el));
+        const own = el.style[prop];
+        el.style[prop] = '';
+        const base = isOn(getComputedStyle(el));
+        el.style[prop] = own;
+        return { [prop]: base === want ? null : want ? on : off };
+      };
+      const weight = (cs) => { const w = parseInt(cs.fontWeight, 10); return (Number.isFinite(w) ? w : cs.fontWeight === 'bold' ? 700 : 400) >= 600; };
+      switch (cmd) {
+        case 'bold': return toggle('fontWeight', weight, '700', '400');
+        case 'italic': return toggle('fontStyle', (cs) => cs.fontStyle !== 'normal', 'italic', 'normal');
+        case 'underline': return toggle('textDecoration', (cs) => (cs.textDecorationLine || cs.textDecoration || '').includes('underline'), 'underline', 'none');
+        case 'color': return value ? { color: String(value) } : null;
+        case 'align': return value ? { textAlign: String(value) } : null;
+        case 'fontSize': return Number.isFinite(+value) && +value > 0 ? { fontSize: +value } : null;
+        case 'fontFamily': return value ? { fontFamily: String(value) } : null;
+        default: return null;
+      }
     },
   };
 
