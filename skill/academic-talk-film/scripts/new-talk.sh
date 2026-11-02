@@ -2,12 +2,17 @@
 # Scaffold a sage-talk/1 talk folder from assets/starter-v2: a minimal working talk (title, one
 # chapter, a dark passage with the close, a backup, a public end card) that passes
 # `talkc validate --render` and builds. Grow it chapter by chapter.
-#   bash new-talk.sh <target-dir> ["Short title"]
-# Refuses to overwrite an existing talk.json. Hand-written single-file decks: scripts/legacy/.
+#   bash new-talk.sh <paper-dir>/<name>.talk ["Short title"]
+# Name the target <name>.talk (e.g. issta26.talk): a SAGE Talk document package, still a plain
+# folder on disk, which Finder shows as one document that opens in the app. Any folder name
+# works. The title defaults to the name without .talk. Refuses to overwrite an existing
+# talk.json. Hand-written single-file decks: scripts/legacy/.
 set -e
 HERE="$(cd "$(dirname "$0")/.." && pwd -P)"
-DEST="${1:?usage: new-talk.sh <target-dir> [\"Short title\"]}"
-TITLE="${2:-Talk}"
+DEST="${1:?usage: new-talk.sh <paper-dir>/<name>.talk [\"Short title\"]}"
+DEST="${DEST%/}"
+NAME="$(basename "$DEST")"
+TITLE="${2:-${NAME%.talk}}"
 if [ -e "$DEST/talk.json" ]; then echo "new-talk: $DEST/talk.json already exists; not overwriting" >&2; exit 1; fi
 mkdir -p "$DEST"
 cp -R "$HERE/assets/starter-v2/." "$DEST/"
@@ -37,4 +42,8 @@ if [ ! -f "$DEST/README.md" ]; then
   } > "$DEST/README.md"
 fi
 echo "scaffolded $DEST"
+case "$DEST" in
+  *.talk) ;;
+  *) echo "note: name it <name>.talk (e.g. mv \"$DEST\" \"$DEST.talk\") to make it a SAGE Talk document" >&2 ;;
+esac
 ls "$DEST"

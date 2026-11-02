@@ -5,8 +5,8 @@
 For a `sage-talk/1` talk folder (`talk.json`), use the SAGE talk editor's compiler:
 
 ```
-talkc publish talk/ <slug>                   # writes talk/build/public/<slug>.html
-talkc shoot talk/build/public/<slug>.html --holds   # check the title autoplays and the end card renders
+talkc publish issta26.talk <slug>            # writes issta26.talk/build/public/<slug>.html
+talkc shoot issta26.talk/build/public/<slug>.html --holds   # check the title autoplays and the end card renders
 ```
 
 It cuts by the spine instead of comment markers: chapters flagged `private` and all backups

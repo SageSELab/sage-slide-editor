@@ -11,7 +11,7 @@ A talk is a **sage-talk/1 folder**: `talk.json` (the spine: chapters, beats, hol
 
 ## What you deliver
 
-A `talk/` folder next to the paper source containing:
+A talk folder next to the paper source, named `<venue><yy>.talk` (for example `issta26.talk`). The `.talk` extension makes it a SAGE Talk document package: still an ordinary folder for git, Dropbox, `talkc` and you, but Finder shows it as one document that opens in the SAGE Talk app (Show Package Contents reveals the files). An existing plain folder such as `talk/` keeps working; rename it only if Kevin asks (the app offers to). It contains:
 
 - `talk.json`, `scenes/`, `beats/`, `lib/`, `theme.css`, `assets/` (font, logos, headshots, screenshots, QR codes).
 - `PLAN.md`, the storyboard, and `README.md` with the keys, the commands and the hold count.
@@ -34,7 +34,7 @@ The canonical arc for an empirical paper: a historical or motivational line → 
 ### 3. Scaffold and build
 
 ```
-bash <skill>/scripts/new-talk.sh <paper-dir>/talk "Short title"
+bash <skill>/scripts/new-talk.sh <paper-dir>/issta26.talk "Short title"
 ```
 
 This copies `assets/starter-v2/`: a minimal working talk (title, one chapter, the dark passage with the close, a backup, a public end card) that already validates and builds. Grow it chapter by chapter: for each chapter add its entry and beats to `talk.json`, its scene, and its `beats/<chapter>.js`. Copy helpers you need from `assets/lib-starter/` (device, code panes, stations, dot grids, bar charts, flow, heat map, terminal replay, slide counter; signatures in its README) into `lib/` and list them in `"lib"`. The format and the `B` API are in `references/engine-api.md`; the visual rules in `references/style.md`. The essentials:
@@ -53,10 +53,10 @@ This copies `assets/starter-v2/`: a minimal working talk (title, one chapter, th
 Validate first, then look. `render(t)` is deterministic, so any instant can be photographed:
 
 ```
-bash <skill>/scripts/talkc.sh validate talk/ --render     # diagnostics with codes, file:line and beat
-bash <skill>/scripts/talkc.sh layout talk/                # hold number, time, label
-bash <skill>/scripts/talkc.sh shoot talk/ --holds --around 0.5   # every hold and 0.5 s either side
-bash <skill>/scripts/talkc.sh shoot talk/ --beats results.rq1 --times 61.3
+bash <skill>/scripts/talkc.sh validate issta26.talk --render     # diagnostics with codes, file:line and beat
+bash <skill>/scripts/talkc.sh layout issta26.talk                # hold number, time, label
+bash <skill>/scripts/talkc.sh shoot issta26.talk --holds --around 0.5   # every hold and 0.5 s either side
+bash <skill>/scripts/talkc.sh shoot issta26.talk --beats results.rq1 --times 61.3
 ```
 
 (`scripts/talkc.sh` runs `talkc` from PATH, `$SAGE_REPO`, or the SAGE talk editor checkout.) Fix every error the validator reports before shooting; warnings are judgement calls (see `references/gotchas.md`). Then look at each PNG of the beats you wrote or changed, and at 0.5 s before and after each changed hold, to catch something moving early or a stale element lingering.
@@ -71,7 +71,7 @@ Kevin refers to slides by the number in the bottom-right counter and to chapters
 
 ### 6. Publish when asked
 
-`talkc publish talk/ <slug>` writes `talk/build/public/<slug>.html`, one self-contained file: private chapters (follow-up, close, recruiting, backups) and notes are cut by the spine, the `public` block's end card is appended, the title autoplays, assets are inlined. Shoot it with `talkc shoot talk/build/public/<slug>.html --holds`. Where it goes on his sites, QR codes, and PDF hosting are in `references/publishing.md`.
+`talkc publish issta26.talk <slug>` writes `issta26.talk/build/public/<slug>.html`, one self-contained file: private chapters (follow-up, close, recruiting, backups) and notes are cut by the spine, the `public` block's end card is appended, the title autoplays, assets are inlined. Shoot it with `talkc shoot issta26.talk/build/public/<slug>.html --holds`. Where it goes on his sites, QR codes, and PDF hosting are in `references/publishing.md`.
 
 ## Inside the SAGE Talk app
 

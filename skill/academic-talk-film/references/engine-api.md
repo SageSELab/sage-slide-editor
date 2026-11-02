@@ -10,7 +10,7 @@ into `build/index.html`; never edit `build/`. The hand-written single-file API (
 ## The talk folder
 
 ```
-talk/
+issta26.talk/          (any folder name works; .talk makes it a SAGE Talk document package)
   talk.json          spine: metadata, chapters, beats (ids, labels, notes, hold), lib, materials
   scenes/<ch>.html   one or more whole <div class="scene"> elements per chapter; objects have ids
   scenes/layers.html elements that persist across chapters (#slideno, a device rig, a world layer)
