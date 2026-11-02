@@ -56,6 +56,10 @@ final class TalkWindowModel {
     var showingPublish = false
     var showingExport = false
 
+    /// The first-run sheet (TalkWindowModel+Onboarding.swift).
+    var onboarding: OnboardingModel?
+    var showOnboarding = false
+
     let canvas = FilmView()
     let thumbnails: ThumbnailStore
     let presentation: PresentationController

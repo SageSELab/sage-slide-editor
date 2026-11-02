@@ -36,6 +36,9 @@ struct TalkWindow: View {
         .navigationTitle(model.talk?.displayName ?? "SAGE Talk")
         .sheet(isPresented: $model.showingPublish) { PublishSheet(model: model) { model.showingPublish = false } }
         .sheet(isPresented: $model.showingExport) { ExportSheet(model: model) { model.showingExport = false } }
+        .sheet(isPresented: $model.showOnboarding) {
+            if let o = model.onboarding { OnboardingSheet(model: o) { model.finishOnboarding() } }
+        }
         .toolbar {
             ToolbarItemGroup {
                 Button { model.prev() } label: { Label("Previous", systemImage: "backward.end.fill") }

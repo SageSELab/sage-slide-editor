@@ -13,6 +13,9 @@ struct SageTalkApp: App {
                 .frame(minWidth: 1100, minHeight: 680)
         }
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Setup Assistant…") { model.presentOnboarding() }
+            }
             CommandGroup(replacing: .newItem) {
                 Button("Open Talk…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")
@@ -75,10 +78,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             NSApp.setActivationPolicy(.accessory)
         }
+        TalkWindowModel.shared.presentOnboardingIfNeeded()
         if let path = ProcessInfo.processInfo.environment["SAGE_OPEN"] ?? CommandLine.arguments.dropFirst().first(where: { !$0.hasPrefix("-") }) {
             NotificationCenter.default.post(name: .sageOpenPath, object: path)
         }
     }
+    /// Folders and talk.json files from Finder (Open With, a drop on the Dock icon).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if let url = urls.first { TalkWindowModel.shared.openDocument(url) }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     /// Stops the sidecar before quitting (it would also exit on its own when stdin closes).
