@@ -169,6 +169,29 @@ private actor SentParams {
         if case .user(_, let t) = chat.entries[0] { #expect(t == "hello") }
     }
 
+    /// Regression: a reply with an inline code span drew the whole paragraph monospaced. Only the
+    /// code span is a code run; the text around it is plain, and styles do not leak across runs.
+    @Test func inlineCodeIsOnlyTheSpan() {
+        let p = "Run `talkc validate --render` before you shoot, then **look** at *each* frame."
+        #expect(ChatMarkdown.blocks(p) == [.paragraph(p)])
+        #expect(ChatMarkdown.runs(p) == [
+            .init("Run "), .init("talkc validate --render", code: true), .init(" before you shoot, then "),
+            .init("look", strong: true), .init(" at "), .init("each", emphasis: true), .init(" frame."),
+        ])
+        let runs = ChatMarkdown.runs("The beat `results.overview` holds at `191.8` s.")
+        #expect(runs.filter(\.code).map(\.text) == ["results.overview", "191.8"])
+        #expect(runs.filter { !$0.code }.map(\.text).joined() == "The beat  holds at  s.")
+        // A paragraph that is all code is all code; one with none has a single plain run.
+        #expect(ChatMarkdown.runs("`B.set`") == [.init("B.set", code: true)])
+        #expect(ChatMarkdown.runs("No code here.") == [.init("No code here.")])
+        // Links, strikethrough, bold code, and unparseable input survive.
+        let link = ChatMarkdown.runs("See [the plan](https://example.com/plan) or ~~not~~ **`this`**.")
+        #expect(link.first { $0.link != nil } == .init("the plan", link: URL(string: "https://example.com/plan")))
+        #expect(link.contains(.init("not", strike: true)))
+        #expect(link.contains(.init("this", code: true, strong: true)))
+        #expect(ChatMarkdown.runs("") == [])
+    }
+
     @Test func markdownBlocks() {
         let md = "# Plan\nFirst *line*\nsame para\n\n- one\n- two\n1. first\n```js\nB.in('#a')\n```\nTail"
         #expect(ChatMarkdown.blocks(md) == [

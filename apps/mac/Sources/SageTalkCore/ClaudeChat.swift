@@ -263,4 +263,38 @@ public enum ChatMarkdown {
         flush()
         return out
     }
+
+    /// A styled stretch of a paragraph: what the pane draws, with its own font per run.
+    public struct Run: Equatable, Sendable {
+        public var text: String
+        public var code = false
+        public var strong = false
+        public var emphasis = false
+        public var strike = false
+        public var link: URL?
+        public init(_ text: String, code: Bool = false, strong: Bool = false, emphasis: Bool = false, strike: Bool = false, link: URL? = nil) {
+            self.text = text; self.code = code; self.strong = strong; self.emphasis = emphasis; self.strike = strike; self.link = link
+        }
+        fileprivate func sameStyle(_ o: Run) -> Bool {
+            code == o.code && strong == o.strong && emphasis == o.emphasis && strike == o.strike && link == o.link
+        }
+    }
+
+    /// Inline Markdown of one block as styled runs. The pane gives only `code` runs a monospaced
+    /// font and leaves every other run on the body font: handing SwiftUI the parsed string with
+    /// its presentation intents drew a whole paragraph monospaced when it held one code span.
+    public static func runs(_ s: String) -> [Run] {
+        guard let a = try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else {
+            return s.isEmpty ? [] : [Run(s)]
+        }
+        var out: [Run] = []
+        for r in a.runs {
+            let intent = r.inlinePresentationIntent ?? []
+            let run = Run(String(a[r.range].characters), code: intent.contains(.code), strong: intent.contains(.stronglyEmphasized),
+                          emphasis: intent.contains(.emphasized), strike: intent.contains(.strikethrough), link: r.link)
+            if run.text.isEmpty { continue }
+            if let last = out.last, last.sameStyle(run) { out[out.count - 1].text += run.text } else { out.append(run) }
+        }
+        return out
+    }
 }

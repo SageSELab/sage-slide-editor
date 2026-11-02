@@ -180,9 +180,28 @@ private struct MarkdownText: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func inline(_ s: String) -> Text {
-        let a = (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
-        return Text(a)
+    private func inline(_ s: String) -> Text { Text(Self.attributed(s)) }
+
+    /// The runs of ChatMarkdown.runs with explicit SwiftUI attributes and no presentation intents:
+    /// only code spans get the monospaced font; everything else inherits the body font.
+    static func attributed(_ s: String) -> AttributedString {
+        var out = AttributedString()
+        for r in ChatMarkdown.runs(s) {
+            var a = AttributedString(r.text)
+            if r.code {
+                a.font = .system(.body, design: .monospaced).weight(r.strong ? .semibold : .regular)
+                a.backgroundColor = Color.secondary.opacity(0.14)
+            } else if r.strong || r.emphasis {
+                var f = Font.body
+                if r.strong { f = f.bold() }
+                if r.emphasis { f = f.italic() }
+                a.font = f
+            }
+            if r.strike { a.strikethroughStyle = .single }
+            if let l = r.link { a.link = l }
+            out += a
+        }
+        return out
     }
 }
 
