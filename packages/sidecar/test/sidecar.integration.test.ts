@@ -157,6 +157,20 @@ describe('sidecar process', () => {
     expect(c.problems).toEqual([]);
   });
 
+  it('opens a .talk package like any talk folder', async () => {
+    const { root, c } = setup();
+    // The temp copy renamed as the app converts a folder; cleanup removes its parent.
+    const pkg = path.join(path.dirname(root), 'ISSTA Talk.talk');
+    fs.renameSync(root, pkg);
+    const open = await c.request<OpenResult>('talk.open', { path: pkg, watch: false });
+    expect(open.kind).toBe('beatFormat');
+    expect(open.root).toBe(pkg);
+    expect(open.build?.ok).toBe(true);
+    expect(open.holds).toHaveLength(spineStats(pkg).beats);
+    expect(fs.existsSync(path.join(pkg, 'build/index.html'))).toBe(true);
+    expect(c.problems).toEqual([]);
+  });
+
   it('opens a legacy deck read-only', async () => {
     const { root, c } = setup();
     const legacy = path.join(path.dirname(root), 'legacy');
