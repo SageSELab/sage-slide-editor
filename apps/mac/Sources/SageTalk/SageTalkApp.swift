@@ -47,6 +47,10 @@ struct SageTalkApp: App {
                 Button(model.textEditing != nil ? "Redo Typing" : model.edits.redoTitle) { model.redo() }
                     .keyboardShortcut("z", modifiers: [.command, .shift])
             }
+            // Themes (TalkWindowModel+Themes.swift, ThemesView.swift).
+            CommandMenu("Format") {
+                ShowThemesButton().keyboardShortcut("t", modifiers: [.command, .option])
+            }
             CommandMenu("Play") {
                 Button("Present") { model.present(.present) }
                     .keyboardShortcut("p", modifiers: [.command, .option])
@@ -63,6 +67,10 @@ struct SageTalkApp: App {
                 Button("Play Through") { model.throughKey() }.keyboardShortcut(.return, modifiers: [])
             }
         }
+        Window("Themes", id: "themes") {
+            ThemesView(themes: AppThemes.model)
+        }
+        .defaultSize(width: 980, height: 640)
         Settings { SettingsView() }
     }
 }

@@ -39,11 +39,13 @@ struct TalkWindow: View {
         .sheet(isPresented: $model.showOnboarding) {
             if let o = model.onboarding { OnboardingSheet(model: o) { model.finishOnboarding() } }
         }
+        .modifier(ThemesWindowOpener())
         .toolbar {
             ToolbarItemGroup {
                 Button { model.prev() } label: { Label("Previous", systemImage: "backward.end.fill") }
                 Button { model.next() } label: { Label("Next Hold", systemImage: "play.fill") }
             }
+            ToolbarItem { ShowThemesButton(toolbar: true) }
         }
     }
 
