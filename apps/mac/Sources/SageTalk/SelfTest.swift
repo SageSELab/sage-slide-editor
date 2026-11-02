@@ -25,6 +25,8 @@ import WebKit
 ///                      repositories, drawn from the Publish sheet (SelfTestPublish.swift; also
 ///                      publish-sheet-committed.png, export-sheet.png, publish.txt)
 ///   onboarding.*       the first-run checks and sheet (SelfTestOnboarding.swift)
+///   themes-*.png, theme-editor.png, themes.txt  beat-format talks: apply the Paper theme to a temp
+///                      copy, save its look to a temp library, undo (SelfTestThemes.swift)
 ///   result.txt         PASS or FAIL lines for every check
 /// then quits. Used by scripts/selftest.sh. It only ever draws the app's own windows and web
 /// views: no screen capture of any kind.
@@ -88,6 +90,7 @@ enum SelfTest {
             await roundTrip(model: model, out: out)
             await editRoundTrip(model: model, source: source, out: out)
             await publishAndExport(model: model, source: source, out: out)
+            await themes(model: model, source: source, out: out)
         }
     }
 
