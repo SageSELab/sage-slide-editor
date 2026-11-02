@@ -123,6 +123,17 @@ enum SelfTest {
         _ = await waitFor(seconds: 5) { abs(mirror.t - h3.at) < 1e-6 }
         try? await Task.sleep(for: .milliseconds(400))
 
+        // Display choices: listed, Automatic places both, a chosen display is used, and choosing
+        // while presenting keeps both windows off screen here (nothing moves onto real displays).
+        check(!p.displays.isEmpty && p.placement != nil, "present: displays listed (\(p.displays.map(\.name)))")
+        if let last = p.displays.last {
+            let before = (pw.frame, p.audienceWindow?.frame)
+            p.audienceChoice = .init(last)
+            check(p.placement?.audience == p.displays.count - 1, "present: the chosen audience display is used")
+            check(pw.frame == before.0 && p.audienceWindow?.frame == before.1, "present: a display change in the self-test moves no window onto a real display")
+            p.audienceChoice = nil
+        }
+
         await writeWindow(pw, films: [mirror], to: out.appendingPathComponent("presenter.png"))
         if let img = try? await audience.snapshot(width: 960) { write(img, to: out.appendingPathComponent("audience.png")) }
         let lines = ["t \(p.state.t)", "position \(p.state.positionLabel)", "current \(p.state.currentHold?.label ?? "-")",

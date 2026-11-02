@@ -61,6 +61,8 @@ struct SageTalkApp: App {
                 Button("End Presentation") { model.presentation.end() }
                     .disabled(!model.presentation.isPresenting)
                 Divider()
+                DisplayChoiceMenus(controller: model.presentation)
+                Divider()
                 // The keys go to the canvas first (nudge, text caret, commit); see nextKey().
                 Button("Next Hold") { model.nextKey() }.keyboardShortcut(.rightArrow, modifiers: [])
                 Button("Previous Hold") { model.prevKey() }.keyboardShortcut(.leftArrow, modifiers: [])

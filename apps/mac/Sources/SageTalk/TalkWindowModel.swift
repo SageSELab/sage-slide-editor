@@ -79,7 +79,7 @@ final class TalkWindowModel {
     init() {
         let thumbs = ThumbnailStore()
         thumbnails = thumbs
-        presentation = PresentationController(thumbnails: thumbs)
+        presentation = PresentationController(thumbnails: thumbs, defaults: SelfTest.outDir == nil ? .standard : nil)
         presentation.onEnd = { [weak self] t in self?.presentingEnded(at: t) }
         canvas.onReady = { [weak self] info in self?.filmBooted(info) }
         canvas.onState = { [weak self] t, playing in self?.filmMoved(t, playing) }
