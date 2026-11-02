@@ -62,3 +62,18 @@ describe('recorder end-time rules (talk-layout.js instrument)', () => {
     expect(r.layout.beats[0]!.hold).toBe(3); // lastEnd 2.0 + default holdPad 1.0
   });
 });
+
+describe('Talk.lib usage (for the public cut)', () => {
+  it('records what each lib defines and reads at load, and what each beat reads', () => {
+    const t = oneChapter([['x', "B.lib.b.go(B, '#h', 0);"], ['y', '']], SCENE, { lib: {
+      'lib/a.js': 'Talk.lib.a = { enter: (B, s, t) => B.in(s, t) };',
+      'lib/b.js': 'const A = Talk.lib.a; Talk.lib.b = { go: (B, s, t) => A.enter(B, s, t) }; Talk.lib.nope;',
+      'lib/c.js': 'Talk.ready(() => {});',
+    } });
+    const r = recordTalk(t);
+    expect(Object.fromEntries(r.lib.defines)).toEqual({ 'lib/a.js': ['a'], 'lib/b.js': ['b'], 'lib/c.js': [] });
+    expect(Object.fromEntries([...r.lib.loadUses].map(([k, v]) => [k, [...v]]))).toEqual({ 'lib/a.js': [], 'lib/b.js': ['a'], 'lib/c.js': [] });
+    expect(Object.fromEntries([...r.lib.beatUses].map(([k, v]) => [k, [...v]]))).toEqual({ 'c.x': ['b'], 'c.y': [] });
+    expect(r.beats.get('c.x')!.lastEnd).toBe(1);
+  });
+});

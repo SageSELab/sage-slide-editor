@@ -46,11 +46,23 @@ export interface BeatRecording {
 
 export interface RecordedElement { id: string | null; dataA: boolean; tag: string }
 
+/**
+ * Who uses which `Talk.lib` helper: the names each lib file defines, the names each lib file
+ * reads while it loads, and the names each beat reads while it runs (directly or through
+ * another helper). The public build keeps only the libs its beats need (publish.ts).
+ */
+export interface LibUsage {
+  defines: Map<string, string[]>;
+  loadUses: Map<string, Set<string>>;
+  beatUses: Map<string, Set<string>>;
+}
+
 export interface Recording {
   beats: Map<string, BeatRecording>;
   /** Beat ids registered with Talk.beat, in registration order. */
   registered: string[];
   elements: RecordedElement[];
+  lib: LibUsage;
   layout: Layout;
   diagnostics: Diagnostic[];
 }
@@ -96,7 +108,8 @@ export function recordTalk(talk: LoadedTalk, opts: LayoutOptions = {}): Recordin
   const spine = talk.spine;
   const beats = new Map<string, BeatRecording>();
   const elements: RecordedElement[] = [];
-  if (!spine) return { beats, registered: [], elements, diagnostics: D, layout: { beats: [], chapters: [], checkpoints: [], duration: 1, darkWindows: [] } };
+  const lib: LibUsage = { defines: new Map(), loadUses: new Map(), beatUses: new Map() };
+  if (!spine) return { beats, registered: [], elements, lib, diagnostics: D, layout: { beats: [], chapters: [], checkpoints: [], duration: 1, darkWindows: [] } };
 
   const { window, document, stage } = buildDom(talk, !!opts.public);
   const elIndex = new WeakMap<object, number>();
@@ -112,8 +125,14 @@ export function recordTalk(talk: LoadedTalk, opts: LayoutOptions = {}): Recordin
 
   const registry = new Map<string, Function>();
   const registered: string[] = [];
+  // Talk.lib behind a proxy that notes every helper read against the current reader.
+  let reader: Set<string> | null = null;
+  const libTarget: AnyObj = {};
+  const libProxy = new Proxy(libTarget, {
+    get: (o, k) => { if (typeof k === 'string' && reader && k in o) reader.add(k); return Reflect.get(o, k); },
+  });
   const TalkStub: AnyObj = {
-    lib: {},
+    lib: libProxy,
     beat: (id: string, fn: Function) => {
       if (registry.has(id)) D.push(diag('beat-registered-twice', 'warning', `Talk.beat('${id}') registered twice; the last one wins`, { beat: id }));
       registry.set(id, fn); registered.push(id);
@@ -132,16 +151,20 @@ export function recordTalk(talk: LoadedTalk, opts: LayoutOptions = {}): Recordin
 
   const scriptFiles = new Set<string>();
   const motionFiles = new Set<string>();
-  const run = (f: SourceFile, what: string) => {
+  const run = (f: SourceFile, what: string, isLib = false) => {
     scriptFiles.add(f.path);
+    const before = new Set(Object.keys(libTarget));
+    if (isLib) { reader = new Set(); lib.loadUses.set(f.path, reader); }
     try {
       new vm.Script(f.text, { filename: f.path }).runInContext(context, { timeout: 2000 });
     } catch (e) {
       const loc = frames((e as Error).stack, new Set([f.path]))[0];
       D.push(diag('record-script-failed', 'warning', `${what} could not run headless: ${(e as Error).message}`, { file: f.path, line: loc?.line, col: loc?.col }));
     }
+    reader = null;
+    if (isLib) lib.defines.set(f.path, Object.keys(libTarget).filter((k) => !before.has(k)));
   };
-  talk.lib.forEach((f) => run(f, 'lib script'));
+  talk.lib.forEach((f) => run(f, 'lib script', true));
   const chapters = opts.public && talk.publicChapter ? [...talk.chapters, talk.publicChapter] : talk.chapters;
   const seenMotion = new Set<string>();
   for (const c of chapters) if (c.motion && !seenMotion.has(c.motion.path)) { seenMotion.add(c.motion.path); motionFiles.add(c.motion.path); run(c.motion, 'motion script'); }
@@ -232,17 +255,18 @@ export function recordTalk(talk: LoadedTalk, opts: LayoutOptions = {}): Recordin
     const rec: BeatRecording = { id, start, lastEnd: 0, registered: !!fn, calls: [], escapes: [] };
     beats.set(id, rec);
     cur = rec; lastEndAbs = start;
+    reader = new Set(); lib.beatUses.set(id, reader);
     if (fn) {
       try { fn(makeB(start)); } catch (e) {
         const loc = frames((e as Error).stack, scriptFiles)[0];
         D.push(diag('record-beat-failed', 'warning', `beat ${id} could not run headless: ${(e as Error).message}`, { file: loc?.file, line: loc?.line, col: loc?.col, beat: id }));
       }
     }
-    cur = null;
+    cur = null; reader = null;
     rec.lastEnd = r6(lastEndAbs - start);
     return rec.lastEnd;
   }, opts);
-  return { beats, registered, elements, layout: lay, diagnostics: D };
+  return { beats, registered, elements, lib, layout: lay, diagnostics: D };
 }
 
 /** Relative lastEnd per beat, the input layout() takes. */
