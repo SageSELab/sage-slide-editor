@@ -64,4 +64,30 @@ describe('talkc', () => {
       expect(b.o.err[0]).toMatch(/script-syntax/);
     } finally { fs.rmSync(dir, { recursive: true }); }
   });
+
+  it('shoot: frames for holds, --times and --beats into build/shots, manifest, exit codes', async () => {
+    const dir = tmpTalk("B.in('#h', 0);");
+    try {
+      const a = io();
+      expect(await main(['shoot', dir], a.io)).toBe(0); // default: every hold
+      expect(fs.readdirSync(path.join(dir, 'build/shots')).sort()).toEqual(['manifest.json', 't0002.000.png']);
+      const out = path.join(dir, 'x'), b = io();
+      expect(await main(['shoot', dir, '--times', '0.5,1', '--beats', 'c.a', '--around', '0.25', '--holds', '--out', out], b.io)).toBe(0);
+      expect(b.o.out[0]).toMatch(/^shot 5 frames/);
+      const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
+      expect(m.frames.map((f: { t: number; kind: string }) => [f.t, f.kind])).toEqual([[0.5, 'time'], [1, 'time'], [1.75, 'before'], [2, 'hold'], [2.25, 'after']]);
+      // an .html film is shot as is, next to itself by default
+      const c = io();
+      expect(await main(['shoot', path.join(dir, 'build/index.html'), '--times', '1'], c.io)).toBe(0);
+      expect(fs.existsSync(path.join(dir, 'build/shots/t0001.000.png'))).toBe(true);
+      const d = io();
+      expect(await main(['shoot', dir, '--beats', 'c.nope'], d.io)).toBe(1);
+      expect(d.o.err[0]).toMatch(/no beat "c\.nope"/);
+      expect(await main(['shoot', dir, '--times', 'abc'], io().io)).toBe(2);
+      expect(await main(['shoot', dir, '--around'], io().io)).toBe(2);
+      expect(await main(['shoot', path.join(dir, 'missing')], io().io)).toBe(1);
+      fs.writeFileSync(path.join(dir, 'beats/c.js'), 'Talk.beat(');
+      expect(await main(['shoot', dir], io().io)).toBe(1);
+    } finally { fs.rmSync(dir, { recursive: true }); }
+  }, 60_000);
 });

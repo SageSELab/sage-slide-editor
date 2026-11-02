@@ -20,6 +20,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@sage/render':
+        specifier: workspace:*
+        version: link:../render
       acorn:
         specifier: ^8.19.0
         version: 8.19.0
