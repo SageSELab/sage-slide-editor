@@ -2,6 +2,8 @@ import Foundation
 
 /// A talk on disk. During Phase 0/1 the app can open either a sage-talk/1 folder
 /// (talk.json + build/index.html) or a legacy hand-written deck (index.html + talk.js), read-only.
+/// A sage-talk/1 folder named `X.talk` is a document package (TalkPackage): still a real folder,
+/// which Finder shows as one file.
 public struct TalkFolder: Equatable, Sendable {
     public enum Kind: Equatable, Sendable { case beatFormat, legacy }
 
@@ -30,6 +32,12 @@ public struct TalkFolder: Equatable, Sendable {
     }
 
     public var displayName: String { root.deletingLastPathComponent().lastPathComponent + "/" + root.lastPathComponent }
+
+    /// The folder is a `.talk` document package (TalkPackage).
+    public var isPackage: Bool { TalkPackage.isPackage(root) }
+
+    /// The talk's name: the folder name without a `.talk` extension.
+    public var name: String { TalkPackage.name(of: root) }
 
     /// URL that opens the film frozen at a time with controls hidden (engine's ?t=&capture).
     public func filmURL(at t: Double, capture: Bool = true) -> URL {

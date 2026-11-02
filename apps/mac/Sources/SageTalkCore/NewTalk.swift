@@ -2,7 +2,8 @@ import Foundation
 
 /// File ▸ New Talk…: scaffolds a sage-talk/1 folder from the skill's `assets/starter-v2`, the same
 /// minimal working talk `scripts/new-talk.sh` copies (title, one chapter, the dark close, a backup
-/// and a public end card; it validates and builds as is). The title goes into talk.json.
+/// and a public end card; it validates and builds as is). The title goes into talk.json. The app
+/// creates `<name>.talk` packages (TalkPackage); any folder name works here.
 public enum NewTalk {
     public static let starterPath = "skills/academic-talk-film/assets/starter-v2"
 
@@ -30,8 +31,10 @@ public enum NewTalk {
         return candidates.first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("talk.json").path) }
     }
 
-    /// Copies the starter into `folder` (created; an existing folder must be empty) and sets the title.
-    public static func create(at folder: URL, title: String, starter: URL) throws {
+    /// Copies the starter into `folder` (created; an existing folder must be empty) and sets the
+    /// title, by default the folder's name without the `.talk` extension.
+    public static func create(at folder: URL, title: String? = nil, starter: URL) throws {
+        let title = title ?? TalkPackage.name(of: folder)
         let fm = FileManager.default
         if fm.fileExists(atPath: folder.path) {
             let visible = try fm.contentsOfDirectory(atPath: folder.path).filter { !$0.hasPrefix(".") }

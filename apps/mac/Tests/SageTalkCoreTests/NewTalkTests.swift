@@ -49,6 +49,20 @@ import Testing
         #expect((try? TalkFolder(root: folder))?.kind == .beatFormat)
     }
 
+    @Test func createsATalkPackageTitledWithoutTheExtension() throws {
+        let starter = try #require(NewTalk.starter(environment: ["SAGE_REPO": repo.path], resources: nil, executable: nil))
+        let folder = TalkPackage.packageURL(try temp().appendingPathComponent("Untitled Talk"))
+        #expect(folder.lastPathComponent == "Untitled Talk.talk")
+        try NewTalk.create(at: folder, starter: starter)
+        let data = try Data(contentsOf: folder.appendingPathComponent("talk.json"))
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["title"] as? String == "Untitled Talk")
+        let plan = try String(contentsOf: folder.appendingPathComponent("PLAN.md"), encoding: .utf8)
+        #expect(plan.hasPrefix("# Untitled Talk · storyboard"))
+        let t = try TalkFolder(root: folder)
+        #expect(t.kind == .beatFormat && t.isPackage && t.name == "Untitled Talk")
+    }
+
     @Test func doesNotCopyExtendedAttributes() throws {
         let starter = try temp().appendingPathComponent("starter")
         try FileManager.default.createDirectory(at: starter.appendingPathComponent("scenes"), withIntermediateDirectories: true)

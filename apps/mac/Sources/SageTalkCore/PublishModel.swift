@@ -88,7 +88,7 @@ public final class PublishModel {
 
     /// A new talk was opened: forget the last one's results.
     public func reset(talkFolder: URL?, title: String = "") {
-        slug = talkFolder.map { Self.slugify($0.lastPathComponent) } ?? ""
+        slug = talkFolder.map { Self.slugify(TalkPackage.name(of: $0)) } ?? ""
         paperEntry = ""
         talkTitle = title
         phase = .idle; result = nil; export = nil; stages = [:]

@@ -72,6 +72,8 @@ import Testing
         #expect(m.slug == "issta-2026-talk")
         #expect(m.slugProblem == nil)
         #expect(m.outputPath == "build/public/issta-2026-talk.html")
+        m.reset(talkFolder: URL(fileURLWithPath: "/talks/ISSTA 2026 Talk.talk"), title: "T")
+        #expect(m.slug == "issta-2026-talk") // a .talk package's extension is not part of the slug
         m.slug = "../evil"
         #expect(m.slugProblem != nil)
         m.slug = ""
