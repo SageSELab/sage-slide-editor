@@ -65,7 +65,7 @@ struct TalkWindow: View {
     @ViewBuilder private var beats: some View {
         if model.holds.isEmpty {
             placeholder(model.talk == nil ? "No talk open" : "Opening…",
-                        model.talk == nil ? "File ▸ Open Talk… (⌘O)" : (model.status ?? ""))
+                        model.talk == nil ? "File ▸ New Talk… (⌘N) or Open Talk… (⌘O)" : (model.status ?? ""))
         } else {
             NavigatorView(model: model)
         }

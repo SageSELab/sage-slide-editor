@@ -17,6 +17,8 @@ struct SageTalkApp: App {
                 Button("Setup Assistant…") { model.presentOnboarding() }
             }
             CommandGroup(replacing: .newItem) {
+                Button("New Talk…") { model.presentNewTalkPanel() }
+                    .keyboardShortcut("n")
                 Button("Open Talk…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")
                 Button("Reveal in Finder") { model.revealInFinder() }

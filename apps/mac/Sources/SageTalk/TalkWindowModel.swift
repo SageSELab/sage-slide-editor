@@ -101,6 +101,26 @@ final class TalkWindowModel {
         if panel.runModal() == .OK, let url = panel.url { open(url) }
     }
 
+    /// File ▸ New Talk…: a save panel names the new talk folder (its name becomes the title), the
+    /// starter talk is copied into it (SageTalkCore/NewTalk.swift), and the new talk opens.
+    func presentNewTalkPanel() {
+        guard let starter = NewTalk.starter() else { error = NewTalk.CreateError.noStarter.localizedDescription; return }
+        let panel = NSSavePanel()
+        panel.title = "New Talk"
+        panel.prompt = "Create"
+        panel.nameFieldLabel = "Talk name:"
+        panel.nameFieldStringValue = "Untitled Talk"
+        panel.message = "Choose where to create the talk folder. Its name becomes the talk's title."
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try NewTalk.create(at: url, title: url.lastPathComponent, starter: starter)
+            open(url)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     /// Beat-format talks open through the sidecar (talk.open builds them); legacy decks load
     /// directly, read-only, with no sidecar.
     func open(_ url: URL) {
