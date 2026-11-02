@@ -49,6 +49,20 @@ import Testing
         #expect((try? TalkFolder(root: folder))?.kind == .beatFormat)
     }
 
+    @Test func doesNotCopyExtendedAttributes() throws {
+        let starter = try temp().appendingPathComponent("starter")
+        try FileManager.default.createDirectory(at: starter.appendingPathComponent("scenes"), withIntermediateDirectories: true)
+        try #"{"title": "__TITLE__"}"#.write(to: starter.appendingPathComponent("talk.json"), atomically: true, encoding: .utf8)
+        let scene = starter.appendingPathComponent("scenes/title.html")
+        try "<div></div>".write(to: scene, atomically: true, encoding: .utf8)
+        #expect(setxattr(scene.path, "com.dropbox.attrs", "x", 1, 0, 0) == 0)
+        let folder = try temp().appendingPathComponent("T")
+        try NewTalk.create(at: folder, title: "T", starter: starter)
+        let copy = folder.appendingPathComponent("scenes/title.html")
+        #expect(try String(contentsOf: copy, encoding: .utf8) == "<div></div>")
+        #expect(getxattr(copy.path, "com.dropbox.attrs", nil, 0, 0, 0) == -1)
+    }
+
     @Test func refusesANonEmptyFolder() throws {
         let starter = try #require(NewTalk.starter(environment: ["SAGE_REPO": repo.path], resources: nil, executable: nil))
         let folder = try temp()

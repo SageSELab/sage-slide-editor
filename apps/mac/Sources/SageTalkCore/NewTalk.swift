@@ -39,11 +39,7 @@ public enum NewTalk {
         } else {
             try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         }
-        for name in try fm.contentsOfDirectory(atPath: starter.path) {
-            let dest = folder.appendingPathComponent(name)
-            if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
-            try fm.copyItem(at: starter.appendingPathComponent(name), to: dest)
-        }
+        try copyContents(of: starter, into: folder)
         let spine = folder.appendingPathComponent("talk.json")
         let text = try String(contentsOf: spine, encoding: .utf8)
         try text.replacingOccurrences(of: "\"__TITLE__\"", with: jsonString(title))
@@ -54,6 +50,24 @@ public enum NewTalk {
         if !fm.fileExists(atPath: plan.path) {
             try "# \(title) · storyboard\n\n(see the skill's references/storyboard.md for the template)\n"
                 .write(to: plan, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Copies file contents only. FileManager.copyItem would also copy extended attributes, and the
+    /// bundled starter carries Dropbox's com.dropbox.attrs (the app is built inside Dropbox): a new
+    /// talk in Dropbox would then claim the starter's Dropbox identity until Dropbox rewrote it.
+    static func copyContents(of source: URL, into dest: URL) throws {
+        let fm = FileManager.default
+        for name in try fm.contentsOfDirectory(atPath: source.path) where name != ".DS_Store" {
+            let from = source.appendingPathComponent(name), to = dest.appendingPathComponent(name)
+            var isDir: ObjCBool = false
+            fm.fileExists(atPath: from.path, isDirectory: &isDir)
+            if isDir.boolValue {
+                try fm.createDirectory(at: to, withIntermediateDirectories: true)
+                try copyContents(of: from, into: to)
+            } else {
+                try Data(contentsOf: from).write(to: to)
+            }
         }
     }
 
