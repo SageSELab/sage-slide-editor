@@ -2,7 +2,7 @@
 // Dark styling follows the spine instead of hard-coded times: a beat is dark if its own
 // `dark` flag says so, else if its chapter is dark. The original's window was 241.1–333.6
 // (when #black is mostly up); this one is (240.8, 333.3], from just after the Summary hold to
-// the 'Syntax to behavior' hold inclusive, so every hold matches. #slideno is not in the frames.
+// the last dark backup hold inclusive, so every hold matches. #slideno is not in the frames.
 Talk.ready((T, layout) => {
   const CP = T.cps, CHAP = T.chapters;
   const el = document.getElementById('slideno');

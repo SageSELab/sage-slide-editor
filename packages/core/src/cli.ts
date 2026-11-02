@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// cli.ts — `talkc`: build, validate, layout, shoot.
+// cli.ts — `talkc`: build, validate, layout, shoot, publish.
 // Runs directly on Node 24 (type stripping); `node --import tsx` also works.
 //
 //   talkc build <talk> [--out <dir>]        write build/index.html; exit 1 on a build error
@@ -10,6 +10,8 @@
 //                                            PNG frames in headless Chromium (default: every
 //                                            hold) into <talk>/build/shots; a talk folder is
 //                                            built first, an .html film is shot as is
+//   talkc publish <talk> [slug] [--out <dir>]   the self-contained public file,
+//                                            <talk>/build/public/<slug>.html (slug: talk)
 // Exit codes: 0 ok, 1 talk has errors (or frames could not be rendered), 2 usage.
 //
 // Commands that need a browser (shoot) import @sage/render lazily, so build, validate and
@@ -21,6 +23,7 @@ import { compileTalk } from './compile.ts';
 import { formatDiagnostic, hasErrors } from './diagnostics.ts';
 import { formatCplist } from './layout.ts';
 import { loadTalk } from './load.ts';
+import { publishTalk } from './publish.ts';
 import { recordTalk } from './record.ts';
 import { validateTalk } from './validate.ts';
 
@@ -31,13 +34,15 @@ const USAGE = `usage: talkc <command> <talk> [options]
   build <talk> [--out <dir>]
   validate <talk> [--json] [--public]
   layout <talk> [--json] [--public]
-  shoot <talk|film.html> [--holds] [--around S] [--times a,b] [--beats ch.beat,...] [--no-backups] [--out <dir>]`;
+  shoot <talk|film.html> [--holds] [--around S] [--times a,b] [--beats ch.beat,...] [--no-backups] [--out <dir>]
+  publish <talk> [slug] [--out <dir>]`;
 
 /** Flags per command; `true` = takes a value. */
 const FLAGS: Record<string, Record<string, boolean>> = {
   build: { '--out': true },
   validate: { '--json': false, '--public': false },
   layout: { '--json': false, '--public': false },
+  publish: { '--out': true },
   shoot: { '--holds': false, '--around': true, '--times': true, '--beats': true, '--no-backups': false, '--out': true },
 };
 
@@ -67,7 +72,7 @@ const list = (vs: string[] | undefined) => (vs ?? []).flatMap((v) => v.split(','
 export function main(argv: readonly string[], io: Io = stdio): number | Promise<number> {
   if (argv[0] === '-h' || argv[0] === '--help') { io.err(USAGE); return 0; }
   const p = parse(argv);
-  if (typeof p === 'string' || p.pos.length !== 1) {
+  if (typeof p === 'string' || p.pos.length < 1 || p.pos.length > (p.cmd === 'publish' ? 2 : 1)) {
     if (typeof p === 'string' && p) io.err(`talkc: ${p}`);
     io.err(USAGE);
     return 2;
@@ -85,6 +90,16 @@ export function main(argv: readonly string[], io: Io = stdio): number | Promise<
     return 0;
   }
   if (cmd === 'shoot') return shoot(dir, p, out, io);
+  if (cmd === 'publish') {
+    const slug = p.pos[1];
+    if (slug !== undefined && !/^[A-Za-z0-9._-]+$/.test(slug)) { io.err(`talkc: bad slug ${slug} (use letters, numbers, . _ -)`); return 2; }
+    const r = publishTalk(dir, { ...(slug ? { slug } : {}), ...(out ? { outDir: out } : {}) });
+    for (const d of r.diagnostics) io.err(formatDiagnostic(d));
+    if (!r.ok) { io.err('talkc: publish failed'); return 1; }
+    if (r.cut?.droppedLibs.length) io.out(`left out (only private beats use them): ${r.cut.droppedLibs.join(', ')}`);
+    io.out(`wrote ${path.relative(process.cwd(), r.outFile!) || r.outFile} (${(r.bytes / 1e6).toFixed(2)} MB)`);
+    return 0;
+  }
   const talk = loadTalk(dir);
   if (cmd === 'validate') {
     const ds = validateTalk(talk, undefined, { public: pub });

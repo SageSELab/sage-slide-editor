@@ -51,7 +51,7 @@ Talk.beat('dfb.fifty', (B) => {            // @120.9 (c4 + 19.4)
   B.in('#fifty-c', 3.3, { dur: 1, y: 16 });
 });
 
-// To the synthetic half (the test replay, 'Two tests per bug', lives in the backups).
+// To the synthetic half (the test replay lives in the backups).
 Talk.beat('dfb.before', (B) => {           // @126.4 (c4 + 24.9)
   B.out('#fifty-n, #fifty-g, #fifty-c, #c4-gh', 0, { dur: 0.5, stagger: 0.04 });
   // The original hides the test-replay lines at absolute t = 0. The keyframes are constant
