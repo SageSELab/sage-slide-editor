@@ -2,6 +2,7 @@
 // main.ts — the SAGE sidecar process. Speaks NDJSON JSON-RPC 2.0 on stdin/stdout (docs/rpc.md);
 // logs to stderr only. Exits 0 on app.shutdown or when stdin closes (the app quit or crashed).
 //
+// Phase 5: talk.publish, talk.export, site.stage and site.commit (src/publish/).
 // Phase 4: the Agent SDK bridge (src/claude/bridge.ts) answers the `claude.*` methods, reports
 // `claude.*` notifications, and asks the app through `app.ask|state|goto` requests.
 import { ClaudeBridge } from './claude/bridge.ts';
@@ -9,6 +10,8 @@ import {
   PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, claudeParamCheckers,
   type ClaudeMethodName, type ClaudeSendParams, type MethodName, type OpenParams, type WatchParams, type EditParams, type Inverse,
 } from './protocol.ts';
+import { Publisher } from './publish/index.ts';
+import { publishParamCheckers, type PublishMethodName } from './protocol.ts';
 import { RpcPeer, type Log } from './rpc.ts';
 import { Session } from './session.ts';
 
@@ -108,6 +111,28 @@ function claudeMethod<M extends ClaudeMethodName>(name: M, fn: (params: never) =
 claudeMethod('claude.send', (p: ClaudeSendParams) => claudeBridge().send(p));
 claudeMethod('claude.interrupt', () => (bridge ? bridge.interrupt() : { interrupted: false }));
 claudeMethod('claude.reset', async () => { await claudeBridge().reset(); return {}; });
+
+// --- Publish and export (Phase 5) -----------------------------------------------------------
+// Queued like builds and edits (an export renders the film the last build wrote).
+const publisher = new Publisher({
+  get root() { return session.root; },
+  get kind() { return session.kind; },
+  build: () => session.build(),
+  spine: () => session.spine(),
+  notifyProgress: (p) => peer.notify('talk.exportProgress', p),
+});
+function publishMethod<M extends PublishMethodName>(name: M, fn: (params: never) => unknown) {
+  peer.handle(name, (params) => {
+    if (shuttingDown) throw new RpcError(ErrorCode.ShuttingDown, 'sidecar is shutting down');
+    const problems = publishParamCheckers[name](params);
+    if (problems.length) throw new RpcError(ErrorCode.InvalidParams, problems.join('; '), { problems });
+    return fn(params as never);
+  });
+}
+publishMethod('talk.publish', (p) => publisher.publish(p));
+publishMethod('talk.export', (p) => publisher.export(p));
+publishMethod('site.stage', (p) => publisher.stage(p));
+publishMethod('site.commit', (p) => publisher.commit(p));
 
 peer.onClose(() => void shutdown('stdin closed'));
 process.stdout.on('error', () => void shutdown('stdout closed', 0));
