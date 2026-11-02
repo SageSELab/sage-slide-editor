@@ -31,8 +31,8 @@ struct TalkWindow: View {
         .navigationTitle(model.talk?.displayName ?? "SAGE Talk")
         .toolbar {
             ToolbarItemGroup {
-                Button { model.canvas.prev() } label: { Label("Previous", systemImage: "backward.end.fill") }
-                Button { model.canvas.next() } label: { Label("Next Hold", systemImage: "play.fill") }
+                Button { model.prev() } label: { Label("Previous", systemImage: "backward.end.fill") }
+                Button { model.next() } label: { Label("Next Hold", systemImage: "play.fill") }
             }
         }
     }
@@ -59,7 +59,7 @@ struct TalkWindow: View {
     @ViewBuilder private var canvas: some View {
         ZStack {
             Color.black
-            if model.talk != nil { CanvasView(controller: model.canvas) }
+            if model.talk != nil { FilmViewRepresentable(film: model.canvas) }
             if let err = model.error { Text(err).foregroundStyle(.white).padding() }
         }
     }

@@ -35,8 +35,14 @@ enum SelfTest {
                 }
             }
             print("selftest: \(model.holds.count) holds, error=\(model.error ?? "none")")
-            NSApp.terminate(nil)
+            quit()
         }
+    }
+
+    /// Quits from a run-loop callout rather than from this main-actor task, so terminate's
+    /// nested run loop can still run main-actor work (the sidecar shutdown).
+    static func quit() {
+        RunLoop.main.perform { MainActor.assumeIsolated { NSApp.terminate(nil) } }
     }
 
     private static func write(_ image: NSImage, to url: URL) {
