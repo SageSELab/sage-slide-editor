@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+ <!-- SAGE Talk app icon: the SAGE Lab leaf on the front card of a slide stack.
+      Full-bleed artwork; packaging/make-icon.swift insets it to the macOS icon grid. -->
+ <rect width="1024" height="1024" rx="230" fill="#f4f6f4"/>
+ <g transform="translate(0 55)">
+  <rect x="250" y="190" width="600" height="400" rx="30" fill="#b9d8c8" transform="rotate(-8 550 390)"/>
+  <rect x="210" y="250" width="600" height="400" rx="30" fill="#e3efe8" transform="rotate(-3 510 450)"/>
+  <rect x="170" y="320" width="640" height="420" rx="32" fill="#ffffff" stroke="#d5ddd8" stroke-width="4"/>
+  <g transform="translate(312 344) scale(.56)">
+   <path d="M600 30 C520 120 490 200 470 290 C440 420 400 530 260 530 C150 530 80 490 50 430 C15 340 35 240 110 165 C220 60 400 35 600 30Z" fill="#016941" stroke="#111111" stroke-width="30" stroke-linejoin="round"/>
+   <path d="M30 610 C90 420 230 250 400 160" fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+  </g>
+ </g>
+</svg>
