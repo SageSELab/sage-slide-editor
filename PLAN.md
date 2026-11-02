@@ -608,6 +608,17 @@ tool rather than headless Chrome.
 
 ### Phase 5 — Publish and export
 
+Status 2026-11-02: done except video. The sidecar answers `talk.publish`, `talk.export`
+(PNGs or a PDF of 1920x1080-point pages via `@sage/render` and pdf-lib, with
+`talk.exportProgress`), `site.stage`, `site.commit` and `talk.qr` (docs/rpc.md "Publish and
+export"). Staging copies the file into a site repo's `public/talks/` and splice-edits
+`talks.yaml` and the paper's `slides` link with the `yaml` Document API's source ranges, so
+every other byte stays; generated YAML (the lab site's) is left alone. Nothing is committed
+until the user clicks Commit in the sheet, and nothing pushes. The app has File ▸ Publish…,
+File ▸ Export ▸ PNGs / PDF with progress, and Settings (⌘,) for the two repo paths (no
+default). Tests: fixtures on both sides, sidecar integration on a temp ISSTA copy and temp
+site repos, view-model tests, and the self-test (publish, export, stage, commit, sheet PNGs).
+
 `talkc publish` wired to a Publish sheet, site-copy actions, PDF/PNG export, optional video.
 
 Exit: the public ISSTA file produced by the app is byte-equivalent in behaviour to the one
