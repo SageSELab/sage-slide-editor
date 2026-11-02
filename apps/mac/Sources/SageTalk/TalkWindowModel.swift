@@ -44,6 +44,9 @@ final class TalkWindowModel {
     /// The spine before an external talk.json change, to find which beats it touched.
     @ObservationIgnored var spineBeforeExternal: SpineSnapshot?
 
+    /// The Claude pane (TalkWindowModel+Claude.swift).
+    let chat = ClaudeChat()
+
     let canvas = FilmView()
     let thumbnails: ThumbnailStore
     let presentation: PresentationController
@@ -144,6 +147,7 @@ final class TalkWindowModel {
             config.stderrHandler = { text in FileHandle.standardError.write(Data(text.utf8)) }
             let sup = SidecarSupervisor(configuration: config)
             supervisor = sup
+            connectClaude(sup)
             Task { [weak self] in
                 for await e in sup.events { self?.handle(e) }
             }
@@ -170,11 +174,13 @@ final class TalkWindowModel {
                 error = Self.describe(built.diagnostics)
             }
         case .notification(SidecarProtocol.Notification.changed, let params):
-            if let c: SidecarProtocol.ChangedParams = try? params?.decode(), c.source == .external {
-                status = "Changed: " + c.paths.prefix(3).joined(separator: ", ")
+            // Claude's writes are not the human's: like a terminal edit they clear the undo stack and badge the beat.
+            if let c: SidecarProtocol.ChangedParams = try? params?.decode(), c.source != .app {
+                status = (c.source == .claude ? "Claude changed: " : "Changed: ") + c.paths.prefix(3).joined(separator: ", ")
                 externalChange(c.paths)
             }
-        case .notification: break
+        case .notification(let method, let params):
+            _ = handleClaudeNotification(method, params)
         case .crashed(_, let willRestart):
             status = willRestart ? "The sidecar stopped; restarting it…" : "The sidecar stopped."
         case .restarted:

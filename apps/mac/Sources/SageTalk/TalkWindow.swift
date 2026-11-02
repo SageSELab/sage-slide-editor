@@ -23,9 +23,11 @@ struct TalkWindow: View {
                 Divider()
                 switch rightPane {
                 case .inspector: InspectorView(model: model)
-                case .claude: placeholder("Claude", "The chat pane arrives in Phase 4.")
+                case .claude: ClaudePane(chat: model.chat)
                 }
             }
+            // A permission request needs an answer: show it.
+            .onChange(of: model.chat.pendingPermission?.id) { _, id in if id != nil { rightPane = .claude } }
             .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
         }
         .navigationTitle(model.talk?.displayName ?? "SAGE Talk")
