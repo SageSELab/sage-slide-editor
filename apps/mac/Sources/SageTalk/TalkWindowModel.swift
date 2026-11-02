@@ -31,11 +31,16 @@ final class TalkWindowModel {
     var collapsed: Set<String> = []
 
     let canvas = FilmView()
-    let thumbnails = ThumbnailStore()
+    let thumbnails: ThumbnailStore
+    let presentation: PresentationController
     @ObservationIgnored private(set) var supervisor: SidecarSupervisor?
     @ObservationIgnored private var openGeneration = 0
 
     init() {
+        let thumbs = ThumbnailStore()
+        thumbnails = thumbs
+        presentation = PresentationController(thumbnails: thumbs)
+        presentation.onEnd = { [weak self] t in self?.canvas.seek(t) }
         canvas.onReady = { [weak self] info in self?.filmBooted(info) }
         canvas.onState = { [weak self] t, playing in self?.filmMoved(t, playing) }
         canvas.onLoadError = { [weak self] msg in self?.error = msg }
@@ -206,6 +211,14 @@ final class TalkWindowModel {
     func next() { canvas.next() }
     func prev() { canvas.prev() }
     func through() { canvas.through() }
+
+    /// Play > Present / Rehearse, from the canvas's current time.
+    func present(_ mode: PresenterState.Mode, offscreen: Bool = false) {
+        guard let filmURL, let filmRoot, !holds.isEmpty else { return }
+        canvas.pause()
+        presentation.start(mode, film: filmURL, readAccess: filmRoot, holds: holds, duration: duration,
+                           at: t, title: talk?.root.lastPathComponent ?? "Talk", offscreen: offscreen)
+    }
 
     func revealInFinder() {
         guard let talk else { return }

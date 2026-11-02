@@ -80,19 +80,20 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
 
     /// Seeks for a dragged scrubber: at most one seek in flight, intermediate positions dropped,
     /// so renders never queue up behind slow paints (FINDINGS D).
-    func scrub(_ t: Double) {
-        if scrubInFlight { scrubPending = t; return }
+    /// `render` instead of `seek` draws without touching play state (the presenter mirror).
+    func scrub(_ t: Double, render: Bool = false) {
+        if scrubInFlight { scrubPending = (t, render); return }
         scrubInFlight = true
-        webView.evaluateJavaScript("window.T && (T.seek(\(Self.num(t))), 0)") { [weak self] _, _ in
+        webView.evaluateJavaScript("window.T && (T.\(render ? "render" : "seek")(\(Self.num(t))), 0)") { [weak self] _, _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.scrubInFlight = false
-                if let next = self.scrubPending { self.scrubPending = nil; self.scrub(next) }
+                if let next = self.scrubPending { self.scrubPending = nil; self.scrub(next.0, render: next.1) }
             }
         }
     }
     private var scrubInFlight = false
-    private var scrubPending: Double?
+    private var scrubPending: (Double, Bool)?
     /// Draws a frame without touching play state (the presenter mirror).
     func render(_ t: Double) { run("T.render(\(Self.num(t)))") }
     func next() { run("T.next()") }

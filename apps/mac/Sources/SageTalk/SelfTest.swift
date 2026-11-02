@@ -8,6 +8,8 @@ import WebKit
 ///   canvas-<n>.png     the canvas web view's own snapshot at hold n
 ///   window.png         the talk window: its view hierarchy, with each web view's own snapshot
 ///                      drawn into its frame (cacheDisplay cannot draw web content)
+///   presenter.png      the presenter window (off screen), with its mirror's own snapshot
+///   audience.png       the audience film's own snapshot; presenter.txt, what the presenter showed
 ///   roundtrip.txt      beat-format talks: an external edit to a temp copy's scene text, then
 ///                      checks that the canvas reloaded at the same time and showed the edit,
 ///                      and how many thumbnails were re-rendered vs adopted
@@ -65,7 +67,49 @@ enum SelfTest {
             await writeWindow(win, films: [model.canvas], to: out.appendingPathComponent("window.png"))
         }
 
+        await presenter(model: model, out: out)
         if talk.kind == .beatFormat { await roundTrip(model: model, out: out) }
+    }
+
+    // MARK: Presenting
+
+    /// Presents with both windows parked off screen (no focus, nothing covers the user's
+    /// screens). Off screen the audience film cannot play (rAF stops), so this drives it with
+    /// seeks and the left arrow, which are synchronous, and checks the relay to the presenter.
+    private static func presenter(model: TalkWindowModel, out: URL) async {
+        guard model.holds.count >= 4 else { return }
+        let p = model.presentation
+        model.select(1)
+        model.present(.present, offscreen: true)
+        let ready = await waitFor(seconds: 20) { p.audience?.info != nil && p.mirror?.info != nil }
+        check(ready && p.isPresenting, "present: audience and presenter films booted")
+        guard ready, let audience = p.audience, let mirror = p.mirror, let pw = p.presenterWindow else { p.end(); return }
+
+        let h3 = model.holds[2], h2 = model.holds[1]
+        audience.seek(h3.at)
+        let relayed = await waitFor(seconds: 5) { abs(p.state.t - h3.at) < 1e-6 && abs(mirror.t - h3.at) < 1e-6 }
+        check(relayed, "present: audience seek relayed to the presenter state and mirror (t=\(p.state.t), mirror \(mirror.t))")
+        check(p.state.notes == (h3.notes ?? ""), "present: notes are hold \(h3.index)'s")
+        check(p.state.nextLabel == model.holds[3].label, "present: next is '\(p.state.nextLabel)'")
+
+        check(p.press(.left), "present: left arrow handled")
+        let back = await waitFor(seconds: 5) { abs(p.state.t - h2.at) < 1e-6 }
+        check(back, "present: left arrow went back to hold \(h2.index) (t=\(p.state.t))")
+        check(p.state.clockStart == nil, "present: the clock waits for the first advance")
+        audience.seek(h3.at)
+        _ = await waitFor(seconds: 5) { abs(mirror.t - h3.at) < 1e-6 }
+        try? await Task.sleep(for: .milliseconds(400))
+
+        await writeWindow(pw, films: [mirror], to: out.appendingPathComponent("presenter.png"))
+        if let img = try? await audience.snapshot(width: 960) { write(img, to: out.appendingPathComponent("audience.png")) }
+        let lines = ["t \(p.state.t)", "position \(p.state.positionLabel)", "current \(p.state.currentHold?.label ?? "-")",
+                     "next \(p.state.nextLabel)", "notes \(p.state.notes)"]
+        try? (lines.joined(separator: "\n") + "\n").write(to: out.appendingPathComponent("presenter.txt"), atomically: true, encoding: .utf8)
+
+        check(p.press(.escape), "present: Esc handled")
+        check(!p.isPresenting && p.presenterWindow == nil && p.audienceWindow == nil, "present: Esc closed both windows")
+        _ = await waitFor(seconds: 3) { abs(model.t - h3.at) < 1e-6 }
+        check(abs(model.t - h3.at) < 1e-6, "present: the canvas follows to where presenting ended")
     }
 
     // MARK: External edit round trip

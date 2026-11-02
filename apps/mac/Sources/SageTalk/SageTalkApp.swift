@@ -21,6 +21,15 @@ struct SageTalkApp: App {
                     .disabled(model.talk == nil)
             }
             CommandMenu("Play") {
+                Button("Present") { model.present(.present) }
+                    .keyboardShortcut("p", modifiers: [.command, .option])
+                    .disabled(model.holds.isEmpty || model.presentation.isPresenting)
+                Button("Rehearse") { model.present(.rehearse) }
+                    .keyboardShortcut("r", modifiers: [.command, .option])
+                    .disabled(model.holds.isEmpty || model.presentation.isPresenting)
+                Button("End Presentation") { model.presentation.end() }
+                    .disabled(!model.presentation.isPresenting)
+                Divider()
                 Button("Next Hold") { model.next() }.keyboardShortcut(.rightArrow, modifiers: [])
                 Button("Previous Hold") { model.prev() }.keyboardShortcut(.leftArrow, modifiers: [])
                 Button("Play Through") { model.through() }.keyboardShortcut(.return, modifiers: [])
