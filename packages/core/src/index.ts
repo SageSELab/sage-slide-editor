@@ -11,7 +11,7 @@ export { recordTalk, lastEnds, elementKey } from './record.ts';
 export type { LibUsage, Recording, BeatRecording, MotionCall, CallLoc, CallKind, RecordedElement } from './record.ts';
 export { validateTalk, sortDiagnostics, type ValidateOptions } from './validate.ts';
 export { compileTalk, renderIndex, checkScript, ENGINE_FILES, DEFAULT_ENGINE_DIR, type CompileOptions, type CompileResult } from './compile.ts';
-export { publishTalk, renderPublic, publicSpine, publicCut, PUBLIC_CSS, type PublishOptions, type PublishResult, type PublishCut } from './publish.ts';
+export { publishTalk, renderPublic, publicSpine, publicCut, privateNeedles, PUBLIC_CSS, type PublishOptions, type PublishResult, type PublishCut } from './publish.ts';
 export { ghostVisible, validateRendered, firstTouch, GHOST_OPACITY, type FrameProbe, type VisibleElement, type RenderValidateOptions } from './talk-render.ts';
 export * from './edit.ts';
 export { sceneElements, type SceneElement } from './html.ts';

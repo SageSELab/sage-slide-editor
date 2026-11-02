@@ -53,6 +53,10 @@ export interface PublishResult {
   bytes: number;
   diagnostics: Diagnostic[];
   cut: PublishCut | null;
+  /** Holds in the public film (private chapters out, end card in). 0 when the publish failed. */
+  holds: number;
+  /** The public film's duration in seconds (0 when the publish failed). */
+  duration: number;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -212,7 +216,7 @@ export function privateNeedles(talk: LoadedTalk): { what: string; text: string }
 }
 
 /** Render the public page (no writes). */
-export function renderPublic(talk: LoadedTalk, opts: PublishOptions = {}): { html: string | null; diagnostics: Diagnostic[]; cut: PublishCut | null } {
+export function renderPublic(talk: LoadedTalk, opts: PublishOptions = {}): { html: string | null; diagnostics: Diagnostic[]; cut: PublishCut | null; layout?: { holds: number; duration: number } } {
   const D: Diagnostic[] = talk.diagnostics.filter((d) => d.severity === 'error');
   const spine = talk.spine;
   if (!spine || D.length) return { html: null, diagnostics: D, cut: null };
@@ -220,6 +224,7 @@ export function renderPublic(talk: LoadedTalk, opts: PublishOptions = {}): { htm
   const readEngine = (f: string) => { try { return fs.readFileSync(path.join(engine, f), 'utf8'); } catch { D.push(diag('file-missing', 'error', `engine file not found: ${path.join(engine, f)}`, {})); return ''; } };
   const rec = recordTalk(talk, { public: true });
   const cut = publicCut(talk, rec);
+  const layout = { holds: rec.layout.beats.length, duration: rec.layout.duration };
   const text = (p: string) => talk.host.read(p) ?? '';
   const scripts: SourceFile[] = [...cut.libs, ...cut.motion].map((p) => ({ path: p, text: text(p) }));
   for (const s of scripts) { const d = checkScript(s); if (d) D.push(d); }
@@ -307,17 +312,17 @@ ${scripts.map(script).join('\n')}
   // Anything still pointing into assets/ would break a file opened on its own.
   const left = D.some((d) => d.severity === 'error') ? null : /(?:\b(?:src|href|poster)=["']|url\(["']?|["'`])assets\//.exec(html);
   if (left) D.push(diag('publish-unresolved-asset', 'error', `an assets/ reference could not be inlined: …${html.slice(left.index, left.index + 80)}…`, {}));
-  return D.some((d) => d.severity === 'error') ? { html: null, diagnostics: D, cut } : { html, diagnostics: D, cut };
+  return D.some((d) => d.severity === 'error') ? { html: null, diagnostics: D, cut } : { html, diagnostics: D, cut, layout };
 }
 
 /** Publish a talk folder: write `<outDir>/<slug>.html`. */
 export function publishTalk(dir: string, opts: PublishOptions = {}): PublishResult {
   const talk = loadTalk(dir);
-  const { html, diagnostics, cut } = renderPublic(talk, opts);
-  if (html === null) return { ok: false, outFile: null, bytes: 0, diagnostics, cut };
+  const { html, diagnostics, cut, layout } = renderPublic(talk, opts);
+  if (html === null) return { ok: false, outFile: null, bytes: 0, diagnostics, cut, holds: 0, duration: 0 };
   const out = path.resolve(opts.outDir ?? path.join(dir, 'build', 'public'));
   fs.mkdirSync(out, { recursive: true });
   const outFile = path.join(out, `${opts.slug ?? 'talk'}.html`);
   fs.writeFileSync(outFile, html);
-  return { ok: true, outFile, bytes: Buffer.byteLength(html), diagnostics, cut };
+  return { ok: true, outFile, bytes: Buffer.byteLength(html), diagnostics, cut, holds: layout?.holds ?? 0, duration: layout?.duration ?? 0 };
 }
