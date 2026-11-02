@@ -654,6 +654,20 @@ Developer ID signing, notarization, hardened runtime, sidecar bundling, crash re
 onboarding (choose auth, pick skill sync), first Windows shell spike (WebView2 host over the
 same sidecar).
 
+### Themes and fonts (done 2026-11-02)
+
+A theme (`sage-theme/1`, `.talktheme` folder: theme.json, generated theme.css, fonts/) holds
+the light and dark palettes, display/body/mono fonts and the type scale. Applying one writes two
+marked blocks at the top of the talk's theme.css (embedded `@font-face` rules for
+`assets/fonts/*.woff2`, then `:root`/`.dk` token overrides); talk.css's type classes read
+`--t-*` variables with the old sizes as fallbacks, so talks without a theme render exactly as
+before (the SAGE built-in applied to the ISSTA port is byte-identical). Built-ins: SAGE, Paper,
+High Contrast, Slate. Google fonts come from Fontsource (OFL/Apache only, cached). Sidecar
+`theme.*`/`fonts.*` (docs/rpc.md), undo through `talk.revert`, `talkc theme`, Claude's
+`talk_theme_*`/`talk_fonts_*` tools and `references/themes.md`; the app's Themes window
+(Format ▸ Themes…), theme editor and FontPicker; `FontEmbedder` is the API for a per-element
+font control (not built yet).
+
 ---
 
 ## 12. Testing strategy
