@@ -1,0 +1,29 @@
+{
+  "name": "@sage/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "talkc": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "acorn": "^8.19.0",
+    "linkedom": "^0.18.15",
+    "parse5": "^8.1.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "fast-check": "^4.3.0",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0",
+    "tsx": "^4.23.15"
+  }
+}

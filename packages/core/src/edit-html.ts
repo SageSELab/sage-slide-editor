@@ -1,0 +1,160 @@
+// edit-html.ts — scene edits on source text: setText, setStyle, setAttr. Elements are found by
+// id with parse5 source locations; only the bytes of the target range are rewritten.
+import { attrValueRange, sceneElements, type SceneElement } from './html.ts';
+import type { SourceFile } from './load.ts';
+import { EditError, makeEdit, type Edit } from './patch.ts';
+
+function byId(scene: SourceFile, id: string): SceneElement {
+  const found = sceneElements(scene.text).filter((e) => e.id === id);
+  if (!found.length) throw new EditError('no-element', `no element #${id} in ${scene.path}`);
+  if (found.length > 1) throw new EditError('duplicate-element', `#${id} occurs ${found.length} times in ${scene.path}`);
+  return found[0]!;
+}
+
+const edit = (scene: SourceFile, range: [number, number], newText: string): Edit =>
+  makeEdit({ [scene.path]: scene.text }, [{ file: scene.path, range, newText }]);
+
+/** Replace the inner HTML of #id. The element needs an explicit end tag. */
+export function setText(scene: SourceFile, id: string, html: string): Edit {
+  const el = byId(scene, id);
+  const st = el.loc.startTag, et = el.loc.endTag;
+  if (!st || !et) throw new EditError('no-end-tag', `#${id} has no explicit end tag`);
+  return edit(scene, [st.endOffset, et.startOffset], html);
+}
+
+const escAttr = (v: string, quote: string) =>
+  v.replace(/&/g, '&amp;').replace(quote === "'" ? /'/g : /"/g, quote === "'" ? '&#39;' : '&quot;');
+
+/** True when the start tag spells attribute `name` more than once (parse5 keeps the first). */
+function hasDuplicateAttr(text: string, el: SceneElement, name: string): boolean {
+  const st = el.loc.startTag!;
+  // blank out quoted values so a value that contains the name does not count
+  const tag = text.slice(st.startOffset, st.endOffset).replace(/"[^"]*"|'[^']*'/g, (m) => " ".repeat(m.length));
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (tag.match(new RegExp(`\\s${esc}(?=[\\s=/>])`, "gi"))?.length ?? 0) > 1;
+}
+
+/** Where a new attribute goes: just before `>` or `/>` of the start tag. */
+function insertPoint(text: string, el: SceneElement): number {
+  const st = el.loc.startTag!;
+  let i = st.endOffset - 1;
+  if (text[i - 1] === '/') i--;
+  while (i > st.startOffset && /\s/.test(text[i - 1]!)) i--;
+  return i;
+}
+
+/**
+ * Set, add (value string, or `true` for a bare attribute) or remove (`null`) an attribute.
+ * An existing value is replaced inside its quotes; quoting style is kept.
+ */
+export function setAttr(scene: SourceFile, id: string, name: string, value: string | true | null): Edit {
+  if (!/^[^\s"'>/=]+$/.test(name)) throw new EditError('bad-attr', `bad attribute name "${name}"`);
+  const el = byId(scene, id), text = scene.text;
+  if (hasDuplicateAttr(text, el, name)) throw new EditError('duplicate-attr', `#${id} repeats the ${name} attribute (an HTML parse error); fix the source first`);
+  const loc = el.loc.attrs?.[name.toLowerCase()];
+  if (loc) {
+    if (value === null) {
+      let s = loc.startOffset;
+      while (s > 0 && /\s/.test(text[s - 1]!)) s--;
+      return edit(scene, [s, loc.endOffset], '');
+    }
+    const vr = attrValueRange(text, loc);
+    if (value === true) return edit(scene, [loc.startOffset, loc.endOffset], name);
+    if (!vr) return edit(scene, [loc.startOffset, loc.endOffset], `${name}="${escAttr(value, '"')}"`);
+    if (!vr.quote) return edit(scene, [vr.start, vr.end], /^[^\s"'=<>`]+$/.test(value) ? value : `"${escAttr(value, '"')}"`);
+    return edit(scene, [vr.start, vr.end], escAttr(value, vr.quote));
+  }
+  if (value === null) return makeEdit({ [scene.path]: text }, []);
+  const at = insertPoint(text, el);
+  return edit(scene, [at, at], value === true ? ` ${name}` : ` ${name}="${escAttr(value, '"')}"`);
+}
+
+export interface StyleProps {
+  left?: number | string | null | undefined;
+  top?: number | string | null | undefined;
+  width?: number | string | null | undefined;
+  height?: number | string | null | undefined;
+  fontSize?: number | string | null | undefined;
+}
+
+const kebab = (p: string) => p.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+const cssValue = (v: number | string) => (typeof v === 'number' ? `${+v.toFixed(3)}px` : v);
+
+interface Decl { name: string; start: number; end: number; valueStart: number; valueEnd: number }
+
+/** Split a style attribute value into declarations (`;` inside quotes/parens ignored). */
+export function parseDecls(css: string): Decl[] {
+  const out: Decl[] = [];
+  let depth = 0, q = '', s = 0;
+  const flush = (e: number) => {
+    const part = css.slice(s, e), c = part.indexOf(':');
+    if (c > 0 && part.slice(0, c).trim()) {
+      const name = part.slice(0, c).trim().toLowerCase();
+      let vs = s + c + 1, ve = e;
+      while (vs < ve && /\s/.test(css[vs]!)) vs++;
+      while (ve > vs && /\s/.test(css[ve - 1]!)) ve--;
+      out.push({ name, start: s, end: e, valueStart: vs, valueEnd: ve });
+    }
+    s = e + 1;
+  };
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i]!;
+    if (q) { if (ch === '\\') i++; else if (ch === q) q = ''; continue; }
+    if (ch === '"' || ch === "'") q = ch;
+    else if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (ch === ';' && !depth) flush(i);
+  }
+  flush(css.length);
+  return out;
+}
+
+/** Rewrite a style string: replace values in place, append new properties, drop nulls. */
+export function patchStyle(css: string, props: Readonly<Record<string, number | string | null | undefined>>): string {
+  let out = css;
+  const decls = parseDecls(css);
+  const sep = decls[0] && /:\s/.test(css.slice(decls[0].start, decls[0].valueStart)) ? ': ' : ':';
+  const edits: { s: number; e: number; t: string }[] = [];
+  const appends: string[] = [];
+  for (const [key, v] of Object.entries(props)) {
+    if (v === undefined) continue;
+    const name = kebab(key);
+    const d = [...decls].reverse().find((x) => x.name === name);
+    if (d && v === null) {
+      // drop every declaration of it, each with its own ';' (the one ending it, or the one before it if last)
+      for (const x of decls.filter((y) => y.name === name)) {
+        let s = x.start;
+        const e = x.end < css.length ? x.end + 1 : x.end;
+        if (x.end >= css.length) { const prev = css.lastIndexOf(';', x.start - 1); if (prev >= 0 && !css.slice(prev + 1, x.start).trim() && !edits.some((q) => q.e > prev)) s = prev; }
+        edits.push({ s, e, t: '' });
+      }
+    } else if (d && v !== null) edits.push({ s: d.valueStart, e: d.valueEnd, t: cssValue(v) });
+    else if (v !== null) appends.push(`${name}${sep}${cssValue(v)}`);
+  }
+  edits.sort((a, b) => b.s - a.s);
+  for (const x of edits) out = out.slice(0, x.s) + x.t + out.slice(x.e);
+  if (appends.length) {
+    const trimmed = out.replace(/\s+$/, ''), tail = out.slice(trimmed.length);
+    const join = sep === ': ' ? '; ' : ';';
+    out = trimmed + (trimmed && !trimmed.endsWith(';') ? join : trimmed.endsWith(';') && sep === ': ' ? ' ' : '') + appends.join(join) + tail;
+  }
+  return out;
+}
+
+/** Set position/size properties in #id's inline style. Numbers are px; null removes (every occurrence). */
+export function setStyle(scene: SourceFile, id: string, props: StyleProps): Edit {
+  const el = byId(scene, id), text = scene.text;
+  const loc = el.loc.attrs?.style;
+  const vr = loc ? attrValueRange(text, loc) : null;
+  if (loc && vr) {
+    const next = patchStyle(text.slice(vr.start, vr.end), props as Record<string, number | string | null | undefined>);
+    if (!vr.quote) return edit(scene, [vr.start, vr.end], `"${next.split('"').join('&quot;')}"`);
+    // `next` is raw attribute text (entities kept as written): escape only the quote.
+    return edit(scene, [vr.start, vr.end], next.split(vr.quote).join(vr.quote === "'" ? "&#39;" : "&quot;"));
+  }
+  const next = patchStyle('', props as Record<string, number | string | null | undefined>);
+  if (!next) return makeEdit({ [scene.path]: text }, []);
+  if (loc) return edit(scene, [loc.startOffset, loc.endOffset], `style="${escAttr(next, '"')}"`);
+  const at = insertPoint(text, el);
+  return edit(scene, [at, at], ` style="${escAttr(next, '"')}"`);
+}
