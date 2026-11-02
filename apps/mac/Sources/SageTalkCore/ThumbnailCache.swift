@@ -45,6 +45,28 @@ public struct ThumbnailCache: Sendable {
         self.init(directory: talkRoot.appendingPathComponent(".sage/thumbs", isDirectory: true))
     }
 
+    /// Where a talk's thumbnails live. A sage-talk/1 folder is the app's document, so its cache
+    /// sits in its own gitignored `.sage/`. A legacy deck is opened read-only and usually lives
+    /// in a paper repository, so nothing is written next to it: its cache goes under
+    /// `caches` (normally ~/Library/Caches/<bundle id>) in a folder named by its path's hash.
+    public static func directory(for talk: TalkFolder, caches: URL) -> URL {
+        switch talk.kind {
+        case .beatFormat:
+            return talk.root.appendingPathComponent(".sage/thumbs", isDirectory: true)
+        case .legacy:
+            let digest = SHA256.hash(data: Data(talk.root.standardizedFileURL.path.utf8))
+            let name = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+            return caches.appendingPathComponent("legacy-thumbs/\(name)", isDirectory: true)
+        }
+    }
+
+    /// The per-user caches folder for this app.
+    public static var userCaches: URL {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        return base.appendingPathComponent(Bundle.main.bundleIdentifier ?? "io.sagelab.talk", isDirectory: true)
+    }
+
     // MARK: Keys
 
     /// Engine files the compiled film loads from beside itself; they change every frame too.

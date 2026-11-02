@@ -34,6 +34,29 @@ import Testing
         #expect(try ThumbnailCache.filmHash(of: f) != before)
     }
 
+    @Test func legacyDecksAreNeverWrittenTo() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data().write(to: root.appendingPathComponent("index.html"))
+        try Data().write(to: root.appendingPathComponent("talk.js"))
+        let caches = URL(fileURLWithPath: "/caches")
+        let dir = ThumbnailCache.directory(for: try TalkFolder(root: root), caches: caches)
+        #expect(dir.path.hasPrefix("/caches/legacy-thumbs/"))
+        #expect(!dir.path.hasPrefix(root.path))
+        // Stable per deck path.
+        #expect(dir == ThumbnailCache.directory(for: try TalkFolder(root: root), caches: caches))
+    }
+
+    @Test func beatFormatTalksKeepTheirCacheInSage() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("beat-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data("{}".utf8).write(to: root.appendingPathComponent("talk.json"))
+        let dir = ThumbnailCache.directory(for: try TalkFolder(root: root), caches: URL(fileURLWithPath: "/caches"))
+        #expect(dir.path.hasSuffix(".sage/thumbs"))
+    }
+
     @Test func livesInTheTalksSageFolder() {
         let c = ThumbnailCache(talkRoot: URL(fileURLWithPath: "/talk"))
         #expect(c.directory.path == "/talk/.sage/thumbs")

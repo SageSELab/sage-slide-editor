@@ -190,7 +190,11 @@ final class TalkWindowModel {
         duration = info.duration
         t = canvas.t
         selectedHold = HoldTimeline(holds: holds, duration: duration).current(at: t)?.id
-        if let filmURL, let filmRoot { thumbnails.setFilm(filmURL, talkRoot: filmRoot, holds: holds) }
+        if let filmURL, let filmRoot {
+            let cacheDir = talk.map { ThumbnailCache.directory(for: $0, caches: ThumbnailCache.userCaches) }
+                ?? filmRoot.appendingPathComponent(".sage/thumbs", isDirectory: true)
+            thumbnails.setFilm(filmURL, talkRoot: filmRoot, cacheDirectory: cacheDir, holds: holds)
+        }
     }
 
     private func filmMoved(_ t: Double, _ playing: Bool) {

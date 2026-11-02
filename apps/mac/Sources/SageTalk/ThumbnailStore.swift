@@ -44,9 +44,9 @@ final class ThumbnailStore {
     var pendingCount: Int { requested.keys.filter { !freshKeys.contains($0) }.count }
 
     /// A talk was opened or rebuilt. Stale thumbnails stay visible until replaced.
-    func setFilm(_ film: URL, talkRoot: URL, holds: [Hold]) {
-        if cache?.directory != ThumbnailCache(talkRoot: talkRoot).directory {
-            cache = ThumbnailCache(talkRoot: talkRoot)
+    func setFilm(_ film: URL, talkRoot: URL, cacheDirectory: URL, holds: [Hold]) {
+        if cache?.directory != cacheDirectory {
+            cache = ThumbnailCache(directory: cacheDirectory)
             images = [:]
             requested = [:]
             queue = []
