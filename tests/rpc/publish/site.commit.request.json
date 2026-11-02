@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 36,
+  "method": "site.commit",
+  "params": {
+    "repo": "/Users/someone/Sites/personal-site",
+    "paths": [
+      "public/talks/ui-repair-issta26.html",
+      "src/content/talks.yaml"
+    ],
+    "message": "Add the ISSTA 2026 talk slides"
+  }
+}

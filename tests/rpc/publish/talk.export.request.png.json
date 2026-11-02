@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 32,
+  "method": "talk.export",
+  "params": {
+    "kind": "png",
+    "holds": [
+      2,
+      3,
+      5
+    ],
+    "around": 0.5
+  }
+}

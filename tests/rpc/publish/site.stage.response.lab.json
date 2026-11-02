@@ -1,0 +1,23 @@
+{
+  "jsonrpc": "2.0",
+  "id": 34,
+  "result": {
+    "site": "lab",
+    "repo": "/Users/someone/Sites/lab-site",
+    "url": "/talks/ui-repair-issta26.html",
+    "files": [
+      {
+        "path": "public/talks/ui-repair-issta26.html",
+        "status": "unchanged"
+      },
+      {
+        "path": "src/content/talks.yaml",
+        "status": "unchanged"
+      }
+    ],
+    "diff": "",
+    "notes": [
+      "src/content/talks.yaml is generated from another repository; the talk listing comes from there."
+    ]
+  }
+}

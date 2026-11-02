@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": 35,
+  "result": {
+    "site": "personal",
+    "repo": "/Users/someone/Sites/personal-site",
+    "url": "/talks/ui-repair-issta26.html",
+    "files": [
+      {
+        "path": "public/talks/ui-repair-issta26.html",
+        "status": "added"
+      },
+      {
+        "path": "src/content/talks.yaml",
+        "status": "modified"
+      },
+      {
+        "path": "src/content/publications.yaml",
+        "status": "modified"
+      }
+    ],
+    "diff": "public/talks/ui-repair-issta26.html: new file, 1.42 MB\ndiff --git a/src/content/publications.yaml b/src/content/publications.yaml\n--- a/src/content/publications.yaml\n+++ b/src/content/publications.yaml\n@@ -63,2 +63,4 @@\n       url: \"/documents/UI-Program-Repair-ISSTA26.pdf\"\n+    - label: \"slides\"\n+      url: \"/talks/ui-repair-issta26.html\"\n",
+    "notes": []
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 35,
+  "error": {
+    "code": -32021,
+    "message": "publish the talk as \"ui-repair-issta26\" first (no build/public/ui-repair-issta26.html)",
+    "data": {
+      "path": "/Users/someone/Talks/issta26/build/public/ui-repair-issta26.html"
+    }
+  }
+}

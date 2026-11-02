@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "error": {
+    "code": -32020,
+    "message": "publish failed: missing asset: assets/gone.png (referenced from scenes/line.html)",
+    "data": {
+      "diagnostics": [
+        {
+          "severity": "error",
+          "code": "asset-missing",
+          "message": "missing asset: assets/gone.png (referenced from scenes/line.html)",
+          "file": "scenes/line.html"
+        }
+      ]
+    }
+  }
+}

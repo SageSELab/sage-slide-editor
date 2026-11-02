@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 36,
+  "result": {
+    "commit": "3f1c2a9e0b7d4c5e6f8a9b0c1d2e3f4a5b6c7d8e",
+    "summary": "3f1c2a9 Add the ISSTA 2026 talk slides\n public/talks/ui-repair-issta26.html | 1 +\n src/content/talks.yaml              | 9 +++++++++\n 2 files changed, 10 insertions(+)"
+  }
+}

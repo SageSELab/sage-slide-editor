@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "path": "/Users/someone/Talks/issta26/build/public/ui-repair-issta26.html",
+    "bytes": 1418823,
+    "holds": 44,
+    "duration": 244.8,
+    "warnings": []
+  }
+}

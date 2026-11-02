@@ -779,3 +779,181 @@ export const appRequestResultCheckers: { [M in AppRequestName]: (r: unknown) => 
   ]),
   'app.goto': (r) => shape(r, 'result', ['t'], [], (v) => want(isNum(v.t) && v.t >= 0, 'result.t: expected a non-negative number')),
 };
+
+// =======================================================================================
+// Publish and export (Phase 5, PLAN 5.6). Its own section, like Claude's, so other protocol
+// additions merge cleanly. Fixtures: tests/rpc/publish/, checked by publish-protocol.test.ts
+// and PublishProtocolTests.swift. Implementation: src/publish/.
+// =======================================================================================
+
+export interface PublishParams {
+  /** Output file name without .html (letters, digits, . _ -). Default: the talk folder's name, slugified. */
+  slug?: string;
+}
+export interface PublishResult {
+  /** Absolute path of the public file (<talk>/build/public/<slug>.html). */
+  path: string;
+  bytes: number;
+  /** Holds in the public film (private chapters out, end card in). */
+  holds: number;
+  /** Public film duration in seconds. */
+  duration: number;
+  /** Non-fatal problems; `publish-private-text` / `publish-private-leak` flag private labels or notes that would ship. */
+  warnings: Diagnostic[];
+}
+
+export type ExportKind = 'png' | 'pdf';
+export interface ExportParams {
+  kind: ExportKind;
+  /** 'all' (default) or 1-based hold numbers of the full film (backups included). */
+  holds?: 'all' | number[];
+  /** Also render each hold `around` seconds before and after (frames sorted by time). */
+  around?: number;
+}
+export interface ExportResult {
+  kind: ExportKind;
+  /** Absolute folder written: <talk>/build/export/png for PNGs, <talk>/build/export for the PDF. */
+  dir: string;
+  /** Absolute paths written: one PNG per frame, or the one PDF. */
+  files: string[];
+  /** Frames rendered (= PNG files = PDF pages). */
+  frames: number;
+  /** Frame size: 1920x1080 px, which is also the PDF page size in points. */
+  width: number;
+  height: number;
+  ms: number;
+  /** Uncaught page errors while rendering. */
+  errors: string[];
+}
+export interface ExportProgressParams { kind: ExportKind; done: number; total: number }
+
+export type SiteName = 'personal' | 'lab';
+export interface SiteStageParams {
+  site: SiteName;
+  /** Absolute path of the site repository's working tree (from the app's settings). */
+  repo: string;
+  /** The published file's slug: <talk>/build/public/<slug>.html goes to public/talks/<slug>.html. */
+  slug: string;
+  /** The publication to link the slides from: its `id` in publications.yaml, or its exact title. */
+  paperEntry?: string;
+}
+export type SiteFileStatus = 'added' | 'modified' | 'unchanged';
+export interface SiteFile { path: string; status: SiteFileStatus }
+export interface SiteStageResult {
+  site: SiteName;
+  /** The repository's top level, symlinks resolved. */
+  repo: string;
+  /** The page's path on the site (/talks/<slug>.html). */
+  url: string;
+  /** Every file stage looked at, repo-relative. Commit the ones not 'unchanged'. */
+  files: SiteFile[];
+  /** The YAML files' diff plus a stat line for the HTML file. Empty when nothing changed. */
+  diff: string;
+  /** What was skipped and why (an auto-generated YAML file, a paper that was not found). */
+  notes: string[];
+}
+export interface SiteCommitParams {
+  repo: string;
+  /** Repo-relative paths to commit (only these; other staged changes stay staged). */
+  paths: string[];
+  message: string;
+}
+export interface SiteCommitResult {
+  /** The new commit's full hash. */
+  commit: string;
+  /** One line per committed file plus the subject. */
+  summary: string;
+}
+
+export interface PublishMethods {
+  /** Writes the public single file (talkc publish). PublishFailed (data.diagnostics) when it cannot. */
+  'talk.publish': { params: PublishParams | undefined; result: PublishResult };
+  /** Rebuilds, then renders holds to PNGs or a PDF; talk.exportProgress after each frame. */
+  'talk.export': { params: ExportParams; result: ExportResult };
+  /** Copies the published file into a site repo and edits its YAML; never commits. */
+  'site.stage': { params: SiteStageParams; result: SiteStageResult };
+  /** Commits the given paths in a site repo (the user clicked Commit). Never pushes. */
+  'site.commit': { params: SiteCommitParams; result: SiteCommitResult };
+}
+export type PublishMethodName = keyof PublishMethods;
+export interface PublishNotifications { 'talk.exportProgress': ExportProgressParams }
+export type PublishNotificationName = keyof PublishNotifications;
+
+export const PUBLISH_METHOD_NAMES: readonly PublishMethodName[] = ['talk.publish', 'talk.export', 'site.stage', 'site.commit'];
+export const PUBLISH_NOTIFICATION_NAMES: readonly PublishNotificationName[] = ['talk.exportProgress'];
+
+export const PublishErrorCode = {
+  /** talk.publish / talk.export: the build or the public cut failed. data.diagnostics. */
+  PublishFailed: -32020,
+  /** site.stage: build/public/<slug>.html does not exist yet. */
+  NotPublished: -32021,
+  /** site.*: not a repository's top level, a version-control command failed, a YAML file does not parse. */
+  SiteFailed: -32022,
+} as const;
+
+export const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const isSlug = (v: unknown) => typeof v === 'string' && SLUG_RE.test(v) && !v.includes('..') && v.length <= 120;
+const absPath = (v: unknown) => typeof v === 'string' && v.startsWith('/');
+const relPath = (v: unknown) => typeof v === 'string' && v.length > 0 && !v.startsWith('/') && !v.split('/').includes('..');
+const KINDS = ['png', 'pdf'] as const, SITES = ['personal', 'lab'] as const, FILE_STATUS = ['added', 'modified', 'unchanged'] as const;
+const strList = (v: unknown, at: string) => checkList(v, at, (x, a) => want(typeof x === 'string', `${a}: expected a string`));
+
+export const publishParamCheckers: { [M in PublishMethodName]: (p: unknown) => Problems } = {
+  'talk.publish': (p) => (p === undefined ? [] : shape(p, 'params', [], ['slug'], (v) => want(v.slug === undefined || isSlug(v.slug), 'params.slug: expected letters, digits, . _ -'))),
+  'talk.export': (p) => shape(p, 'params', ['kind'], ['holds', 'around'], (v) => [
+    ...oneOf(v.kind, KINDS, 'params.kind'),
+    ...want(v.holds === undefined || v.holds === 'all' || (Array.isArray(v.holds) && v.holds.length > 0 && v.holds.every((h) => isInt(h) && h >= 1)), "params.holds: expected 'all' or a non-empty list of hold numbers"),
+    ...want(v.around === undefined || (isNum(v.around) && v.around > 0 && v.around <= 10), 'params.around: expected seconds in (0, 10]'),
+  ]),
+  'site.stage': (p) => shape(p, 'params', ['site', 'repo', 'slug'], ['paperEntry'], (v) => [
+    ...oneOf(v.site, SITES, 'params.site'),
+    ...want(absPath(v.repo), 'params.repo: expected an absolute path'),
+    ...want(isSlug(v.slug), 'params.slug: expected letters, digits, . _ -'),
+    ...want(v.paperEntry === undefined || (typeof v.paperEntry === 'string' && v.paperEntry.trim().length > 0), 'params.paperEntry: expected a non-empty string'),
+  ]),
+  'site.commit': (p) => shape(p, 'params', ['repo', 'paths', 'message'], [], (v) => [
+    ...want(absPath(v.repo), 'params.repo: expected an absolute path'),
+    ...want(Array.isArray(v.paths) && v.paths.length > 0 && v.paths.every(relPath), 'params.paths: expected repo-relative paths'),
+    ...want(typeof v.message === 'string' && v.message.trim().length > 0, 'params.message: expected a non-empty string'),
+  ]),
+};
+
+export const publishResultCheckers: { [M in PublishMethodName]: (r: unknown) => Problems } = {
+  'talk.publish': (r) => shape(r, 'result', ['path', 'bytes', 'holds', 'duration', 'warnings'], [], (v) => [
+    ...want(absPath(v.path) && String(v.path).endsWith('.html'), 'result.path: expected an absolute .html path'),
+    ...want(isInt(v.bytes) && v.bytes > 0, 'result.bytes: expected a positive integer'),
+    ...want(isInt(v.holds) && v.holds >= 0, 'result.holds: expected a non-negative integer'),
+    ...want(isNum(v.duration) && v.duration >= 0, 'result.duration: expected a non-negative number'),
+    ...checkList(v.warnings, 'result.warnings', checkDiagnostic),
+  ]),
+  'talk.export': (r) => shape(r, 'result', ['kind', 'dir', 'files', 'frames', 'width', 'height', 'ms', 'errors'], [], (v) => [
+    ...oneOf(v.kind, KINDS, 'result.kind'),
+    ...want(absPath(v.dir), 'result.dir: expected an absolute path'),
+    ...checkList(v.files, 'result.files', (x, at) => want(absPath(x), `${at}: expected an absolute path`)),
+    ...want(isInt(v.frames) && v.frames >= 1, 'result.frames: expected a positive integer'),
+    ...want(isInt(v.width) && isInt(v.height), 'result.width/height: expected integers'),
+    ...want(isNum(v.ms) && v.ms >= 0, 'result.ms: expected a non-negative number'),
+    ...strList(v.errors, 'result.errors'),
+  ]),
+  'site.stage': (r) => shape(r, 'result', ['site', 'repo', 'url', 'files', 'diff', 'notes'], [], (v) => [
+    ...oneOf(v.site, SITES, 'result.site'),
+    ...want(absPath(v.repo), 'result.repo: expected an absolute path'),
+    ...want(typeof v.url === 'string' && v.url.startsWith('/'), 'result.url: expected a site path'),
+    ...checkList(v.files, 'result.files', (x, at) => shape(x, at, ['path', 'status'], [], (f) => [
+      ...want(relPath(f.path), `${at}.path: expected a repo-relative path`), ...oneOf(f.status, FILE_STATUS, `${at}.status`),
+    ])),
+    ...strs(v, ['diff'], 'result'),
+    ...strList(v.notes, 'result.notes'),
+  ]),
+  'site.commit': (r) => shape(r, 'result', ['commit', 'summary'], [], (v) => [
+    ...want(typeof v.commit === 'string' && /^[0-9a-f]{40,64}$/.test(v.commit), 'result.commit: expected a commit hash'),
+    ...strs(v, ['summary'], 'result'),
+  ]),
+};
+
+export const publishNotificationCheckers: { [N in PublishNotificationName]: (p: unknown) => Problems } = {
+  'talk.exportProgress': (p) => shape(p, 'params', ['kind', 'done', 'total'], [], (v) => [
+    ...oneOf(v.kind, KINDS, 'params.kind'),
+    ...want(isInt(v.done) && isInt(v.total) && v.done >= 0 && v.total >= 1 && v.done <= v.total, 'params.done/total: expected 0 <= done <= total, total >= 1'),
+  ]),
+};

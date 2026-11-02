@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 33,
+  "method": "talk.export",
+  "params": {
+    "kind": "pdf",
+    "holds": "all"
+  }
+}

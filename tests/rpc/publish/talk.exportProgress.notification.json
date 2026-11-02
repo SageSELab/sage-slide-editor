@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "method": "talk.exportProgress",
+  "params": {
+    "kind": "pdf",
+    "done": 12,
+    "total": 61
+  }
+}

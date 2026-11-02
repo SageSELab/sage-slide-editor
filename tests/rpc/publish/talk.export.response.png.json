@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 32,
+  "result": {
+    "kind": "png",
+    "dir": "/Users/someone/Talks/issta26/build/export/png",
+    "files": [
+      "/Users/someone/Talks/issta26/build/export/png/hold-02-before.png",
+      "/Users/someone/Talks/issta26/build/export/png/hold-02.png",
+      "/Users/someone/Talks/issta26/build/export/png/hold-02-after.png"
+    ],
+    "frames": 3,
+    "width": 1920,
+    "height": 1080,
+    "ms": 1630,
+    "errors": []
+  }
+}

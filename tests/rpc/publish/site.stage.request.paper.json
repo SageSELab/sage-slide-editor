@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 35,
+  "method": "site.stage",
+  "params": {
+    "site": "personal",
+    "repo": "/Users/someone/Sites/personal-site",
+    "slug": "ui-repair-issta26",
+    "paperEntry": "pub-079"
+  }
+}

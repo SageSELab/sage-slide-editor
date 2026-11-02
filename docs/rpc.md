@@ -314,3 +314,54 @@ The chat pane's protocol. It lives in its own section of `protocol.ts` (`ClaudeM
 
 Saved rules: Bash by its first two words (commands with shell metacharacters always ask), file
 tools by folder, WebFetch by host, other tools by name.
+
+## Publish and export (Phase 5)
+
+PLAN 5.6 and the skill's `references/publishing.md`. Its own section of `protocol.ts`
+(`PublishMethods`, `PublishNotifications`, `PublishErrorCode`) and of Swift
+(`PublishProtocol.swift`); fixtures in `tests/rpc/publish/`, checked by
+`publish-protocol.test.ts` and `PublishProtocolTests.swift`. Source: `packages/sidecar/src/publish/`.
+All four methods run in the request queue, one at a time with builds and edits.
+
+| Method | Params | Result | Errors |
+|---|---|---|---|
+| `talk.publish` | `{slug?}` | `{path, bytes, holds, duration, warnings: Diagnostic[]}` | NoTalkOpen, UnsupportedForKind, InvalidParams, PublishFailed |
+| `talk.export` | `{kind: 'png'\|'pdf', holds?: 'all'\|number[], around?: number}` | `{kind, dir, files, frames, width, height, ms, errors}` | NoTalkOpen, UnsupportedForKind, InvalidParams, PublishFailed |
+| `site.stage` | `{site: 'personal'\|'lab', repo, slug, paperEntry?}` | `{site, repo, url, files: {path, status}[], diff, notes}` | NoTalkOpen, InvalidParams, NotPublished, SiteFailed |
+| `site.commit` | `{repo, paths, message}` | `{commit, summary}` | InvalidParams, SiteFailed |
+
+| Notification | Params |
+|---|---|
+| `talk.exportProgress` | `{kind, done, total}`, after each frame of a `talk.export` |
+
+- `talk.publish` is `talkc publish`: `<talk>/build/public/<slug>.html`, slug default the talk
+  folder's name, slugified. `holds` and `duration` are the public film's (private chapters out,
+  end card in). `warnings` are the core's non-fatal diagnostics, among them
+  `publish-private-text` (a private chapter or beat label, or the opening of a speaker note, in
+  a file the public build ships) and `publish-private-leak` (the same, found only in the
+  finished page; text the engine itself carries is not counted). A failed cut is PublishFailed
+  with `data.diagnostics`.
+- `talk.export` rebuilds first (PublishFailed if the build fails), then renders
+  `build/index.html` (backups included) in headless Chromium through `@sage/render`. `holds` are
+  1-based hold numbers; `around` adds frames that many seconds before and after each hold.
+  PNG: `build/export/png/hold-NN[-before|-after].png` plus `manifest.json`; the folder is emptied
+  first. PDF: `build/export/<talk>.pdf`, one 1920x1080-point page per frame, assembled with
+  pdf-lib. A hold number outside the film is InvalidParams.
+- `site.stage` works in the repository at `repo`, which must be a working tree's top folder (no
+  default: the app passes the path from its settings). It copies `build/public/<slug>.html` to
+  `public/talks/<slug>.html`, adds the talk to `src/content/talks.yaml` (or gives its entry a
+  `slides` link), and with `paperEntry` (an `id`, else an exact title) adds the `slides` link
+  to that paper in `src/content/publications.yaml`. YAML edits are splices at the nodes' source
+  ranges (`yaml`'s Document API), so comments, quoting and blank lines elsewhere are kept byte
+  for byte. A YAML file whose header says it is generated (the lab site's) is not edited;
+  `notes` says so, as it does for a paper that is not found. Nothing is staged or committed.
+  `files` lists every file looked at with its status against HEAD; `diff` is the YAML diff,
+  preceded by one line for the HTML file. Running it again changes nothing.
+- `site.commit` commits exactly `paths` (other staged changes stay staged), with `message`. The
+  app sends it only when the user clicks Commit. Nothing in the sidecar pushes.
+
+| Code | Name | Meaning |
+|---|---|---|
+| -32020 | PublishFailed | The public cut or the build failed. `data.diagnostics` |
+| -32021 | NotPublished | `site.stage`: `build/public/<slug>.html` does not exist. `data.path` |
+| -32022 | SiteFailed | Not a repository's top folder, a version-control command failed, a YAML file does not parse, nothing to commit |

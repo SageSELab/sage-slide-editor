@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 33,
+  "result": {
+    "kind": "pdf",
+    "dir": "/Users/someone/Talks/issta26/build/export",
+    "files": [
+      "/Users/someone/Talks/issta26/build/export/issta26.pdf"
+    ],
+    "frames": 61,
+    "width": 1920,
+    "height": 1080,
+    "ms": 11840,
+    "errors": []
+  }
+}

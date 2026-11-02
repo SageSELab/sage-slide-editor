@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "path": "/Users/someone/Talks/issta26/build/public/ui-repair-issta26.html",
+    "bytes": 1418990,
+    "holds": 44,
+    "duration": 244.8,
+    "warnings": [
+      {
+        "severity": "warning",
+        "code": "publish-private-text",
+        "message": "private chapter label \"One more thing\" appears in a file the public build ships",
+        "file": "scenes/end.html:14"
+      },
+      {
+        "severity": "warning",
+        "code": "publish-private-leak",
+        "message": "speaker note \"Thank you. I am Kevin Moran from UCF. Jo\" appears in the published page",
+        "file": "build/public/ui-repair-issta26.html"
+      }
+    ]
+  }
+}
