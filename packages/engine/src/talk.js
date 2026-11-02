@@ -136,7 +136,9 @@
     draw(sel, t, dur, a, b, ease = 'inOut') {
       this.els(sel).forEach((p) => {
         const L = p.getTotalLength();
-        p.style.strokeDasharray = L;
+        // Gap of 2L, not L: with a gap of exactly L WebKit paints the zero-length dash at the
+        // pattern boundary as a round-cap dot. Visually identical otherwise.
+        p.style.strokeDasharray = L + ' ' + 2 * L;
         this.anim(p, t, dur, [{ strokeDashoffset: L * (1 - a) }, { strokeDashoffset: L * (1 - b) }], { ease });
       });
       return this;

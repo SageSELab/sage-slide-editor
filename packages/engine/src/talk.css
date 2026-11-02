@@ -30,8 +30,11 @@
   --cosmetic: #c47a00;
   --nav: #6b5bd6;
   --display: "Manrope", -apple-system, "SF Pro Display", system-ui, sans-serif;
-  --text: -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Named fonts first: Chromium ignores -apple-system and ui-monospace and has always resolved
+     these to "SF Pro Text" and Menlo, so the decks were designed against those. Naming them
+     first makes WebKit (the app canvas) match Chromium (the podium) instead of the reverse. */
+  --text: "SF Pro Text", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: Menlo, ui-monospace, "SF Mono", Consolas, monospace;
 }
 /* Dark passages (the "One more thing" section) flip the tokens on their scene. */
 .dk {
