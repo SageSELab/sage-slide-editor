@@ -218,6 +218,14 @@ enum SelfTest {
         for f in films where f.webView.window === window {
             let frame = f.webView.convert(f.webView.bounds, to: view)
             if let img = try? await f.snapshot(width: frame.width) { shots.append((frame, img)) }
+            // The canvas's format bar floats over the web view: draw it over the snapshot too.
+            if let host = f.webView.superview as? CanvasContainerView, !host.bar.isHidden,
+               let rep = host.bar.bitmapImageRepForCachingDisplay(in: host.bar.bounds) {
+                host.bar.cacheDisplay(in: host.bar.bounds, to: rep)
+                let img = NSImage(size: host.bar.bounds.size)
+                img.addRepresentation(rep)
+                shots.append((host.bar.convert(host.bar.bounds, to: view), img))
+            }
         }
         let size = view.bounds.size
         let scale = window.backingScaleFactor
