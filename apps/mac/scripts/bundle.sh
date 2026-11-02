@@ -1,6 +1,11 @@
 #!/bin/bash
 # Build the SwiftPM executable and wrap it in a minimal .app bundle (until a real Xcode
 # project with signing arrives in Phase 6).   bash scripts/bundle.sh [debug|release]
+#
+# The development app runs the sidecar from this checkout (`node --import tsx src/main.ts` in
+# packages/sidecar). The repo path and the node path are baked into Contents/Resources
+# (sage-repo-path, sage-node-path) because an app opened from Finder has no useful cwd or PATH.
+# SAGE_REPO and SAGE_NODE in the environment override them (SidecarLocator).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CONF="${1:-debug}"
@@ -22,5 +27,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
+REPO="$(cd ../.. && pwd)"
+printf '%s\n' "$REPO" > "$APP/Contents/Resources/sage-repo-path"
+NODE="${SAGE_NODE:-$(command -v node || true)}"
+if [ -n "$NODE" ]; then printf '%s\n' "$NODE" > "$APP/Contents/Resources/sage-node-path"; fi
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 echo "$APP"

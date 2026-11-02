@@ -32,7 +32,13 @@ has a fixture in `tests/rpc/`, and both test suites decode the same files (PLAN 
 
 The app starts one sidecar per open talk. In development this is
 `node --import tsx src/main.ts`, run with cwd `packages/sidecar`
-(`SidecarConfiguration.development`). The sidecar logs `ready` to stderr. It needs no
+(`SidecarConfiguration.development`). The app finds the repository through `SAGE_REPO`, else
+the path `apps/mac/scripts/bundle.sh` bakes into `Contents/Resources/sage-repo-path`, else the
+folders above its executable; and `node` through `SAGE_NODE`, else the baked
+`sage-node-path`, else PATH (`SidecarLocator`). `SidecarSupervisor` owns the client: it
+restarts a sidecar that exits unexpectedly once (re-opening the talk), reports a second crash
+instead of looping, and shuts the sidecar down when the app quits. Legacy decks open without
+a sidecar. The sidecar logs `ready` to stderr. It needs no
 handshake, but `app.ping` reports the protocol version.
 
 The sidecar exits 0 when any of these happens:
