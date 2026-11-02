@@ -1,0 +1,14 @@
+{
+  "name": "format-spike",
+  "private": true,
+  "type": "module",
+  "description": "Phase 0 format spike: beat-format port of the ISSTA opening + frame-diff harness",
+  "scripts": {
+    "build": "node build.mjs ../../fixtures/issta26",
+    "diff": "node diff.mjs"
+  },
+  "dependencies": {
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0"
+  }
+}
