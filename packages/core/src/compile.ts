@@ -17,10 +17,19 @@ import { loadTalk, type LoadedTalk, type SourceFile } from './load.ts';
 export const ENGINE_FILES = ['talk.js', 'talk.css', 'edit.js', 'talk-layout.js'] as const;
 export const DEFAULT_ENGINE_DIR = fileURLToPath(new URL('../../engine/src/', import.meta.url));
 
+/**
+ * The engine folder to use when a caller passes none: `SAGE_ENGINE_DIR` when set (the packaged
+ * app's sidecar sets it, since a bundled core no longer sits next to packages/engine), else
+ * packages/engine/src. Read at call time, not import time.
+ */
+export function defaultEngineDir(env: NodeJS.ProcessEnv = process.env): string {
+  return env.SAGE_ENGINE_DIR || DEFAULT_ENGINE_DIR;
+}
+
 export interface CompileOptions {
   /** Output folder; default `<talk>/build`. */
   outDir?: string;
-  /** Folder holding the engine files; default packages/engine/src. */
+  /** Folder holding the engine files; default `defaultEngineDir()`. */
   engineDir?: string;
 }
 
@@ -104,7 +113,7 @@ export function compileTalk(dir: string, opts: CompileOptions = {}): CompileResu
   const { html, diagnostics } = renderIndex(talk);
   if (html === null) return { ok: false, outFile: null, bytes: 0, diagnostics };
   const out = path.resolve(opts.outDir ?? path.join(dir, 'build'));
-  const engine = opts.engineDir ?? DEFAULT_ENGINE_DIR;
+  const engine = opts.engineDir ?? defaultEngineDir();
   fs.mkdirSync(out, { recursive: true });
   const outFile = path.join(out, 'index.html');
   fs.writeFileSync(outFile, html);

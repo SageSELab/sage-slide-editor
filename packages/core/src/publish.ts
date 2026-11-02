@@ -22,7 +22,7 @@
 // (build-public.py skipped a pattern that no longer matched without a word).
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_ENGINE_DIR } from './compile.ts';
+import { defaultEngineDir } from './compile.ts';
 import { checkScript } from './compile.ts';
 import { diag, type Diagnostic } from './diagnostics.ts';
 import { loadTalk, type ChapterSources, type LoadedTalk, type SourceFile } from './load.ts';
@@ -33,7 +33,7 @@ export interface PublishOptions {
   slug?: string;
   /** Output folder; default `<talk>/build/public`. */
   outDir?: string;
-  /** Folder holding talk.js, talk.css, talk-layout.js; default packages/engine/src. */
+  /** Folder holding talk.js, talk.css, talk-layout.js; default `defaultEngineDir()`. */
   engineDir?: string;
   /** Text overrides keyed by element id (inner HTML); applied by a tiny applier. */
   overrides?: { text?: Record<string, string> };
@@ -220,7 +220,7 @@ export function renderPublic(talk: LoadedTalk, opts: PublishOptions = {}): { htm
   const D: Diagnostic[] = talk.diagnostics.filter((d) => d.severity === 'error');
   const spine = talk.spine;
   if (!spine || D.length) return { html: null, diagnostics: D, cut: null };
-  const engine = opts.engineDir ?? DEFAULT_ENGINE_DIR;
+  const engine = opts.engineDir ?? defaultEngineDir();
   const readEngine = (f: string) => { try { return fs.readFileSync(path.join(engine, f), 'utf8'); } catch { D.push(diag('file-missing', 'error', `engine file not found: ${path.join(engine, f)}`, {})); return ''; } };
   const rec = recordTalk(talk, { public: true });
   const cut = publicCut(talk, rec);
