@@ -14,7 +14,7 @@ The engine, theme, editor, save server, and public-build script are bundled in `
 A `talk/` folder next to the paper source containing:
 
 - `index.html`, the film: scenes (HTML) at the top, then one script with absolute times and `cp(...)` holds.
-- `talk.js`, `talk.css`, `edit.js`, `serve.py`, `Edit talk.command`, `build-public.py` from `assets/` (copied by `scripts/new-talk.sh`).
+- `talk.js`, `talk.css`, `edit.js`, `serve.py`, `Edit talk.command`, `build-public.py` from `assets/` (copied by `scripts/new-talk.sh`). For a `sage-talk/1` talk folder (`talk.json`), `talkc publish` replaces `build-public.py`; the script stays for legacy single-file decks.
 - `assets/` with the font, logos, headshots, screenshots, QR codes.
 - `PLAN.md`, the storyboard, and `README.md` with the keys and the editing workflow.
 - `public/<slug>.html`, the self-contained web version, when he asks to publish.
@@ -58,6 +58,15 @@ bash <skill>/scripts/cplist.sh talk/            # hold number, time, label
 bash <skill>/scripts/shoot.sh talk/ 27.5 61.3   # PNGs at those times
 ```
 
+For a `sage-talk/1` talk folder (`talk.json`), use `talkc` from the SAGE talk editor instead (the scripts above remain for legacy single-file decks):
+
+```
+talkc layout talk/                                  # hold list (replaces cplist.sh)
+talkc shoot talk/ --holds --around 0.5              # every hold and 0.5 s either side, into talk/build/shots
+talkc shoot talk/ --times 27.5,61.3 --beats c2.layout   # (replaces shoot.sh; also takes an .html film)
+talkc validate talk/ --render                       # static checks plus elements visible before their beat
+```
+
 Shoot every hold and look at each PNG with the Read tool. Also shoot a frame 0.5 s before and after any hold you changed, to catch something moving early or a stale element lingering. Syntax-check the script with `node -e` before shooting; a parse error renders a blank stage. Common failure modes and their fixes are in `references/gotchas.md`; read it the first time something looks wrong, because most of them (backward-filling animations, invisible panes swallowing clicks, descenders clipped by blur) are not obvious from the frame.
 
 ### 5. Iterate the way he gives feedback
@@ -73,7 +82,7 @@ Text-only edits can also be made by him in the page: `E` enters edit mode, ⌘S 
 
 ### 6. Publish when asked
 
-`python3 build-public.py` writes a single self-contained file: private regions (follow-up chapter, backups, recruiting slide, notes, editor) are stripped and an end card with links is appended. Where it goes on his sites, how QR codes are generated, and how the paper PDF is hosted are in `references/publishing.md`.
+`python3 build-public.py` (legacy decks) or `talkc publish talk/ <slug>` (a `sage-talk/1` folder; writes `talk/build/public/<slug>.html`, cutting by the spine's `private` chapters and `public` block instead of comment markers) writes a single self-contained file: private regions (follow-up chapter, backups, recruiting slide, notes, editor) are stripped and an end card with links is appended. Where it goes on his sites, how QR codes are generated, and how the paper PDF is hosted are in `references/publishing.md`.
 
 ## Voice on screen
 
@@ -81,8 +90,8 @@ Kevin's slides say the fact. Headlines are short claims ("Effectiveness on real 
 
 ## Files in this skill
 
-- `assets/` — `talk.js` (engine), `talk.css` (light theme + dark passage + component vocabulary), `edit.js` (in-page text editor), `serve.py` and `Edit talk.command` (local server that saves edits), `build-public.py` (public build), `starter/index.html` (a minimal working film to grow), `manrope-latin.woff2`.
-- `scripts/new-talk.sh` (scaffold), `shoot.sh` (frames at times), `cplist.sh` (hold list), `shift-times.py` (move a block of times).
+- `assets/` — `talk.js` (engine), `talk.css` (light theme + dark passage + component vocabulary), `edit.js` (in-page text editor), `serve.py` and `Edit talk.command` (local server that saves edits), `build-public.py` (public build, legacy decks; `talkc publish` for talk folders), `starter/index.html` (a minimal working film to grow), `manrope-latin.woff2`.
+- `scripts/new-talk.sh` (scaffold), `shoot.sh` (frames at times; `talkc shoot` for talk folders), `cplist.sh` (hold list; `talkc layout`), `shift-times.py` (move a block of times).
 - `references/engine-api.md` — every `Talk` method, keys, URL parameters, the editor, the public build markers.
 - `references/style.md` — the visual and writing rules with concrete patterns (title build, device beats, station builds, bar charts, counters, summary, close, recruiting slide).
 - `references/storyboard.md` — PLAN.md template and the hold budget.
