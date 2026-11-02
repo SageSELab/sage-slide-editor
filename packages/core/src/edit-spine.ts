@@ -94,6 +94,38 @@ export interface InsertBeatOptions {
   motionStub?: boolean;
 }
 
+/** Beat fields setBeatProps may change (talk.json only; null removes a flag). */
+export interface BeatProps { label?: string; backup?: boolean | null; dark?: boolean | null }
+/** Chapter fields setChapterProps may change (talk.json only; null removes a flag). */
+export interface ChapterProps { label?: string; dark?: boolean | null; private?: boolean | null; backup?: boolean | null }
+
+/**
+ * Set or remove members of one spine object, one property at a time (each against the text the
+ * previous one produced, so neighbouring separators stay consistent), as a single Edit.
+ */
+function setProps(src: SpineSources, find: (s: SpineSources) => JsonObject, props: Readonly<Record<string, unknown>>, allowed: readonly string[], what: string): Edit {
+  let text = src.spine.text;
+  for (const [k, v] of Object.entries(props)) {
+    if (!allowed.includes(k)) throw new EditError('bad-prop', `${what} property "${k}" cannot be set here`);
+    if (v === undefined) continue;
+    if (k === 'label' ? typeof v !== 'string' : v !== null && typeof v !== 'boolean') throw new EditError('bad-value', `${what} ${k} must be ${k === 'label' ? 'a string' : 'a boolean or null'}`);
+    const obj = find({ ...src, spine: { path: src.spine.path, text } });
+    const p = v === null ? removeMemberPatch(src.spine.path, text, obj, k) : setMemberPatch(src.spine.path, text, obj, k, v);
+    if (p) text = text.slice(0, p.range[0]) + p.newText + text.slice(p.range[1]);
+  }
+  return finish(src, text === src.spine.text ? [] : [{ file: src.spine.path, range: [0, src.spine.text.length], newText: text }]);
+}
+
+/** Set a beat's label, backup or dark flag. */
+export function setBeatProps(src: SpineSources, ref: string, props: BeatProps): Edit {
+  return setProps(src, (s) => locate(s, ref).node, props as Record<string, unknown>, ['label', 'backup', 'dark'], 'beat');
+}
+
+/** Set a chapter's label, dark, private or backup flag. */
+export function setChapterProps(src: SpineSources, chapterId: string, props: ChapterProps): Edit {
+  return setProps(src, (s) => chapter(s, chapterId).obj, props as Record<string, unknown>, ['label', 'dark', 'private', 'backup'], 'chapter');
+}
+
 /** Insert a new beat at `index` of a chapter (index = beats.length appends). */
 export function insertBeat(src: SpineSources, chapterId: string, index: number, beat: BeatInput, opts: InsertBeatOptions = {}): Edit {
   const ch = chapter(src, chapterId);

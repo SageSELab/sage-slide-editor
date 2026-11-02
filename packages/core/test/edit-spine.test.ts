@@ -5,7 +5,7 @@ import fc from 'fast-check';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { deleteBeat, duplicateBeat, insertBeat, moveBeat, setHold, setNotes, spineSources, type SpineSources } from '../src/edit-spine.ts';
+import { deleteBeat, duplicateBeat, insertBeat, moveBeat, setBeatProps, setChapterProps, setHold, setNotes, spineSources, type SpineSources } from '../src/edit-spine.ts';
 import { loadTalk, loadTalkFrom, memoryHost, talkFiles } from '../src/load.ts';
 import { applyToTexts, type Edit } from '../src/patch.ts';
 import { recordTalk } from '../src/record.ts';
@@ -162,5 +162,44 @@ describe('beat edits on odd formatting', () => {
   it('setNotes removes and adds members without touching the rest', () => {
     const out = roundTrip(texts, setNotes(src, 'a.x', 'He said "hi" — ok'));
     expect(JSON.parse(out['talk.json']!).chapters[0].beats[0].notes).toBe('He said "hi" — ok');
+  });
+});
+
+describe('setBeatProps and setChapterProps', () => {
+  const odd = `{"format":"sage-talk/1","title":"T",
+    "chapters": [ { "id": "a", "label": "A", "dark": true,
+        "beats": [{"id":"x","label":"X","hold":1}, {"id":"y","label":"Y", "backup": true}] },
+      {"id":"b","label":"B","beats":[]} ] }`;
+  const src: SpineSources = { spine: { path: 'talk.json', text: odd } };
+  const texts = { 'talk.json': odd };
+  type Parsed = { chapters: (Record<string, unknown> & { beats: Record<string, unknown>[] })[] };
+  const parsed = (t: Record<string, string>) => JSON.parse(t['talk.json']!) as Parsed;
+  it('sets a label and adds a flag in one edit, inverse restores', () => {
+    const out = roundTrip(texts, setBeatProps(src, 'a.x', { label: 'Ex "1"', backup: true }));
+    expect(parsed(out).chapters[0]!.beats[0]).toEqual({ id: 'x', label: 'Ex "1"', hold: 1, backup: true });
+    expect(out['talk.json']).toContain('{"id":"x","label":"Ex \\"1\\"","hold":1, "backup":true}');
+  });
+  it('removes a flag with null and leaves the rest of the object alone', () => {
+    const out = roundTrip(texts, setBeatProps(src, 'a.y', { backup: null }));
+    expect(out['talk.json']).toContain('{"id":"y","label":"Y"}');
+  });
+  it('sets chapter label, dark and private', () => {
+    const out = roundTrip(texts, setChapterProps(src, 'a', { label: 'Alpha', dark: null, private: true }));
+    const ch = parsed(out).chapters[0]!;
+    expect([ch.label, ch.dark, ch.private]).toEqual(['Alpha', undefined, true]);
+    expect(roundTrip(texts, setChapterProps(src, 'b', { dark: true }))['talk.json']).toContain('{"id":"b","label":"B","beats":[], "dark":true}');
+  });
+  it('no-op edits are empty; bad input has stable codes', () => {
+    expect(setBeatProps(src, 'a.x', { label: 'X' }).patches).toEqual([]);
+    expect(() => setBeatProps(src, 'a.x', { hold: 2 } as never)).toThrow(expect.objectContaining({ code: 'bad-prop' }));
+    expect(() => setBeatProps(src, 'a.x', { backup: 'yes' } as never)).toThrow(expect.objectContaining({ code: 'bad-value' }));
+    expect(() => setChapterProps(src, 'zz', { dark: true })).toThrow(expect.objectContaining({ code: 'no-chapter' }));
+    expect(() => setBeatProps(src, 'a.zz', { dark: true })).toThrow(expect.objectContaining({ code: 'no-beat' }));
+  });
+  it('round trips on the ISSTA fixture', () => {
+    const { t, texts: tx } = fixture();
+    const s = spineSources(t);
+    roundTrip(tx, setBeatProps(s, 'line.title', { label: 'Opening', dark: true }));
+    roundTrip(tx, setChapterProps(s, 'line', { label: 'The line, renamed', private: true }));
   });
 });
