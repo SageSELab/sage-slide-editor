@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for the vendored Node (Contents/Resources/node/bin/node).
+  allow-jit: V8 compiles JavaScript to machine code in MAP_JIT pages. Under the hardened
+  runtime without it node 24.22.2 dies at startup ('Fatal process out of memory: Failed to
+  reserve virtual memory for CodeRange', tried when this was written; docs/packaging.md), and
+  package.sh runs a JIT probe on the signed binary. Nothing else is needed: Node 24 on arm64
+  uses MAP_JIT with per-thread write protection, so allow-unsigned-executable-memory is not
+  required (the probe passes without it), and the sidecar loads no native addons, so library
+  validation stays on. The official binary's own signature carries six entitlements
+  (get-task-allow, disable-library-validation, ...); re-signing replaces them with this one.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+</dict>
+</plist>

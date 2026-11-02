@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for the app executable (SwiftUI + WKWebView). Empty on purpose:
+  WebKit's JavaScript JIT runs in its own WebContent process, which carries Apple's
+  entitlements, so the app process needs no JIT exception; the app is not sandboxed (PLAN 13.3:
+  it spawns Node and reads arbitrary paper folders), so it needs no sandbox entitlements; it
+  loads no third-party libraries, so library validation stays on. Node's JIT exception lives
+  on the Node binary alone (node.entitlements).
+-->
+<plist version="1.0">
+<dict/>
+</plist>
