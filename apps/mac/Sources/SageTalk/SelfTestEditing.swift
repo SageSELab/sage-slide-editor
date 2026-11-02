@@ -4,9 +4,12 @@ import SageTalkCore
 /// The self-test's edit round trip (Phase 3) on a temp copy of the talk, with no edit mode:
 /// the paused canvas is editable as soon as the talk opens. Select an object by a synthesized
 /// click and drag it 40 px; click a headline twice to put the caret in it, retype it and leave
-/// with Esc; check ⌘Z inside the text is the text's own; bold a range from the format bar; set
-/// a hold from the inspector's code path; check that playing hides the overlay and pausing
-/// brings it back; then undo all four edits, and check that every source file is
+/// with Esc; check ⌘Z inside the text is the text's own; bold a range from the format bar;
+/// drill into #c1-bench (click, click again: its second line, which has no id; click again:
+/// the caret) and retype that line, which gives it an id; set a hold from the inspector's code
+/// path; check that playing hides the overlay and pausing brings it back. The canvas's own
+/// edits must not reload the canvas (no flash); the hold must. Then undo all five edits, and
+/// check that every source file is
 /// byte-identical to the start and the canvas shows the original again. Writes edit-moved.png,
 /// edit-text.png, edit-bold.png, edit-hold.png, edit-undone.png, edit-window.png (the format
 /// bar over the selected text) and edit.txt. Pointer and key events are synthesized inside the
@@ -46,13 +49,13 @@ extension SelfTest {
         check(selected, "edit: a click on #c1-eye selected it (selection \(model.selection?.id ?? "none"), left \(model.selection.map { InspectorFormat.number($0.left) } ?? "-"))")
         let left0 = model.selection?.left ?? .nan
         await press(model, "c1-eye", dx: 40, meta: true)
-        let moved = await waitForEdit(model, applied: 1, ready: ready0)
+        let moved = await waitForEdit(model, applied: 1, ready: ready0, reload: false)
         let scene = copy.appendingPathComponent("scenes/line.html")
         let sceneText = (try? String(contentsOf: scene, encoding: .utf8)) ?? ""
         check(moved && sceneText.contains("id=\"c1-eye\" data-a style=\"position:absolute;left:\(InspectorFormat.number(left0 + 40))px;top:110px\""),
               "edit: dragging #c1-eye 40 px wrote left:\(InspectorFormat.number(left0 + 40))px into scenes/line.html")
         check(abs(model.canvas.t - h2.at) < 1e-6 && model.selection?.id == "c1-eye" && model.selection?.left == left0 + 40,
-              "edit: after the move the canvas reloaded at t=\(h2.at) (t=\(model.canvas.t)) with #c1-eye still selected at left \(model.selection.map { InspectorFormat.number($0.left) } ?? "-")")
+              "edit: after the move the canvas stayed at t=\(h2.at) (t=\(model.canvas.t)) without a reload (loads \(model.canvas.readyCount - ready0)) with #c1-eye still selected at left \(model.selection.map { InspectorFormat.number($0.left) } ?? "-")")
         log.append("move: left \(left0) -> \(model.selection?.left ?? .nan), undo \(model.edits.undoTitle)")
         await shot(model, out, "edit-moved.png")
 
@@ -73,7 +76,7 @@ extension SelfTest {
         _ = try? await model.canvas.call(replaceJS, ["id": "t-g", "text": newText])
         await key(model, "Escape")
         let left = await waitFor(seconds: 5) { model.textEditing == nil }
-        let texted = await waitForEdit(model, applied: 2, ready: ready1)
+        let texted = await waitForEdit(model, applied: 2, ready: ready1, reload: false)
         let sceneText2 = (try? String(contentsOf: scene, encoding: .utf8)) ?? ""
         check(left && texted && sceneText2.contains(">\(newText)</h1>"), "edit: Esc left text editing and saved '\(newText)' into the scene")
         let shows = (try? await model.canvas.call("return document.getElementById('t-g').textContent", [:]) as? String) ?? ""
@@ -120,21 +123,56 @@ extension SelfTest {
             await writeWindow(win, films: [model.canvas], to: out.appendingPathComponent("edit-window.png"))
         }
         await key(model, "Escape")
-        let bolded = await waitForEdit(model, applied: 3, ready: ready2)
+        let bolded = await waitForEdit(model, applied: 3, ready: ready2, reload: false)
         let sceneText3 = (try? String(contentsOf: scene, encoding: .utf8)) ?? ""
         check(bolded && sceneText3.contains("\">" + "<b>Junayed Mahmud</b> · <b>Sparsh Pandey</b>"),
               "edit: Bold from the format bar wrote <b>Junayed Mahmud</b> into the scene")
         log.append("bold: \(sceneText3.contains("<b>Junayed Mahmud</b>"))")
+
+        // 4b. Drill into #c1-bench (Keynote groups): a click selects the block, a click on it
+        // its second line (no id: the address c1-bench>p.sub:1), a click on that the caret.
+        // Retyping it gives the line an id in the source, in the same edit.
+        let benchHold = await firstHold(model, showing: "c1-bench")
+        if let benchHold {
+            model.select(benchHold.id)
+            _ = await waitFor(seconds: 5) { abs(model.t - benchHold.at) < 1e-6 }
+            _ = await waitForAsync(seconds: 5) { await overlayOn(model) }
+            let ready4 = model.canvas.readyCount
+            let line = "#c1-bench > p.sub:nth-of-type(2)", addr = "c1-bench>p.sub:1"
+            await press(model, selector: line)
+            let outer = await waitFor(seconds: 5) { model.selection?.id == "c1-bench" }
+            await press(model, selector: line)
+            let inner = await waitFor(seconds: 5) { model.selection?.id == addr }
+            check(outer && inner, "edit: a click on #c1-bench's second line selected #c1-bench, a second click the line itself (selection \(model.selection?.id ?? "none"))")
+            await press(model, selector: line)
+            let inLine = await waitFor(seconds: 5) { model.textEditing == addr }
+            let lineText = "Unit tests have set the bar."
+            _ = try? await model.canvas.call(replaceSelectorJS, ["q": line, "text": lineText])
+            await key(model, "Escape")
+            let saved = await waitForEdit(model, applied: 4, ready: ready4, reload: false)
+            let sceneText4 = (try? String(contentsOf: scene, encoding: .utf8)) ?? ""
+            let domId = (try? await model.canvas.call("return document.querySelector('#c1-bench > p.sub:nth-of-type(2)').id") as? String) ?? ""
+            check(inLine && saved && sceneText4.contains("<p id=\"c1-bench-sub\" class=\"sub\" style=\"margin-top:10px;font-size:34px\">\(lineText)</p>")
+                  && model.selection?.id == "c1-bench-sub" && domId == "c1-bench-sub" && model.canvas.readyCount == ready4,
+                  "edit: retyping the line gave it the id #c1-bench-sub in the scene and on the canvas, without a reload (selection \(model.selection?.id ?? "none"), page id '\(domId)', loads \(model.canvas.readyCount - ready4))")
+            log.append("drill-down: \(model.selection?.id ?? "none")")
+            await shot(model, out, "edit-drill.png")
+            model.select(h1.id)
+            _ = await waitFor(seconds: 5) { abs(model.t - h1.at) < 1e-6 }
+        } else {
+            check(false, "edit: a hold where #c1-bench shows")
+        }
+        let editsBeforeHold = model.edits.applied
 
         // 5. Set the title beat's hold from the inspector's code path.
         guard let beat = model.currentBeat, let rel = model.currentRelativeHold else { check(false, "edit: current beat for the hold"); return }
         let ready3 = model.canvas.readyCount
         let newHold = InspectorFormat.nudged(rel.value, by: 0.5)
         model.apply(.setHold(ref: beat.ref, hold: newHold))
-        let held = await waitForEdit(model, applied: 4, ready: ready3)
+        let held = await waitForEdit(model, applied: editsBeforeHold + 1, ready: ready3)
         check(held && abs((model.holds.first?.at ?? 0) - newHold) < 1e-6 && model.spine?.locate(beat.ref)?.beat.hold == newHold,
               "edit: setHold \(beat.ref) \(rel.value) -> \(newHold) moved hold 1 to \(model.holds.first?.at ?? 0)")
-        check(model.edits.undoStack.map(\.title) == ["Move", "Edit Text", "Edit Text", "Set Hold"], "edit: undo stack \(model.edits.undoStack.map(\.title))")
+        check(model.edits.undoStack.map(\.title) == ["Move", "Edit Text", "Edit Text", "Edit Text", "Set Hold"], "edit: undo stack \(model.edits.undoStack.map(\.title))")
         log.append("hold: \(rel.value) -> \(newHold); stack \(model.edits.undoStack.map(\.title))")
         await shot(model, out, "edit-hold.png")
 
@@ -154,8 +192,9 @@ extension SelfTest {
         model.select(h1.id)
         _ = await waitFor(seconds: 5) { abs(model.t - model.holds[0].at) < 1e-6 }
 
-        // 7. Undo all four.
-        for i in 0..<4 {
+        // 7. Undo all five.
+        let total = model.edits.undoStack.count
+        for i in 0..<total {
             let ready = model.canvas.readyCount
             let r = await model.undoNow()
             let ok = r != nil
@@ -166,8 +205,8 @@ extension SelfTest {
         try? await Task.sleep(for: .milliseconds(500))
         let end = sources(copy)
         let differing = Set(start.keys).union(end.keys).filter { start[$0] != end[$0] }.sorted()
-        check(differing.isEmpty, "edit: after four undos every source file is byte-identical to the start (\(differing.isEmpty ? "\(end.count) files" : "differ: \(differing.joined(separator: ", "))"))")
-        check(!model.edits.canUndo && model.edits.redoStack.count == 4, "edit: undo stack empty, redo stack \(model.edits.redoStack.map(\.title))")
+        check(differing.isEmpty, "edit: after \(total) undos every source file is byte-identical to the start (\(differing.isEmpty ? "\(end.count) files" : "differ: \(differing.joined(separator: ", "))"))")
+        check(!model.edits.canUndo && model.edits.redoStack.count == 5, "edit: undo stack empty, redo stack \(model.edits.redoStack.map(\.title))")
 
         // The canvas shows the original: the headline at hold 1, #c1-eye back at its old left.
         _ = await waitForAsync(seconds: 5) { await overlayOn(model) }
@@ -179,13 +218,23 @@ extension SelfTest {
         await shot(model, out, "edit-undone.png")
     }
 
-    /// Waits until the edit pipeline has applied `applied` edits in total and the canvas has
-    /// reloaded since `ready` with the overlay back on.
-    private static func waitForEdit(_ model: TalkWindowModel, applied: Int, ready: Int) async -> Bool {
-        let ok = await waitFor(seconds: 30) { model.edits.applied >= applied && model.canvas.readyCount > ready && !model.edits.busy }
+    /// Waits until the edit pipeline has applied `applied` edits in total and, with `reload`,
+    /// the canvas has reloaded since `ready` with the overlay back on. Without it (an edit the
+    /// canvas made itself) the canvas must not have reloaded at all.
+    private static func waitForEdit(_ model: TalkWindowModel, applied: Int, ready: Int, reload: Bool = true) async -> Bool {
+        let ok = await waitFor(seconds: 30) { model.edits.applied >= applied && (!reload || model.canvas.readyCount > ready) && !model.edits.busy }
         _ = await waitForAsync(seconds: 5) { await overlayOn(model) }
-        try? await Task.sleep(for: .milliseconds(300))
-        return ok && model.edits.lastError == nil
+        try? await Task.sleep(for: .milliseconds(reload ? 300 : 800)) // a stray reload would show by now
+        return ok && model.edits.lastError == nil && (reload || model.canvas.readyCount == ready)
+    }
+
+    /// The first hold at which #id shows (effective opacity at least 0.05).
+    private static func firstHold(_ model: TalkWindowModel, showing id: String) async -> Hold? {
+        for h in model.holds {
+            let v = (try? await model.canvas.call("T.seek(t); return SageCanvas.visible(document.getElementById(id));", ["t": h.at, "id": id]) as? Bool) ?? false
+            if v { return h }
+        }
+        return nil
     }
 
     private static func overlayOn(_ model: TalkWindowModel) async -> Bool {
@@ -213,7 +262,11 @@ extension SelfTest {
 
     /// A press on #id (and, with dx/dy, a drag), synthesized as pointer events in the page.
     private static func press(_ model: TalkWindowModel, _ id: String, dx: Double = 0, dy: Double = 0, meta: Bool = false) async {
-        _ = try? await model.canvas.call(pointerJS, ["id": id, "dx": dx, "dy": dy, "meta": meta])
+        await press(model, selector: "#" + id, dx: dx, dy: dy, meta: meta)
+    }
+
+    private static func press(_ model: TalkWindowModel, selector: String, dx: Double = 0, dy: Double = 0, meta: Bool = false) async {
+        _ = try? await model.canvas.call(pointerJS, ["q": selector, "dx": dx, "dy": dy, "meta": meta])
         try? await Task.sleep(for: .milliseconds(150))
     }
 
@@ -238,7 +291,7 @@ extension SelfTest {
 
     /// A press (and, with dx/dy, a drag) on #id, synthesized as pointer events in the page.
     private static let pointerJS = """
-    const el = document.getElementById(id);
+    const el = document.querySelector(q);
     const r = el.getBoundingClientRect();
     const k = document.querySelector('.stage').getBoundingClientRect().width / 1920;
     const x = r.left + Math.min(20, r.width / 2), y = r.top + Math.min(r.height / 2, 16 * k);
@@ -254,6 +307,14 @@ extension SelfTest {
     /// Replaces the text being edited as typing would (select all of it, insert).
     private static let replaceJS = """
     const el = document.getElementById(id);
+    const s = getSelection(); const range = document.createRange(); range.selectNodeContents(el); s.removeAllRanges(); s.addRange(range);
+    if (!document.execCommand('insertText', false, text)) el.textContent = text;
+    return true;
+    """
+
+    /// Replaces the text being edited in the element `q` (a CSS selector).
+    private static let replaceSelectorJS = """
+    const el = document.querySelector(q);
     const s = getSelection(); const range = document.createRange(); range.selectNodeContents(el); s.removeAllRanges(); s.addRange(range);
     if (!document.execCommand('insertText', false, text)) el.textContent = text;
     return true;
