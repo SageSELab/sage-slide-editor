@@ -564,7 +564,14 @@ export interface ClaudeSendParams {
   text: string;
   /** Absolute or talk-relative paths the user attached (from the Materials sidebar). */
   attachments?: string[];
+  /**
+   * Reasoning effort for this and later requests (the pane's footer control). The Agent SDK's
+   * `effort` option; a running conversation switches with Query.applyFlagSettings. Absent: unchanged.
+   */
+  effort?: ClaudeEffort;
 }
+export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type ClaudeEffort = (typeof CLAUDE_EFFORTS)[number];
 export interface ClaudeSendResult {
   /** 1-based count of messages sent in this sidecar. */
   turn: number;
@@ -703,8 +710,9 @@ function shape(v: unknown, at: string, required: string[], optional: string[], b
 }
 
 export const claudeParamCheckers: { [M in ClaudeMethodName]: (p: unknown) => Problems } = {
-  'claude.send': (p) => shape(p, 'params', ['text'], ['attachments'], (v) => [
+  'claude.send': (p) => shape(p, 'params', ['text'], ['attachments', 'effort'], (v) => [
     ...want(typeof v.text === 'string' && v.text.trim().length > 0, 'params.text: expected a non-empty string'),
+    ...(v.effort === undefined ? [] : oneOf(v.effort, CLAUDE_EFFORTS, 'params.effort')),
     ...(v.attachments === undefined ? [] : checkList(v.attachments, 'params.attachments', (x, at) => want(typeof x === 'string' && x.length > 0, `${at}: expected a path`))),
   ]),
   'claude.interrupt': (p) => checkEmpty(p),

@@ -16,7 +16,7 @@ const toolResult = (id: string, text: string, isError = false): SDKMessage => ({
 const result = (total: number, extra: object = {}): SDKMessage => ({ type: 'result', subtype: 'success', is_error: false, total_cost_usd: total, duration_ms: 1200, num_turns: 2, usage: { input_tokens: 10, output_tokens: 60, cache_read_input_tokens: 2000, cache_creation_input_tokens: 300 }, session_id: SID, ...extra } as unknown as SDKMessage);
 
 /** A query() whose output per user message is scripted; records options and prompts. */
-function scripted(turns: ((o: Options) => SDKMessage[] | Promise<SDKMessage[]>)[], opts: { throwAfter?: string } = {}) {
+function scripted(turns: ((o: Options) => SDKMessage[] | Promise<SDKMessage[]>)[], opts: { throwAfter?: string; flags?: unknown[] } = {}) {
   const calls: { options: Options; prompts: string[]; closed: boolean }[] = [];
   let turn = 0;
   const fn: QueryFn = ({ prompt, options }) => {
@@ -38,6 +38,7 @@ function scripted(turns: ((o: Options) => SDKMessage[] | Promise<SDKMessage[]>)[
     }
     const g = gen();
     const q: QueryLike = { [Symbol.asyncIterator]: () => g, interrupt: async () => undefined, close: () => { rec.closed = true; void it.return?.(); } };
+    if (opts.flags) q.applyFlagSettings = async (f) => { opts.flags!.push(f); };
     return q;
   };
   return { fn, calls };
@@ -48,7 +49,7 @@ const noFrames: FrameRenderer = { render: async (_h, shots) => { for (const s of
 let cleanup: (() => void) | null = null;
 afterEach(() => { cleanup?.(); cleanup = null; });
 
-function setup(turns: Parameters<typeof scripted>[0], o: { throwAfter?: string; ask?: string } = {}) {
+function setup(turns: Parameters<typeof scripted>[0], o: { throwAfter?: string; ask?: string; flags?: unknown[] } = {}) {
   const t = tempTalk();
   cleanup = t.cleanup;
   const notes: { method: string; params: Record<string, unknown> }[] = [];
@@ -208,6 +209,37 @@ describe('ClaudeBridge', () => {
     // The forked session's total continues from the saved 1.00 USD: this request cost 0.25.
     expect(s.notes.find((n) => n.method === 'claude.result')!.params).toMatchObject({ cost: 0.25, totalCost: 0.25 });
     expect(JSON.parse(fs.readFileSync(path.join(s.t.root, '.sage/session.json'), 'utf8'))).toMatchObject({ sessionId: SID, cwd: s.t.root, totalCostUsd: 1.25 });
+  });
+
+  it('effort: the option on the first query, applyFlagSettings on a live one, a restart without it', async () => {
+    const flags: unknown[] = [];
+    const s = setup([() => [result(0)], () => [result(0)], () => [result(0)], () => [result(0)]], { flags });
+    await s.bridge.send({ text: 'one', effort: 'medium' });
+    await s.waitResult(1);
+    expect(s.q.calls[0]!.options.effort).toBe('medium');
+    // Same effort, or none given: nothing changes.
+    await s.bridge.send({ text: 'two' });
+    await s.waitResult(2);
+    expect(flags).toEqual([]);
+    // A new effort on an idle live process: switched in place, same process.
+    await s.bridge.send({ text: 'three', effort: 'max' });
+    await s.waitResult(3);
+    expect(flags).toEqual([{ effortLevel: 'max' }]);
+    expect(s.q.calls).toHaveLength(1);
+    expect(s.bridge.effort).toBe('max');
+    expect(s.q.calls[0]!.prompts).toEqual(['one', 'two', 'three']);
+  });
+
+  it('effort: a query without applyFlagSettings is restarted with the new option', async () => {
+    const s = setup([() => [result(0)], () => [result(0)]]);
+    await s.bridge.send({ text: 'one' });
+    await s.waitResult(1);
+    expect(s.q.calls[0]!.options.effort).toBeUndefined();
+    await s.bridge.send({ text: 'two', effort: 'low' });
+    await s.waitResult(2);
+    expect(s.q.calls).toHaveLength(2);
+    expect(s.q.calls[0]!.closed).toBe(true);
+    expect(s.q.calls[1]!.options).toMatchObject({ effort: 'low', resume: SID });
   });
 
   it('serves the app tools: talk_goto and talk_frame move the canvas; talk_layout lists holds', async () => {

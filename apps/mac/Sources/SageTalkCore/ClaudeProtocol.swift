@@ -26,10 +26,27 @@ public enum ClaudeProtocol {
         public static let goto = "app.goto"
     }
 
+    /// Reasoning effort (the Agent SDK's `effort` option; the pane's footer control).
+    public enum Effort: String, Codable, CaseIterable, Sendable {
+        case low, medium, high, xhigh, max
+        public var label: String {
+            switch self {
+            case .low: "Low"
+            case .medium: "Medium"
+            case .high: "High"
+            case .xhigh: "Extra high"
+            case .max: "Max"
+            }
+        }
+    }
+
     public struct SendParams: Codable, Equatable, Sendable {
         public var text: String
         public var attachments: [String]?
-        public init(text: String, attachments: [String]? = nil) { self.text = text; self.attachments = attachments }
+        public var effort: Effort?
+        public init(text: String, attachments: [String]? = nil, effort: Effort? = nil) {
+            self.text = text; self.attachments = attachments; self.effort = effort
+        }
     }
     public struct SendResult: Codable, Equatable, Sendable { public var turn: Int }
     public struct InterruptResult: Codable, Equatable, Sendable { public var interrupted: Bool }
@@ -134,8 +151,8 @@ public enum ClaudeProtocol {
 }
 
 extension SidecarClient {
-    public func claudeSend(_ text: String, attachments: [String]? = nil) async throws -> ClaudeProtocol.SendResult {
-        try await call(ClaudeProtocol.Method.send, ClaudeProtocol.SendParams(text: text, attachments: attachments))
+    public func claudeSend(_ params: ClaudeProtocol.SendParams) async throws -> ClaudeProtocol.SendResult {
+        try await call(ClaudeProtocol.Method.send, params)
     }
 
     public func claudeInterrupt() async throws -> ClaudeProtocol.InterruptResult {

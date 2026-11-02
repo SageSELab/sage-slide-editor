@@ -22,12 +22,17 @@ private actor Sent {
     func add(_ t: String) { texts.append(t) }
 }
 
+private actor SentParams {
+    var params: [ClaudeProtocol.SendParams] = []
+    func add(_ p: ClaudeProtocol.SendParams) { params.append(p) }
+}
+
 @MainActor @Suite struct ClaudeChatTests {
     /// Plays the recording into a chat; returns the chat, what it sent, and the beats it followed.
     static func play() async throws -> (ClaudeChat, [String], [String]) {
         let chat = ClaudeChat()
         let sent = Sent()
-        chat.commands = .init(send: { t, _ in await sent.add(t) }, interrupt: {}, reset: {})
+        chat.commands = .init(send: { p in await sent.add(p.text) }, interrupt: {}, reset: {})
         var followed: [String] = []
         chat.onEditedBeat = { followed.append($0) }
         for line in try ClaudeRecording.lines() {
@@ -132,10 +137,29 @@ private actor Sent {
         if case .notice(_, let text, let isError)? = chat.entries.last { #expect(text == "Stopped." && !isError) } else { Issue.record("no notice") }
     }
 
+    @Test func sendCarriesTheEffort() async throws {
+        let chat = ClaudeChat()
+        let box = SentParams()
+        chat.commands = .init(send: { p in await box.add(p) }, interrupt: {}, reset: {})
+        #expect(chat.effort == .high)
+        chat.draft = "first"
+        await chat.send()
+        chat.effort = .max
+        chat.draft = "second"
+        await chat.send()
+        let sent = await box.params
+        #expect(sent.map(\.effort) == [.high, .max])
+        #expect(sent.map(\.text) == ["first", "second"])
+        // On the wire: the fixture tests/rpc/claude/claude.send.request.effort.json.
+        let wire = try JSONValue.encoding(ClaudeProtocol.SendParams(text: "Re-time the results chapter.", effort: .xhigh))
+        #expect(wire == .object(["text": .string("Re-time the results chapter."), "effort": .string("xhigh")]))
+        #expect(ClaudeProtocol.Effort.allCases.map(\.rawValue) == ["low", "medium", "high", "xhigh", "max"])
+    }
+
     @Test func sendFailureIsShown() async {
         struct Down: Error {}
         let chat = ClaudeChat()
-        chat.commands = .init(send: { _, _ in throw Down() }, interrupt: {}, reset: {})
+        chat.commands = .init(send: { _ in throw Down() }, interrupt: {}, reset: {})
         chat.draft = "  hello  "
         #expect(chat.canSend)
         await chat.send()

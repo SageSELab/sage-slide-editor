@@ -250,13 +250,17 @@ The chat pane's protocol. It lives in its own section of `protocol.ts` (`ClaudeM
 
 | Method | Params | Result | Errors |
 |---|---|---|---|
-| `claude.send` | `{text: string, attachments?: string[]}` | `{turn}` | NoTalkOpen, UnsupportedForKind (legacy), InvalidParams |
+| `claude.send` | `{text: string, attachments?: string[], effort?: 'low'\|'medium'\|'high'\|'xhigh'\|'max'}` | `{turn}` | NoTalkOpen, UnsupportedForKind (legacy), InvalidParams |
 | `claude.interrupt` | none | `{interrupted: boolean}` | |
 | `claude.reset` | none | `{}` | NoTalkOpen |
 
 - `claude.send` replies at once; the answer streams as notifications and ends with one
   `claude.result`. A send while a request is running is queued by the SDK and answered after it.
   Attachments are absolute or talk-relative paths, listed under the message text.
+- `effort` is the Agent SDK's `effort` option (the pane's footer control). It applies to this
+  and later requests: a new process starts with it; an idle live one switches with
+  `Query.applyFlagSettings({effortLevel})` (no restart, so the conversation and cache stay); a
+  change sent while a request runs waits for the next idle send.
 - The `claude.*` methods skip the request queue (like `app.ping`), so Stop works while a build
   runs. The bridge is created on the first `claude.*` call and closed by `talk.open`,
   `talk.close` and shutdown.
@@ -273,8 +277,11 @@ The chat pane's protocol. It lives in its own section of `protocol.ts` (`ClaudeM
 
 - `claude.tool` is sent when a call starts (`running`) and again when it ends, with the same
   `id`. `name` drops the app server prefix (`talk_frame`). `path` is talk-relative, for file
-  tools inside the talk. `beat` is the beat a Write or Edit touched (or the beat `talk_goto` and
-  `talk_frame` moved to): the canvas follows it unless the user pinned the canvas.
+  tools inside the talk. `beat` is the beat a Write or Edit touched, the beat `talk_insert_beat`
+  added or `talk_set_notes` changed (or the beat `talk_goto` and `talk_frame` moved to): the canvas
+  follows edits unless the user pinned the canvas.
+- `talk_insert_beat` and `talk_set_notes` write through `talk.edit` labelled as Claude's, so
+  their `talk.changed` has `source: 'claude'`.
 - `cost` is this request's spend; `totalCost` is the conversation's spend since the sidecar
   started. `contextTokens` is the context size of the request's last model call.
 - `error.kind: 'budget'` is the SDK's `error_max_budget_usd`: the request hit `maxBudgetUsd`

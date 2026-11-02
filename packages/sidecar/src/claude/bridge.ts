@@ -23,7 +23,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import type {
   AppGotoParams, AppGotoResult, AppStateResult, AskDecision, AskParams, AskResult, BuildResult, ClaudeInterruptResult,
-  ClaudeNotificationName, ClaudeNotifications, ClaudeSendParams, ClaudeSendResult, EditParams, EditResult, LayoutResult,
+  ClaudeEffort, ClaudeNotificationName, ClaudeNotifications, ClaudeSendParams, ClaudeSendResult, EditParams, EditResult, LayoutResult,
 } from '../protocol.ts';
 import type { Log } from '../rpc.ts';
 import { locateBeat } from './beat-locator.ts';
@@ -70,6 +70,8 @@ export interface BridgeHost {
 export interface QueryLike extends AsyncIterable<SDKMessage> {
   interrupt(): Promise<unknown>;
   close(): void;
+  /** Session-scoped settings overlay (SDK Query.applyFlagSettings): used to switch effort live. */
+  applyFlagSettings?(settings: { effortLevel?: ClaudeEffort | null }): Promise<void>;
 }
 export type QueryFn = (p: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => QueryLike;
 
@@ -91,7 +93,8 @@ export interface BridgeOptions {
   frames?: FrameRenderer;
   trace?: (e: TraceEntry) => void;
   env?: Record<string, string | undefined>;
-  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** Initial effort; claude.send's `effort` changes it. */
+  effort?: ClaudeEffort;
   maxTurns?: number;
 }
 
@@ -121,7 +124,7 @@ export class InputQueue implements AsyncIterable<SDKUserMessage> {
   }
 }
 
-interface Live { q: QueryLike; input: InputQueue; plan: ResumePlan; spent: number; done: Promise<void> }
+interface Live { q: QueryLike; input: InputQueue; plan: ResumePlan; spent: number; done: Promise<void>; effort: ClaudeEffort | undefined }
 
 export class ClaudeBridge {
   readonly model: string;
@@ -138,12 +141,14 @@ export class ClaudeBridge {
   private frames: FrameRenderer;
   private tools: TalkTool[];
   private closed = false;
+  private effortLevel: ClaudeEffort | undefined;
 
   constructor(private host: BridgeHost, private opts: BridgeOptions = {}) {
     this.model = opts.model ?? DEFAULT_MODEL;
     const envBudget = Number(process.env.SAGE_CLAUDE_BUDGET_USD);
     this.budgetUsd = opts.budgetUsd ?? (envBudget > 0 ? envBudget : DEFAULT_BUDGET_USD);
     this.pluginDir = opts.pluginDir ?? process.env.SAGE_PLUGIN_DIR ?? DEFAULT_PLUGIN_DIR;
+    this.effortLevel = opts.effort;
     this.frames = opts.frames ?? chromiumFrames();
     this.store = new PermissionStore(host.root);
     this.translator = this.makeTranslator();
@@ -171,6 +176,8 @@ export class ClaudeBridge {
   }
 
   get isRunning() { return this.running; }
+  /** The effort the next request runs at (undefined: the model's default). */
+  get effort() { return this.effortLevel; }
   get totalCost() { return this.translator.totalCost; }
   /** The app tools with their handlers (the replay tests call them as the SDK would). */
   get toolHandlers(): ReadonlyMap<string, TalkTool['handler']> { return new Map(this.tools.map((t) => [t.name, t.handler])); }
@@ -182,6 +189,9 @@ export class ClaudeBridge {
     if (this.closed) throw new Error('the Claude bridge is closed');
     this.opts.trace?.({ kind: 'send', text: p.text });
     if (this.live && !this.running && this.live.spent > 0) await this.recycle();
+    if (p.effort) this.effortLevel = p.effort;
+    // Mid-request the change waits for the next message (a restart would end the running request).
+    if (this.live && !this.running && this.live.effort !== this.effortLevel) await this.switchEffort(this.live);
     const live = await this.ensureLive();
     const text = p.attachments?.length
       ? `${p.text}\n\nAttached files:\n${p.attachments.map((a) => `- ${absFrom(this.host.root, a)}`).join('\n')}`
@@ -192,6 +202,24 @@ export class ClaudeBridge {
     this.host.notify('claude.status', { state: 'running' });
     live.input.push({ type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null, origin: { kind: 'human' } } as SDKUserMessage);
     return { turn: this.turns };
+  }
+
+  /**
+   * Moves a live process to the requested effort: applyFlagSettings when the query supports it
+   * (the SDK's session flag layer, no restart), else the process is recycled and the next one
+   * starts with the `effort` option (the conversation resumes).
+   */
+  private async switchEffort(live: Live) {
+    const level = this.effortLevel;
+    if (live.q.applyFlagSettings) {
+      try {
+        await live.q.applyFlagSettings({ effortLevel: level ?? null });
+        live.effort = level;
+        this.host.log('info', `effort set to ${level ?? 'default'}`);
+        return;
+      } catch (e) { this.host.log('warn', `applyFlagSettings failed (${(e as Error).message}); restarting the query`); }
+    }
+    await this.stopLive();
   }
 
   async interrupt(): Promise<ClaudeInterruptResult> {
@@ -345,7 +373,7 @@ export class ClaudeBridge {
       maxBudgetUsd: this.budgetUsd,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: SYSTEM_APPEND },
       stderr: (s: string) => this.host.log('debug', `claude: ${s.trimEnd()}`),
-      ...(this.opts.effort ? { effort: this.opts.effort } : {}),
+      ...(this.effortLevel ? { effort: this.effortLevel } : {}),
       ...(this.opts.maxTurns ? { maxTurns: this.opts.maxTurns } : {}),
       ...(plan.resume ? { resume: plan.resume } : {}),
       ...(plan.forkSession ? { forkSession: true } : {}),
@@ -367,7 +395,7 @@ export class ClaudeBridge {
     this.host.notify('claude.status', { state: 'starting', ...(notes.length ? { message: notes.join('; ') } : {}) });
     const input = new InputQueue();
     const q = (this.opts.queryFn ?? (sdkQuery as unknown as QueryFn))({ prompt: input, options });
-    const live: Live = { q, input, plan, spent: 0, done: Promise.resolve() };
+    const live: Live = { q, input, plan, spent: 0, done: Promise.resolve(), effort: this.effortLevel };
     live.done = this.pump(live);
     this.live = live;
     return live;

@@ -87,11 +87,29 @@ struct ClaudePane: View {
             if let n = chat.contextTokens { Text("Context \(ClaudeFormat.tokens(n))") }
             Spacer()
             if let m = chat.model { Text(m.replacingOccurrences(of: "claude-", with: "")) }
+            effortControl
         }
         .lineLimit(1).minimumScaleFactor(0.8)
         .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
         .padding(.horizontal, 10).padding(.vertical, 4)
         .accessibilityIdentifier("claude.footer")
+    }
+
+    /// The reasoning effort sent with the next message (the Agent SDK's `effort` option; a running
+    /// conversation switches with applyFlagSettings, so changing it does not lose the context).
+    private var effortControl: some View {
+        Menu {
+            Picker("Effort", selection: $chat.effort) {
+                ForEach(ClaudeProtocol.Effort.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.inline).labelsHidden()
+        } label: {
+            Label("Effort: \(chat.effort.label)", systemImage: "gauge.with.dots.needle.33percent")
+                .labelStyle(.titleAndIcon)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.visible).fixedSize()
+        .help("Reasoning effort for the next message. Higher thinks longer and costs more.")
+        .accessibilityIdentifier("claude.effort")
     }
 
     private var prompt: some View {

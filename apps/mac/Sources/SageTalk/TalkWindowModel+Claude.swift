@@ -9,7 +9,7 @@ extension TalkWindowModel {
     func connectClaude(_ sup: SidecarSupervisor) {
         let client = sup.client
         chat.commands = ClaudeChat.Commands(
-            send: { text, attachments in _ = try await client.claudeSend(text, attachments: attachments) },
+            send: { params in _ = try await client.claudeSend(params) },
             interrupt: { _ = try await client.claudeInterrupt() },
             reset: { try await client.claudeReset() })
         chat.onEditedBeat = { [weak self] beat in self?.follow(beat: beat) }

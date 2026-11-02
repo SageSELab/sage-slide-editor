@@ -40,10 +40,10 @@ public final class ClaudeChat {
 
     /// Sends commands to the sidecar (TalkWindowModel wires it to SidecarClient).
     public struct Commands: Sendable {
-        public var send: @Sendable (String, [String]?) async throws -> Void
+        public var send: @Sendable (ClaudeProtocol.SendParams) async throws -> Void
         public var interrupt: @Sendable () async throws -> Void
         public var reset: @Sendable () async throws -> Void
-        public init(send: @escaping @Sendable (String, [String]?) async throws -> Void,
+        public init(send: @escaping @Sendable (ClaudeProtocol.SendParams) async throws -> Void,
                     interrupt: @escaping @Sendable () async throws -> Void,
                     reset: @escaping @Sendable () async throws -> Void) {
             self.send = send; self.interrupt = interrupt; self.reset = reset
@@ -67,6 +67,8 @@ public final class ClaudeChat {
     /// When false the user pinned the canvas: Claude's edits and talk_goto do not move it.
     public var followsClaude = true
     public var draft = ""
+    /// Reasoning effort sent with every message (the footer control; the Agent SDK `effort` option).
+    public var effort: ClaudeProtocol.Effort = .high
     /// Rows the user expanded.
     public var expanded: Set<String> = []
 
@@ -170,7 +172,7 @@ public final class ClaudeChat {
         draft = ""
         entries.append(.user(id: take(), text: text))
         state = .running
-        do { try await commands.send(text, nil) } catch {
+        do { try await commands.send(ClaudeProtocol.SendParams(text: text, effort: effort)) } catch {
             state = .error
             notice("Could not send: \(error.localizedDescription)", isError: true)
         }

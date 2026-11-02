@@ -57,6 +57,7 @@ describe('Claude validators reject drift', () => {
   it('bad values and unknown keys', () => {
     expect(claudeParamCheckers['claude.send']({ text: '  ' })).toEqual(['params.text: expected a non-empty string']);
     expect(claudeParamCheckers['claude.send']({ text: 'x', files: [] })).toEqual(["params: unexpected 'files'"]);
+    expect(claudeParamCheckers['claude.send']({ text: 'x', effort: 'huge' })).toEqual(['params.effort: bad value']);
     expect(claudeNotificationCheckers['claude.tool']({ id: 'a', name: 'Edit', summary: '', status: 'ok' })).toEqual(['params.status: bad value']);
     expect(claudeNotificationCheckers['claude.tool']({ id: 'a', name: 'Edit', summary: '', status: 'done', path: '/abs' })).toEqual(['params.path: expected a relative path']);
     expect(appRequestResultCheckers['app.ask']({ decision: 'always' })).toEqual(['result.decision: bad value']);

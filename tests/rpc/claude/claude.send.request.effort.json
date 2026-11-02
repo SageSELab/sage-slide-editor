@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 22,
+  "method": "claude.send",
+  "params": {
+    "text": "Re-time the results chapter.",
+    "effort": "xhigh"
+  }
+}

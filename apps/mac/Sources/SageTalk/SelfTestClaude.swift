@@ -18,7 +18,7 @@ extension SelfTest {
         let chat = model.chat
         let live = chat.commands
         // Sends go nowhere while the recording plays: the self-test never reaches Claude.
-        chat.commands = .init(send: { _, _ in }, interrupt: {}, reset: {})
+        chat.commands = .init(send: { _ in }, interrupt: {}, reset: {})
         defer { chat.commands = live }
         chat.clear()
         chat.followsClaude = true
