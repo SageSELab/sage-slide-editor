@@ -6,6 +6,10 @@
 // sidecar announced the write beforehand (expectWrite) and the file on disk still has exactly
 // the announced content; anything else is external. Matching on content rather than on time
 // keeps a terminal edit that lands right after an app write from being mislabelled.
+//
+// Events that leave a file's size and modification time unchanged are dropped: Dropbox (and
+// other sync clients) rewrite extended attributes on files shortly after they are created or
+// edited, and each of those would otherwise trigger a rebuild and a canvas reload.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +27,7 @@ export function isIgnored(rel: string): boolean {
     || /\.tmp\.\d+\.[0-9a-f]+$/.test(base);
 }
 
+const signature = (st: fs.Stats) => `${st.size}:${st.mtimeMs}`;
 const hash = (data: Buffer | string) => createHash('sha256').update(data).digest('hex');
 
 /** Who announced an expected write. Claude's edits are announced by the bridge (canUseTool, PostToolUse). */
@@ -46,6 +51,8 @@ export class TalkWatcher {
   private dirty = new Set<string>();
   private timer: NodeJS.Timeout | null = null;
   private expected = new Map<string, Expected>();
+  /** Last seen `size:mtime` per talk-relative file, seeded on start(). */
+  private seen = new Map<string, string>();
   private readonly debounceMs: number;
   private readonly expectTtlMs: number;
 
@@ -58,6 +65,7 @@ export class TalkWatcher {
 
   start() {
     if (this.fsw) return;
+    this.seed();
     this.fsw = fs.watch(this.root, { recursive: true, persistent: false }, (_event, filename) => {
       if (!filename) return; // some platforms omit it; FSEvents always provides it
       const rel = filename.toString().split(path.sep).join('/');
@@ -100,6 +108,13 @@ export class TalkWatcher {
       let st: fs.Stats | null = null;
       try { st = fs.statSync(abs); } catch { /* deleted */ }
       if (st?.isDirectory()) continue; // directory events carry no content change of their own
+      if (st) {
+        const sig = signature(st);
+        if (this.seen.get(rel) === sig) continue; // metadata only (xattrs, permissions): not an edit
+        this.seen.set(rel, sig);
+      } else {
+        this.seen.delete(rel);
+      }
       const exp = this.expected.get(rel);
       let digest: string | null = null;
       if (st) { try { digest = hash(fs.readFileSync(abs)); } catch { digest = null; } }
@@ -113,6 +128,23 @@ export class TalkWatcher {
       }
     }
     if (batch.app.length || batch.external.length || batch.claude?.length) this.opts.onBatch(batch);
+  }
+
+  /** Records every watched file's signature, so later metadata-only events can be told apart. */
+  private seed() {
+    this.seen.clear();
+    const walk = (dir: string, prefix: string) => {
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        const rel = prefix + e.name;
+        if (isIgnored(rel)) continue;
+        const abs = path.join(dir, e.name);
+        if (e.isDirectory()) walk(abs, rel + '/');
+        else if (e.isFile()) { try { this.seen.set(rel, signature(fs.statSync(abs))); } catch { /* raced a delete */ } }
+      }
+    };
+    walk(this.root, '');
   }
 
   private schedule() {

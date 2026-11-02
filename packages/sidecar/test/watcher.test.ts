@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -61,6 +62,19 @@ describe('TalkWatcher', () => {
     (w as unknown as { dirty: Set<string> }).dirty = new Set(['talk.json', 'theme.css', 'scenes']);
     w.flush();
     expect(batches).toEqual([{ app: ['talk.json'], external: ['theme.css'] }]);
+  });
+
+  it('ignores metadata-only changes such as a sync client rewriting xattrs', async () => {
+    const { root, batches } = start();
+    await settle();
+    batches.length = 0;
+    const file = path.join(root, 'theme.css');
+    fs.chmodSync(file, 0o600); // metadata only, like Dropbox's com.dropbox.attrs rewrite
+    if (process.platform === 'darwin') execFileSync('xattr', ['-w', 'com.example.sync', 'x', path.join(root, 'talk.json')]);
+    await settle();
+    expect(batches).toEqual([]);
+    fs.appendFileSync(file, '\n/* edit */\n');
+    await eventually(() => batches.find((b) => b.external.includes('theme.css')), 4_000, 'the real edit');
   });
 
   it('labels writes announced by Claude separately from the app\'s', () => {
