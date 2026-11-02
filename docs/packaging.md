@@ -88,14 +88,14 @@ Measured on this build (`build/package-size.txt`):
 
 | Part | Size |
 |---|---|
-| **SAGE Talk.app** | **432 MB** |
+| **SAGE Talk.app** | **435 MB** |
 | claude, the Agent SDK's native CLI | 296 MB (68 %) |
 | node 24.22.2 | 116 MB (27 %) |
 | playwright-core | 11.4 MB |
-| sidecar bundle (main.mjs 2.1 MB + talkc.mjs 2.0 MB) | 4.1 MB |
-| Swift executable (stripped) | 1.9 MB |
+| sidecar bundle (main.mjs + talkc.mjs) | 5.5 MB |
+| Swift executable (stripped) | 2.5 MB |
 | sdk.mjs | 1.3 MB |
-| plugin (skill) | 0.3 MB |
+| plugin (skill) | 0.5 MB |
 | engine | 0.1 MB |
 
 Two binaries are 95 % of the app. Ways down, not taken yet: point the SDK at a `claude` the
@@ -230,13 +230,14 @@ variables launchd gives a Finder launch, so nothing can reach the checkout: no `
 2. the app in `SAGE_SELFTEST` mode (never activated; draws only its own views) with
    `SAGE_SELFTEST_EXPECT_MODE=bundled`: every self-test check passes (talk built and opened
    through the bundled sidecar, all 61 thumbnails, presenting, the external-edit and edit
-   round trips, the Claude pane replay via `SAGE_SELFTEST_CLAUDE_TRACE`, onboarding with the
-   real auth check); the app's log shows the sidecar's `ready (… bundled …)` line and no
+   round trips, the Claude pane replay via `SAGE_SELFTEST_CLAUDE_TRACE`, `talk.publish`,
+   `talk.export` and site staging through the sidecar, onboarding with the real auth check);
+   the app's log shows the sidecar's `ready (… bundled …)` line and no
    development one;
 3. `talkc` as Claude's Bash would find it (`Resources/sidecar/bin` first on `PATH`):
    `talkc publish` writes `build/public/issta26.html` byte-identical to the repository's
    `talkc publish` of the same talk, and `talkc shoot` renders a frame through the bundled
    playwright-core in the chosen browser (skipped when there is none).
 
-Result on this Mac (macOS 27, Chrome installed, signed in to Claude): all 18 checks pass, 45
-self-test checks inside; the sidecar starts in about 0.3 s.
+Result on this Mac (macOS 27, Chrome installed, signed in to Claude): all 19 checks pass, with
+63 self-test checks inside; the sidecar answers its first request in about 0.3 s.

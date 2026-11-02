@@ -10,7 +10,8 @@
 #   2. the app in SAGE_SELFTEST mode (never activated, draws only its own views): the sidecar
 #      starts from the bundle (expected mode: bundled), the talk builds and opens, every
 #      thumbnail renders, presenting, the edit and external-edit round trips, the Claude pane
-#      replay, and the onboarding checks (Claude auth asked without a model call)
+#      replay, talk.publish / talk.export / site staging through the sidecar, and the
+#      onboarding checks (Claude auth asked without a model call)
 #   3. talkc, found on the PATH the sidecar gives Claude (Resources/sidecar/bin first):
 #      publish writes the public file, byte-identical to the repository's talkc output; and
 #      shoot renders a frame with the bundled Playwright in the render browser the app chose
@@ -74,6 +75,7 @@ check "no sidecar ran from a checkout" sh -c "! grep -q 'info: ready (protocol 1
 check "the onboarding sidecar runs in bundled mode" grep -q '^PASS onboarding: the sidecar runs in bundled mode' "$RESULT"
 check "the talk built and opened" grep -q '^PASS talk opened and the engine booted' "$RESULT"
 check "every thumbnail rendered" grep -q '^PASS all thumbnails generated' "$RESULT"
+check "talk.publish and talk.export through the bundled sidecar" sh -c "grep -q '^PASS publish: wrote' '$RESULT' && grep -q '^PASS export: PDF' '$RESULT'"
 check "Claude auth reported without a model call" grep -q '^PASS onboarding: Claude auth state reported' "$RESULT"
 check "talkc reported inside the copied app" grep -qF "talkc $SIDE/bin/talkc" "$OUT/selftest/onboarding.txt"
 

@@ -631,7 +631,7 @@ remain): `apps/mac/scripts/package.sh` builds a self-contained `SAGE Talk.app` (
 the release binary, Node 24.22.2 from nodejs.org (pinned SHA-256), the sidecar as two esbuild
 ESM files with only the Agent SDK (plus its 296 MB native `claude`) and playwright-core beside
 them, the engine, the plugin with the skill copied in, and a `talkc` shim first on Claude's
-PATH. 432 MB, of which `claude` is 68 % and Node 27 %. The sidecar finds everything from its
+PATH. 435 MB, of which `claude` is 68 % and Node 27 %. The sidecar finds everything from its
 own location (`runtime.ts`); the app runs it through `SidecarConfiguration.bundled`. Chromium
 is not bundled: an installed Google Chrome is used, else Playwright's headless shell is
 downloaded on first use. Ad-hoc signed with the hardened runtime (Node needs only
