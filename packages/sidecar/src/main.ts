@@ -5,7 +5,9 @@
 // Phase 5: talk.publish, talk.export, site.stage and site.commit (src/publish/).
 // Phase 4: the Agent SDK bridge (src/claude/bridge.ts) answers the `claude.*` methods, reports
 // `claude.*` notifications, and asks the app through `app.ask|state|goto` requests.
-import { fileURLToPath } from 'node:url';
+// First: exports a bundled runtime (engine, plugin, talkc, browser) into the environment that
+// Claude and talkc inherit, before any other module runs (src/runtime.ts).
+import { runtime } from './runtime-env.ts';
 import { ClaudeBridge } from './claude/bridge.ts';
 import {
   PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, claudeParamCheckers, setupParamCheckers,
@@ -15,13 +17,7 @@ import { Publisher } from './publish/index.ts';
 import { publishParamCheckers, type PublishMethodName } from './protocol.ts';
 import { RpcPeer, type Log } from './rpc.ts';
 import { Session } from './session.ts';
-import { applyRuntime, resolveRuntime } from './runtime.ts';
 import { checkSetup, installBrowser } from './setup.ts';
-
-// Where engine, plugin, talkc and the render browser are: this repository, or SAGE Talk.app.
-// A bundled runtime is exported into the environment, which Claude and talkc inherit.
-const runtime = resolveRuntime({ entry: fileURLToPath(import.meta.url) });
-applyRuntime(runtime);
 
 const VERSION = '0.0.0';
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 } as const;
