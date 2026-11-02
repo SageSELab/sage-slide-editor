@@ -2,6 +2,18 @@
 
 ## Public build
 
+For a `sage-talk/1` talk folder (`talk.json`), use the SAGE talk editor's compiler:
+
+```
+talkc publish talk/ <slug>                   # writes talk/build/public/<slug>.html
+talkc shoot talk/build/public/<slug>.html --holds   # check the title autoplays and the end card renders
+```
+
+It cuts by the spine instead of comment markers: chapters flagged `private` and all backups
+are dropped, the spine's `public` section supplies the end card, notes are stripped, and every
+asset is inlined. It warns when a private label or a speaker note would ship. The rest of this
+section describes the legacy path for hand-written single-file decks:
+
 ```
 cd talk && python3 build-public.py <slug>      # writes public/<slug>.html
 ```

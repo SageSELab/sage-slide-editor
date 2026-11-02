@@ -75,6 +75,10 @@ Presenter notes are edited in the presenter window; they save with the main wind
 
 ## Public build
 
+For a `sage-talk/1` talk folder, `talkc publish <talk> [slug]` writes `build/public/<slug>.html`,
+cutting by the spine (`private` chapters, backups, the `public` section) rather than the
+markers below; see publishing.md. For legacy single-file decks:
+
 `python3 build-public.py [slug]` writes `public/<slug>.html`:
 
 - removes HTML between `<!-- private:start -->` and `<!-- private:end -->`, and script between `// private:start` and `// private:end` (use these around the follow-up chapter, the recruiting slide, the backups);
