@@ -21,6 +21,9 @@ import WebKit
 ///                      (SelfTestClaude.swift; also window-claude.png, claude.txt)
 ///   materials.png      beat-format talks: the Materials tab over a temp paper and package
 ///                      (also window-materials.png)
+///   publish-sheet.png  beat-format talks: publish, export and stage a temp copy into temp site
+///                      repositories, drawn from the Publish sheet (SelfTestPublish.swift; also
+///                      publish-sheet-committed.png, export-sheet.png, publish.txt)
 ///   result.txt         PASS or FAIL lines for every check
 /// then quits. Used by scripts/selftest.sh. It only ever draws the app's own windows and web
 /// views: no screen capture of any kind.
@@ -82,6 +85,7 @@ enum SelfTest {
             let source = talk.root
             await roundTrip(model: model, out: out)
             await editRoundTrip(model: model, source: source, out: out)
+            await publishAndExport(model: model, source: source, out: out)
         }
     }
 
