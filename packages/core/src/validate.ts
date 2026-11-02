@@ -29,6 +29,9 @@
 //   escape-hatch (info)            use of B.at or B.T
 //   beat-no-motion (info)          a spine beat with no Talk.beat registration
 //   beat-not-in-spine (warning)    a Talk.beat registration the spine does not list
+// In talk-render.ts (`talkc validate --render`, needs Chromium; tests in test/talk-render.test.ts):
+//   ghost-visible (error)          a data-a element visible at a hold that no beat has brought in
+//   render-page-error (error)      the compiled film threw in the browser
 import { parse as parseJs } from 'acorn';
 import { diag, type Diagnostic } from './diagnostics.ts';
 import { assetRefs, cssUrls, isLocalRef, sceneElements } from './html.ts';

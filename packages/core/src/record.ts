@@ -44,7 +44,30 @@ export interface BeatRecording {
   escapes: { what: 'B.at' | 'B.T'; loc?: CallLoc | undefined }[];
 }
 
-export interface RecordedElement { id: string | null; dataA: boolean; tag: string }
+export interface RecordedElement {
+  id: string | null;
+  dataA: boolean;
+  tag: string;
+  /** Stable address shared with the browser: see elementKey. */
+  key: string;
+}
+
+/**
+ * An element's address that survives differences between the recorder's DOM and a real page
+ * (the public build drops private scenes): the nearest ancestor-or-self with an id, then the
+ * child-element indices down to the element, e.g. `#rq1/2/0`; `/3/1` from the stage when no
+ * ancestor has an id. talk-render.ts computes the same key in the page.
+ */
+export function elementKey(el: Element, stage: Element): string {
+  const parts: string[] = [];
+  for (let e: Element | null = el; e && e !== stage; e = e.parentElement) {
+    const id = e.getAttribute('id');
+    if (id) return ['#' + id, ...parts].join('/');
+    const p: Element | null = e.parentElement;
+    parts.unshift(String(p ? Array.prototype.indexOf.call(p.children, e) : 0));
+  }
+  return ['', ...parts].join('/');
+}
 
 /**
  * Who uses which `Talk.lib` helper: the names each lib file defines, the names each lib file
@@ -117,7 +140,7 @@ export function recordTalk(talk: LoadedTalk, opts: LayoutOptions = {}): Recordin
     let i = elIndex.get(el);
     if (i === undefined) {
       i = elements.length;
-      elements.push({ id: el.getAttribute('id'), dataA: el.hasAttribute('data-a'), tag: el.tagName.toLowerCase() });
+      elements.push({ id: el.getAttribute('id'), dataA: el.hasAttribute('data-a'), tag: el.tagName.toLowerCase(), key: elementKey(el, stage) });
       elIndex.set(el, i);
     }
     return i;

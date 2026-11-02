@@ -3,7 +3,9 @@
 // Runs directly on Node 24 (type stripping); `node --import tsx` also works.
 //
 //   talkc build <talk> [--out <dir>]        write build/index.html; exit 1 on a build error
-//   talkc validate <talk> [--json] [--public]   exit 1 when any error-severity diagnostic
+//   talkc validate <talk> [--json] [--public] [--render]
+//                                            exit 1 when any error-severity diagnostic;
+//                                            --render adds the browser checks (ghost-visible)
 //   talkc layout <talk> [--json] [--public]     the hold list, like ?cplist
 //   talkc shoot <talk|film.html> [--holds] [--around S] [--times a,b] [--beats ch.beat,...]
 //               [--no-backups] [--out <dir>]
@@ -14,25 +16,26 @@
 //                                            <talk>/build/public/<slug>.html (slug: talk)
 // Exit codes: 0 ok, 1 talk has errors (or frames could not be rendered), 2 usage.
 //
-// Commands that need a browser (shoot) import @sage/render lazily, so build, validate and
+// Commands that need a browser (shoot, validate --render) import @sage/render lazily, so build, validate and
 // layout, and every library user of @sage/core, never load Playwright.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileTalk } from './compile.ts';
-import { formatDiagnostic, hasErrors } from './diagnostics.ts';
+import { formatDiagnostic, hasErrors, type Diagnostic } from './diagnostics.ts';
 import { formatCplist } from './layout.ts';
 import { loadTalk } from './load.ts';
 import { publishTalk } from './publish.ts';
 import { recordTalk } from './record.ts';
-import { validateTalk } from './validate.ts';
+import { validateRendered } from './talk-render.ts';
+import { sortDiagnostics, validateTalk } from './validate.ts';
 
 export interface Io { out: (s: string) => void; err: (s: string) => void }
 const stdio: Io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') };
 
 const USAGE = `usage: talkc <command> <talk> [options]
   build <talk> [--out <dir>]
-  validate <talk> [--json] [--public]
+  validate <talk> [--json] [--public] [--render]
   layout <talk> [--json] [--public]
   shoot <talk|film.html> [--holds] [--around S] [--times a,b] [--beats ch.beat,...] [--no-backups] [--out <dir>]
   publish <talk> [slug] [--out <dir>]`;
@@ -40,7 +43,7 @@ const USAGE = `usage: talkc <command> <talk> [options]
 /** Flags per command; `true` = takes a value. */
 const FLAGS: Record<string, Record<string, boolean>> = {
   build: { '--out': true },
-  validate: { '--json': false, '--public': false },
+  validate: { '--json': false, '--public': false, '--render': false },
   layout: { '--json': false, '--public': false },
   publish: { '--out': true },
   shoot: { '--holds': false, '--around': true, '--times': true, '--beats': true, '--no-backups': false, '--out': true },
@@ -103,13 +106,20 @@ export function main(argv: readonly string[], io: Io = stdio): number | Promise<
   const talk = loadTalk(dir);
   if (cmd === 'validate') {
     const ds = validateTalk(talk, undefined, { public: pub });
-    if (json) io.out(JSON.stringify({ ok: !hasErrors(ds), diagnostics: ds }, null, 2));
-    else {
-      for (const d of ds) io.out(formatDiagnostic(d));
-      const n = (s: string) => ds.filter((d) => d.severity === s).length;
-      io.out(`${n('error')} errors, ${n('warning')} warnings, ${n('info')} infos`);
-    }
-    return hasErrors(ds) ? 1 : 0;
+    const report = (ds: Diagnostic[]) => {
+      if (json) io.out(JSON.stringify({ ok: !hasErrors(ds), diagnostics: ds }, null, 2));
+      else {
+        for (const d of ds) io.out(formatDiagnostic(d));
+        const n = (s: string) => ds.filter((d) => d.severity === s).length;
+        io.out(`${n('error')} errors, ${n('warning')} warnings, ${n('info')} infos`);
+      }
+      return hasErrors(ds) ? 1 : 0;
+    };
+    if (!flags.has('--render')) return report(ds);
+    if (hasErrors(ds)) { io.err('talkc: render checks skipped: fix the errors first'); return report(ds); }
+    return validateRendered(talk, { public: pub }).then(
+      (more) => report(sortDiagnostics([...ds, ...more])),
+      (e: Error) => { io.err(`talkc: render checks failed: ${e.message.split('\n')[0]}`); return 1; });
   }
   // layout
   if (!talk.spine) { for (const d of talk.diagnostics) io.err(formatDiagnostic(d)); return 1; }
