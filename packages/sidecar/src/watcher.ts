@@ -23,7 +23,11 @@ export function isIgnored(rel: string): boolean {
 
 const hash = (data: Buffer | string) => createHash('sha256').update(data).digest('hex');
 
-export interface WatchBatch { app: string[]; external: string[] }
+/** Who announced an expected write. Claude's edits are announced by the bridge (canUseTool, PostToolUse). */
+export type WriteAuthor = 'app' | 'claude';
+
+/** `claude` is present only when non-empty. */
+export interface WatchBatch { app: string[]; external: string[]; claude?: string[] }
 
 export interface WatcherOptions {
   debounceMs?: number;
@@ -33,7 +37,7 @@ export interface WatcherOptions {
   log?: Log;
 }
 
-interface Expected { digest: string | null; until: number }
+interface Expected { digest: string | null; until: number; author: WriteAuthor }
 
 export class TalkWatcher {
   private fsw: fs.FSWatcher | null = null;
@@ -74,9 +78,9 @@ export class TalkWatcher {
     this.dirty.clear();
   }
 
-  /** Announces that the sidecar is about to write `content` to `rel` (null: delete it). */
-  expectWrite(rel: string, content: Buffer | string | null) {
-    this.expected.set(rel, { digest: content === null ? null : hash(content), until: Date.now() + this.expectTtlMs });
+  /** Announces that `author` is about to write `content` to `rel` (null: delete it). */
+  expectWrite(rel: string, content: Buffer | string | null, author: WriteAuthor = 'app') {
+    this.expected.set(rel, { digest: content === null ? null : hash(content), until: Date.now() + this.expectTtlMs, author });
   }
 
   /** Forces pending events out now (tests, shutdown). */
@@ -97,13 +101,16 @@ export class TalkWatcher {
       const exp = this.expected.get(rel);
       let digest: string | null = null;
       if (st) { try { digest = hash(fs.readFileSync(abs)); } catch { digest = null; } }
-      if (exp && exp.digest === digest) batch.app.push(rel);
+      if (exp && exp.digest === digest) {
+        if (exp.author === 'claude') (batch.claude ??= []).push(rel);
+        else batch.app.push(rel);
+      }
       else {
         if (exp) this.expected.delete(rel); // someone else wrote over our write
         batch.external.push(rel);
       }
     }
-    if (batch.app.length || batch.external.length) this.opts.onBatch(batch);
+    if (batch.app.length || batch.external.length || batch.claude?.length) this.opts.onBatch(batch);
   }
 
   private schedule() {

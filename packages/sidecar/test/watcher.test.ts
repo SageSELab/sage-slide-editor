@@ -62,4 +62,18 @@ describe('TalkWatcher', () => {
     w.flush();
     expect(batches).toEqual([{ app: ['talk.json'], external: ['theme.css'] }]);
   });
+
+  it('labels writes announced by Claude separately from the app\'s', () => {
+    const t = tempTalk();
+    stop = t.cleanup;
+    const batches: WatchBatch[] = [];
+    const w = new TalkWatcher(t.root, { onBatch: (b) => batches.push(b) });
+    fs.writeFileSync(path.join(t.root, 'scenes/line.html'), 'claude wrote this');
+    w.expectWrite('scenes/line.html', 'claude wrote this', 'claude');
+    w.expectWrite('talk.json', fs.readFileSync(path.join(t.root, 'talk.json')), 'app');
+    w.expectWrite('theme.css', 'predicted, but a terminal won', 'claude');
+    (w as unknown as { dirty: Set<string> }).dirty = new Set(['scenes/line.html', 'talk.json', 'theme.css']);
+    w.flush();
+    expect(batches).toEqual([{ app: ['talk.json'], external: ['theme.css'], claude: ['scenes/line.html'] }]);
+  });
 });

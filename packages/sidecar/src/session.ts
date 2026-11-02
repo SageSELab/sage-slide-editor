@@ -11,7 +11,7 @@ import {
 } from './protocol.ts';
 import { applyEdit, applyInverse, type Applied } from './edit.ts';
 import type { Log } from './rpc.ts';
-import { TalkWatcher, atomicAppWrite, type WatchBatch } from './watcher.ts';
+import { TalkWatcher, atomicAppWrite, type WatchBatch, type WriteAuthor } from './watcher.ts';
 
 export interface SessionEvents {
   changed: (p: ChangedParams) => void;
@@ -126,6 +126,16 @@ export class Session {
     return result;
   }
 
+  /** Announces a write another author (the Claude bridge) is about to make, so the watcher labels it. */
+  expectWrite(rel: string, content: string | Buffer | null, author: WriteAuthor) {
+    this.talk?.watcher?.expectWrite(rel, content, author);
+  }
+
+  get kind(): TalkKind | null { return this.talk?.kind ?? null; }
+
+  /** The open talk's talk.json (for the Claude bridge: materials, chapters). */
+  async spine() { return (await this.load()).spine; }
+
   /** Resolves when queued builds have finished (shutdown, tests). */
   idle(): Promise<unknown> { return this.buildChain.catch(() => {}); }
 
@@ -153,8 +163,9 @@ export class Session {
     if (this.talk !== t) return; // stale watcher of a closed talk
     if (b.external.length) this.events.changed({ paths: b.external, source: 'external' });
     if (b.app.length) this.events.changed({ paths: b.app, source: 'app' });
+    if (b.claude?.length) this.events.changed({ paths: b.claude, source: 'claude' });
     // App writes that talk.edit already rebuilt need no second build.
-    const covered = !b.external.length && b.app.every((f) => this.builtByEdit.has(f));
+    const covered = !b.external.length && !b.claude?.length && b.app.every((f) => this.builtByEdit.has(f));
     for (const f of b.app) this.builtByEdit.delete(f);
     if (covered) return;
     if (t.kind === 'beatFormat' && !this.changeBuildQueued) {
