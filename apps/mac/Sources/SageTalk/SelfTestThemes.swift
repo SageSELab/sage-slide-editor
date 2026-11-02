@@ -80,5 +80,23 @@ extension SelfTest {
         let back = (try? await model.canvas.call(display, [:]) as? String) ?? ""
         log.append("after undo --display: \(back)")
         check(back.contains("Manrope"), "themes: after undo the canvas is back to Manrope")
+
+        // The format bar's Font button: pick a Google font for the title headline.
+        check(model.canPickFont, "fonts: the Font button has a picker")
+        model.select(1)
+        try? await Task.sleep(for: .milliseconds(400))
+        await model.selectObject("t-g")
+        guard model.selection?.id == "t-g", let s = model.themeService,
+              let fraunces = try? await FontEmbedder(service: s).search("Fraunces").first(where: { $0.id == "fraunces" }) else {
+            check(false, "fonts: #t-g selected and Fraunces found in the catalog (\(model.selection?.id ?? "-"))"); return
+        }
+        let err = await model.embedAndApplyFont(fraunces)
+        let scene = copy.appendingPathComponent("scenes/line.html")
+        let styled = await waitFor(seconds: 20) { ((try? String(contentsOf: scene, encoding: .utf8)) ?? "").range(of: "font-family: ?Fraunces", options: .regularExpression) != nil }
+        let faces = (try? String(contentsOf: cssURL, encoding: .utf8)) ?? ""
+        log.append("font: error \(err ?? "none"), undo stack \(model.edits.undoStack.map(\.title))")
+        check(err == nil && styled && faces.contains("assets/fonts/fraunces-latin-400-normal.woff2"),
+              "fonts: Fraunces embedded (fonts.add) and set on #t-g (\(err ?? "ok"))")
+        check(model.edits.undoStack.map(\.title).suffix(2).first == "Add Font “Fraunces”", "fonts: adding the font is undoable (\(model.edits.undoStack.map(\.title)))")
     }
 }
