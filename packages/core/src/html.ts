@@ -7,23 +7,27 @@ export interface SceneElement {
   id: string | null;
   attrs: Map<string, string>;
   loc: Token.ElementLocation;
+  /** Index of the parent element in the same list (-1: a top-level element of the fragment). */
+  parent: number;
 }
 
 /** Every element of a scene fragment, in document order, with its source location. */
 export function sceneElements(text: string): SceneElement[] {
   const out: SceneElement[] = [];
-  const walk = (n: P5.ParentNode) => {
+  const walk = (n: P5.ParentNode, parent: number) => {
     for (const c of n.childNodes) {
       if (!('tagName' in c)) continue;
       const el = c as P5.Element;
+      let me = parent;
       if (el.sourceCodeLocation) {
         const attrs = new Map(el.attrs.map((a) => [a.name, a.value]));
-        out.push({ tag: el.tagName, id: attrs.get('id') ?? null, attrs, loc: el.sourceCodeLocation });
+        me = out.length;
+        out.push({ tag: el.tagName, id: attrs.get('id') ?? null, attrs, loc: el.sourceCodeLocation, parent });
       }
-      walk(el.tagName === 'template' ? (el as P5.Template).content : el);
+      walk(el.tagName === 'template' ? (el as P5.Template).content : el, me);
     }
   };
-  walk(parseFragment(text, { sourceCodeLocationInfo: true }));
+  walk(parseFragment(text, { sourceCodeLocationInfo: true }), -1);
   return out;
 }
 

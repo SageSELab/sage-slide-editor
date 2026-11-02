@@ -195,3 +195,90 @@ export function setStyle(scene: SourceFile, id: string, props: StyleProps): Edit
   const at = insertPoint(text, el);
   return edit(scene, [at, at], ` style="${escAttr(next, '"')}"`);
 }
+
+// ---------------------------------------------------------------------------------------
+// Addresses of elements without an id (the canvas's drill-down into a card's title, say).
+//
+// An address is the nearest ancestor with an id, then one step per element down to the
+// target: `g1>div.t`, `c4>p.sub`, `g1>div.mini>div.ico`, `c6>div.row:2`. A step is the tag,
+// the first class when it is a plain name (letters, digits, `_`, `-`), and `:n` when it is the
+// n-th (0-based, n > 0) sibling with that tag and class. `>` cannot appear in the ids the app
+// writes, so an id containing it is an address. canvas.js computes the same addresses.
+
+export interface AddressStep { tag: string; cls: string; n: number }
+
+/** True when `id` is an element address rather than an id. */
+export const isAddress = (id: string) => id.includes('>');
+
+/** The class an address step names: the first class when it is a plain name, else ''. */
+export const stepClass = (cls: string | undefined | null) => {
+  const first = (cls ?? '').trim().split(/\s+/)[0] ?? '';
+  return /^[A-Za-z_][\w-]*$/.test(first) ? first : '';
+};
+
+/** Splits an address; null when it is not one. */
+export function parseAddress(address: string): { base: string; steps: AddressStep[] } | null {
+  const parts = address.split('>');
+  if (parts.length < 2 || !parts[0]) return null;
+  const steps: AddressStep[] = [];
+  for (const p of parts.slice(1)) {
+    const m = /^([a-z][a-z0-9-]*)(?:\.([A-Za-z_][\w-]*))?(?::(\d+))?$/.exec(p);
+    if (!m) return null;
+    steps.push({ tag: m[1]!, cls: m[2] ?? '', n: m[3] ? Number(m[3]) : 0 });
+  }
+  return { base: parts[0], steps };
+}
+
+/**
+ * The source element an address names, and its recording key (`#base/i/j`, record.ts
+ * elementKey). Throws EditError 'bad-address', 'no-element', or 'stale-path' when the source
+ * has no such element (it was generated at runtime, or the source changed).
+ */
+export function resolveAddress(scene: SourceFile, address: string): { el: SceneElement; key: string } {
+  const a = parseAddress(address);
+  if (!a) throw new EditError('bad-address', `"${address}" is not an element address`);
+  const els = sceneElements(scene.text);
+  const bases = els.flatMap((e, i) => (e.id === a.base ? [i] : []));
+  if (!bases.length) throw new EditError('no-element', `no element #${a.base} in ${scene.path}`);
+  if (bases.length > 1) throw new EditError('duplicate-element', `#${a.base} occurs ${bases.length} times in ${scene.path}`);
+  let cur = bases[0]!;
+  const key = ['#' + a.base];
+  for (const s of a.steps) {
+    const kids = els.flatMap((e, i) => (e.parent === cur ? [i] : []));
+    const same = kids.filter((i) => els[i]!.tag === s.tag && stepClass(els[i]!.attrs.get('class')) === s.cls);
+    const next = same[s.n];
+    if (next === undefined) {
+      throw new EditError('stale-path', `${address} is not in ${scene.path} (the film may have generated it, or the source changed); give it an id in the scene to edit it`);
+    }
+    key.push(String(kids.indexOf(next)));
+    cur = next;
+  }
+  const el = els[cur]!;
+  if (el.id) throw new EditError('stale-path', `${address} has the id #${el.id} in ${scene.path}; edit it by its id`);
+  return { el, key: key.join('/') };
+}
+
+/** A readable id for an addressed element, unique among `taken`: `g1-t`, `c4-sub-2`. */
+export function newIdFor(address: string, taken: ReadonlySet<string>): string {
+  const a = parseAddress(address);
+  if (!a) throw new EditError('bad-address', `"${address}" is not an element address`);
+  const last = a.steps[a.steps.length - 1]!;
+  const stem = `${a.base}-${last.cls || last.tag}`.replace(/[^\w-]/g, '-');
+  let id = stem;
+  for (let n = 2; taken.has(id); n++) id = `${stem}-${n}`;
+  return id;
+}
+
+/**
+ * Gives the addressed element an id: returns the scene as it would be with ` id="..."` added
+ * to the element's start tag, the id, and the element's recording key before the change.
+ */
+export function assignId(scene: SourceFile, address: string, taken: ReadonlySet<string>): { scene: SourceFile; id: string; key: string } {
+  const { el, key } = resolveAddress(scene, address);
+  const id = newIdFor(address, taken);
+  const st = el.loc.startTag!;
+  // right after the tag name, so the id reads first: <div id="g1-t" class="t">
+  const at = st.startOffset + 1 + el.tag.length;
+  const text = scene.text.slice(0, at) + ` id="${id}"` + scene.text.slice(at);
+  return { scene: { path: scene.path, text }, id, key };
+}

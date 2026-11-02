@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { applyPatches, EditError, type Patch } from './patch.ts';
 
-export { setText, setStyle, setAttr, patchStyle, STYLE_KEYS, type StyleProps } from './edit-html.ts';
+export { setText, setStyle, setAttr, patchStyle, STYLE_KEYS, type StyleProps, isAddress, parseAddress, resolveAddress, newIdFor, assignId, stepClass, type AddressStep } from './edit-html.ts';
 export { insertBeat, deleteBeat, duplicateBeat, moveBeat, setHold, setNotes, setBeatProps, setChapterProps, spineSources, type SpineSources, type InsertBeatOptions, type BeatProps, type ChapterProps } from './edit-spine.ts';
 export { stretchBeat, type StretchResult, type StretchSkip } from './stretch.ts';
 export { applyPatches, applyToTexts, makeEdit, EditError, type Edit, type Patch } from './patch.ts';
