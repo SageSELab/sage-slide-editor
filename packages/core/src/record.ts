@@ -27,6 +27,8 @@ export interface MotionCall {
   /** Number of keyframes for anim-like calls, and whether they set opacity. */
   keyframes?: number | undefined;
   opacity?: boolean | undefined;
+  /** For `set`: the keys it steps (`text`, `class`, or style properties). */
+  keys?: string[] | undefined;
   /** First frame in a talk script (helper calls point into lib/), and the frame in the motion file. */
   loc?: CallLoc | undefined;
   beatLoc?: CallLoc | undefined;
@@ -262,10 +264,11 @@ export function recordTalk(talk: LoadedTalk, opts: LayoutOptions = {}): Recordin
     const B: AnyObj = {
       ...rel,
       lib: TalkStub.lib,
-      set: (sel: unknown, t: number) => {
+      set: (sel: unknown, t: number, v?: unknown) => {
         const s = r6(start + t), list = els(sel);
         noteEnd(s);
-        push({ method: 'set', kind: 'set', sel: selStr(sel), start: s, end: s, n: list.length, targets: list.map(idx) });
+        const keys = v && typeof v === 'object' ? Object.entries(v as AnyObj).flatMap(([k, x]) => (k === 'style' && x && typeof x === 'object' ? Object.keys(x as AnyObj) : [k])) : [];
+        push({ method: 'set', kind: 'set', sel: selStr(sel), start: s, end: s, n: list.length, targets: list.map(idx), keys });
       },
     };
     Object.defineProperty(B, 'at', { enumerable: true, get: () => { cur?.escapes.push({ what: 'B.at', loc: where().loc }); return start; } });
