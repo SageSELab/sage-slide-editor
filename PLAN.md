@@ -639,7 +639,11 @@ downloaded on first use. Ad-hoc signed with the hardened runtime (Node needs onl
 the sidecar, the Claude login (the SDK's `accountInfo()`, no message sent) and the browser,
 and states the 6.4 login caveat. `scripts/package-smoke.sh` runs a copy of the app away from
 the repository with a Finder-like environment: the full self-test in bundled mode, and
-`talkc publish` byte-identical to the repository's.
+`talkc publish` byte-identical to the repository's. Talks are `.talk` document packages
+(UTType `io.sagelab.talk`, with `io.sagelab.talktheme` declared for themes): still plain
+folders on disk, shown by Finder as one document with its own icon that opens in the app.
+New Talk creates `<name>.talk`; plain folders keep opening, and the app offers (never forces)
+an in-place rename to `<name>.talk` (docs/packaging.md).
 
 Developer ID signing, notarization, hardened runtime, sidecar bundling, crash reporting,
 onboarding (choose auth, pick skill sync), first Windows shell spike (WebView2 host over the

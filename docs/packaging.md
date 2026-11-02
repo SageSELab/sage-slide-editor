@@ -19,11 +19,13 @@ the sidecar from this checkout with `node --import tsx`.
 
 ```
 SAGE Talk.app/Contents/
-  Info.plist                 io.sagelab.talk, version from git describe, document types
+  Info.plist                 io.sagelab.talk, version from git describe, document types, UTTypes
   PkgInfo
   MacOS/SageTalk             SwiftPM release build, debug symbols stripped
   Resources/
     AppIcon.icns             packaging/AppIcon.svg, rendered by packaging/make-icon.swift
+    TalkDocument.icns        .talk document icon (packaging/TalkDocument.svg)
+    ThemeDocument.icns       .talktheme document icon (packaging/ThemeDocument.svg)
     canvas.js                the editing overlay (packages/engine/src/canvas.js)
     node/bin/node            Node 24.22.2 darwin-arm64 (official tarball), re-signed ad hoc
     node/LICENSE
@@ -137,10 +139,41 @@ progress parsing and failure reporting are tested with a stand-in installer
 `vX.Y.Z` tag in `git describe` (0.6.0 while there is none); `CFBundleVersion` the commit
 count; the full `git describe` in `SAGEGitDescribe` and in the sidecar manifest (shown on the
 onboarding sheet); category `public.app-category.productivity`; minimum macOS 15.0 (the
-SwiftPM platform); arm64 only. Document types: folders (a talk is a folder with `talk.json`,
-or a legacy `index.html` deck) and `public.json` (opening a `talk.json` opens its folder),
-both rank Alternate so the app never claims folders or JSON by default; they make Open With
-and drops on the Dock icon work (`application(_:open:)`).
+SwiftPM platform); arm64 only.
+
+Document types and UTTypes live in `packaging/document-types.plist.xml`, which both
+`package.sh` and the development `bundle.sh` insert (so the dev app behaves the same):
+
+| UTType (exported) | Extension | Conforms to | Icon | Document type |
+|---|---|---|---|---|
+| `io.sagelab.talk` | `talk` | `com.apple.package`, `public.composite-content` | `TalkDocument.icns` | "SAGE Talk", Editor, rank Owner, `LSTypeIsPackage` |
+| `io.sagelab.talktheme` | `talktheme` | `com.apple.package`, `public.composite-content` | `ThemeDocument.icns` | "SAGE Talk Theme", Viewer, rank Owner, `LSTypeIsPackage` |
+
+plus the older types, both rank Alternate so the app never claims folders or JSON by default:
+plain folders (a talk folder with `talk.json`, or a legacy `index.html` deck) and
+`public.json` (opening a `talk.json` opens its folder). Together they make double-click,
+Open With and drops on the Dock icon work (`application(_:open:)`).
+
+**`.talk` packages.** A talk named `<name>.talk` is still an ordinary folder on disk: git,
+Dropbox, Claude, the sidecar and `talkc` read and write its files as before. Finder shows it as
+one document with the SAGE Talk document icon and opens it in the app; *Show Package
+Contents* reveals the files. File ▸ New Talk… creates `Untitled Talk.talk` (title: the name
+without the extension); the open panel offers `.talk` packages as files and plain folders
+as folders. When a plain beat-format folder opens, a bar under the canvas offers *Convert to
+.talk Package…* (also in the File menu; *Not Now* stops offering it for that folder). After a
+confirmation, which warns when the folder is inside a git repository (git sees the rename as
+a move of every file), it renames the folder to `<name>.talk` in place and reopens it; it
+refuses when that name is taken. Nothing converts on its own, and legacy decks are never
+offered. `.talktheme` is a theme package (a folder with `theme.json`, `theme.css` and
+`fonts/`); the app declares it, and refuses to open one as a talk.
+
+**Icons.** `packaging/TalkDocument.svg` (a page with a folded corner and the app icon's slide
+stack and leaf) and `packaging/ThemeDocument.svg` (the leaf over palette swatches) are
+rendered by `make-icon.swift --document` at every iconset size; `scripts/make-icns.sh`
+runs it and iconutil, cached in `build/cache`. Launch Services learns the types when the app
+is registered: the build scripts unregister their build copies, so the types (and the
+icons in Finder) come from the installed `/Applications` copy. Without a registration the
+app still opens `.talk` folders, using a dynamic type for the extension.
 
 ## Signing and entitlements
 
@@ -226,7 +259,9 @@ variables launchd gives a Finder launch, so nothing can reach the checkout: no `
 `SAGE_NODE`, no node on `PATH`, cwd the temp folder. It checks:
 
 1. the copied app's signature verifies; no `sage-repo-path`; no file in the app (binaries
-   included) contains the repository's path;
+   included) contains the repository's path; Info.plist exports `io.sagelab.talk` as a package
+   with the `talk` extension and its icon, claims it (Owner, `LSTypeIsPackage`), and exports
+   `io.sagelab.talktheme`;
 2. the app in `SAGE_SELFTEST` mode (never activated; draws only its own views) with
    `SAGE_SELFTEST_EXPECT_MODE=bundled`: every self-test check passes (talk built and opened
    through the bundled sidecar, all 61 thumbnails, presenting, the external-edit and edit
@@ -239,5 +274,5 @@ variables launchd gives a Finder launch, so nothing can reach the checkout: no `
    `talkc publish` of the same talk, and `talkc shoot` renders a frame through the bundled
    playwright-core in the chosen browser (skipped when there is none).
 
-Result on this Mac (macOS 27, Chrome installed, signed in to Claude): all 19 checks pass, with
+Result on this Mac (macOS 27, Chrome installed, signed in to Claude): all 22 checks pass, with
 63 self-test checks inside; the sidecar answers its first request in about 0.3 s.
