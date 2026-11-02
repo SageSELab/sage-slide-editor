@@ -1,0 +1,43 @@
+{
+  "format": "sage-talk/1",
+  "title": "__TITLE__",
+  "venue": "VENUE 2026 · City",
+  "stage": { "width": 1920, "height": 1080 },
+  "theme": "theme.css",
+  "layers": "scenes/layers.html",
+  "lib": ["lib/slideno.js"],
+  "materials": { "paper": ".." },
+  "defaults": { "holdPad": 1.0, "tail": 1.0 },
+  "chapters": [
+    {
+      "id": "title", "label": "Title", "scene": "scenes/title.html",
+      "beats": [
+        { "id": "title", "label": "Title", "notes": "Thanks. I am Kevin Moran; this is joint work with ...", "hold": 5 }
+      ]
+    },
+    {
+      "id": "claim", "label": "Chapter name", "scene": "scenes/claim.html",
+      "beats": [
+        { "id": "claim", "label": "The claim", "notes": "What this pane is for.", "hold": 3 },
+        { "id": "number", "label": "The number", "notes": "Eleven of fifty.", "hold": 3 }
+      ]
+    },
+    {
+      "id": "omt", "label": "One more thing", "dark": true, "private": true, "scene": "scenes/omt.html",
+      "beats": [
+        { "id": "omt", "label": "One more thing", "notes": "One more thing.", "hold": 4 },
+        { "id": "thanks", "label": "Thank you", "notes": "So, how far are we? ...", "hold": 4 }
+      ]
+    },
+    {
+      "id": "backup", "label": "Backup", "dark": true, "private": true, "backup": true,
+      "beats": [
+        { "id": "backup", "label": "Backup", "notes": "Backup slides follow.", "hold": 2 }
+      ]
+    }
+  ],
+  "public": {
+    "id": "end", "label": "Paper", "tail": 0, "scene": "scenes/end.html", "motion": "beats/end.js",
+    "beats": [ { "id": "end", "label": "Paper", "hold": 4 } ]
+  }
+}

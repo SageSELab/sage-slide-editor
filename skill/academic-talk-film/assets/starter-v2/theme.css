@@ -1,0 +1,12 @@
+/* Per-talk CSS on top of the engine's talk.css (inlined into build/index.html). */
+.logos { display: flex; gap: 46px; align-items: center; filter: grayscale(1); opacity: .8; }
+.logos img { height: 54px; width: auto; }
+.authors-line { font-size: 29px; line-height: 1.5; color: var(--ink-2); }
+.authors-line b { color: var(--ink); font-weight: 600; }
+/* Stacking: scenes are stacked in build order (layers first). The black scene sits above the light
+   chapters, a device rig above it, the dark chapter's content on top. */
+#black { z-index: 3; } .rig { z-index: 4; } #c8 { z-index: 5; }
+/* Public end card buttons (scenes/end.html; only present in the public build). */
+.endbtn { display: inline-block; padding: 16px 34px; border-radius: 999px; background: var(--ink); color: #fff; font: 700 26px var(--display); text-decoration: none; }
+.endbtn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+.endbtn:hover { background: var(--a1); color: #fff; box-shadow: none; }
