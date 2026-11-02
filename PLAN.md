@@ -305,15 +305,20 @@ the inputs that affect that beat.
 
 ### 5.3 Canvas
 
-The compiled film in a WKWebView, fit to the pane, with `canvas.js` injected in edit mode:
+The compiled film in a WKWebView, fit to the pane, with `canvas.js` injected. There is no edit
+mode (Keynote-style): whenever the film is paused the canvas is directly editable; while it
+plays the overlay steps aside and comes back, at the new time, when playback stops:
 
 - Click to select the topmost object with an id at the point (hit test honours opacity, so
   invisible-at-this-time objects are skipped unless the Layers popover selects them).
 - Drag to move, handles to resize, Option-drag to duplicate, arrow keys to nudge (Shift for
   10 px). Positions snap to a 10 px grid and to other objects' edges and centres, with Keynote
   style guides. Writes `left/top/width/height` through core, debounced.
-- Double-click text to edit in place (`contenteditable`), Escape cancels, blur commits the
-  innerHTML (inline tags preserved, block children refused, like `edit.js` does today).
+- Click selected text (or double-click, or just type) to edit it in place (`contenteditable`);
+  Escape or Enter commits and leaves the text, a click elsewhere commits the
+  innerHTML (inline tags preserved, block children refused). A floating format bar (B/I/U
+  and colour inline on a selected range, else setStyle on the element; size, alignment, font)
+  sits over the selected text object.
 - Images: drop a file to replace `src`, or drop onto empty stage to insert a new positioned
   `<img>` into the current chapter's scene with a build-in step.
 - Insert menu for human-added objects: text box (eyebrow, headline, sub, caption styles),
@@ -559,7 +564,7 @@ Status (2026-11-02): `talk.edit`/`talk.revert` in the sidecar (every core op plu
 `setBeatProps`/`setChapterProps`; atomic staged writes labelled `app`; inverses carry file
 digests and a stale one is refused with EditConflict); `canvas.js` (hit test, move, resize,
 snapping with guides, nudges, in-place text, keyboard-only) with 15 Playwright WebKit tests;
-in the app: edit mode (⌘E), Object/Beat/Chapter inspector, navigator beat menu, undo/redo of
+in the app: modeless canvas editing with a format bar (no ⌘E edit mode since 2026-11-02), Object/Beat/Chapter inspector, navigator beat menu, undo/redo of
 the app's own edits, external changes clearing the history and badging beats. The self-test's
 edit round trip (move, retype, set hold, undo all three) ends byte-identical. Not yet: image
 replace/insert by drop, the Insert menu, drag reorder in the navigator, Option-drag
