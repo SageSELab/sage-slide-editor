@@ -64,6 +64,29 @@ public final class EditSession {
         }
     }
 
+    /// Runs an edit made through another method that returns an EditResult (theme.apply,
+    /// fonts.add), in line with the other edits; its inverse goes on the undo stack as `title`.
+    /// Returns the method's whole result; throws what it threw (lastError is set too).
+    public func performOther<R: Sendable>(_ title: String, _ work: @escaping @Sendable () async throws -> R,
+                                          edit: @escaping @Sendable (R) -> SidecarProtocol.EditResult) async throws -> R {
+        let outcome: Result<R, Error> = await serially { [self] in
+            do {
+                let r = try await work()
+                let e = edit(r)
+                if !e.inverse.isEmpty {
+                    undoStack.append(UndoEntry(title: title, inverse: e.inverse))
+                    redoStack.removeAll()
+                }
+                succeeded(e)
+                return .success(r)
+            } catch {
+                lastError = Self.describe(error)
+                return .failure(error)
+            }
+        }
+        return try outcome.get()
+    }
+
     @discardableResult
     public func undo() async -> SidecarProtocol.EditResult? { await step(undo: true) }
 
