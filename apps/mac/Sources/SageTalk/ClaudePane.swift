@@ -217,6 +217,8 @@ private struct ToolRowView: View {
         case "talk_layout": "Layout"
         case "talk_state": "Canvas state"
         case "talk_materials": "Materials"
+        case "talk_insert_beat": "Insert beat"
+        case "talk_set_notes": "Notes"
         default: row.name
         }
     }
@@ -234,6 +236,8 @@ private struct ToolRowView: View {
         case "talk_layout": "list.number"
         case "talk_state": "scope"
         case "talk_materials": "books.vertical"
+        case "talk_insert_beat": "plus.rectangle.on.rectangle"
+        case "talk_set_notes": "text.bubble"
         default: "wrench.and.screwdriver"
         }
     }

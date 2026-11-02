@@ -23,7 +23,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import type {
   AppGotoParams, AppGotoResult, AppStateResult, AskDecision, AskParams, AskResult, BuildResult, ClaudeInterruptResult,
-  ClaudeNotificationName, ClaudeNotifications, ClaudeSendParams, ClaudeSendResult, LayoutResult,
+  ClaudeNotificationName, ClaudeNotifications, ClaudeSendParams, ClaudeSendResult, EditParams, EditResult, LayoutResult,
 } from '../protocol.ts';
 import type { Log } from '../rpc.ts';
 import { locateBeat } from './beat-locator.ts';
@@ -46,7 +46,7 @@ export const SYSTEM_APPEND = [
   'You are the assistant pane of SAGE, a Mac app for editing, presenting and publishing Kevin Moran\'s animation-first research talk films.',
   'The working directory is a sage-talk/1 talk: talk.json (the spine: chapters, beats, holds, notes), scenes/*.html, beats/*.js (motion), lib/*.js, theme.css. build/ is generated.',
   'The user is watching the canvas while you work: every file you save is rebuilt and reloaded, and the canvas follows the beat you last edited.',
-  'Use the academic-talk-film skill for the format, style and voice. Use the talk tools: talk_layout for holds and diagnostics, talk_goto to show the user a beat, talk_frame to look at frames (it builds and renders with Chromium; then Read the PNG), talk_state for what the user is looking at, talk_materials for the paper.',
+  'Use the academic-talk-film skill for the format, style and voice. Use the talk tools: talk_layout for holds and diagnostics, talk_goto to show the user a beat, talk_frame to look at frames (it builds and renders with Chromium; then Read the PNG), talk_state for what the user is looking at, talk_materials for the paper, talk_insert_beat to add a beat and talk_set_notes to change presenter notes (both keep talk.json valid; do not hand-edit those parts of talk.json).',
   'Do not start browsers, servers or headless Chrome yourself. Keep replies short; the user sees your tool calls.',
 ].join('\n');
 
@@ -58,6 +58,8 @@ export interface BridgeHost {
   spine(): Promise<{ materials?: Record<string, string>; chapters?: { id: string; scene?: string; motion?: string; beats?: { id: string }[] }[] }>;
   layout(): Promise<LayoutResult>;
   build(): Promise<BuildResult>;
+  /** The sidecar's talk.edit, labelled as Claude's write (the spine tools). */
+  edit?(p: EditParams): Promise<EditResult>;
   expectWrite(rel: string, content: string | null, author: 'claude'): void;
   notify<N extends ClaudeNotificationName>(method: N, params: ClaudeNotifications[N]): void;
   /** sidecar -> app request (app.ask, app.state, app.goto). */
@@ -150,6 +152,8 @@ export class ClaudeBridge {
       layout: () => host.layout(),
       build: () => host.build(),
       materials: () => this.materials,
+      spine: () => host.spine(),
+      ...(host.edit ? { edit: (p: EditParams) => host.edit!(p) } : {}),
       app: {
         state: () => this.appRequest<AppStateResult>('app.state', {}),
         goto: (p: AppGotoParams) => this.appRequest<AppGotoResult>('app.goto', p),

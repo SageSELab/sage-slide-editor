@@ -98,11 +98,15 @@ export class Session {
     atomicAppWrite(t.watcher, t.root, rel, content);
   }
 
-  /** talk.edit: apply one source edit, rebuild, return the inverse (PLAN 4). */
-  async edit(p: EditParams): Promise<EditResult> {
+  /**
+   * talk.edit: apply one source edit, rebuild, return the inverse (PLAN 4). The Claude bridge's
+   * spine tools pass author 'claude', so the watcher reports the change as Claude's (the app
+   * badges the beat and clears its own undo stack, as for Claude's file edits).
+   */
+  async edit(p: EditParams, author: WriteAuthor = 'app'): Promise<EditResult> {
     this.requireBeatFormat('talk.edit');
     const t = this.requireTalk();
-    return this.afterWrite(t, applyEdit(t.root, t.watcher, p));
+    return this.afterWrite(t, applyEdit(t.root, t.watcher, p, author), author);
   }
 
   /** talk.revert: apply an inverse unless its files changed since (EditConflict). */
@@ -112,12 +116,12 @@ export class Session {
     return this.afterWrite(t, applyInverse(t.root, t.watcher, inv));
   }
 
-  private async afterWrite(t: OpenTalk, a: Applied): Promise<EditResult> {
+  private async afterWrite(t: OpenTalk, a: Applied, author: WriteAuthor = 'app'): Promise<EditResult> {
     const result: EditResult = { inverse: a.inverse, changed: a.changed, ok: true, diagnostics: [] };
     if (a.stretch) result.stretch = a.stretch;
     if (!a.changed.length) return result;
     // The watcher will report these paths as 'app'; this build already covers them.
-    for (const f of a.changed) this.builtByEdit.add(f);
+    if (author === 'app') for (const f of a.changed) this.builtByEdit.add(f);
     const b = await this.enqueueBuild('edit');
     result.ok = b.ok;
     result.diagnostics = b.diagnostics;

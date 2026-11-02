@@ -15,7 +15,7 @@ import {
   type Edit, type LoadedTalk, type Patch, type SourceFile,
 } from '@sage/core';
 import { ErrorCode, RpcError, type EditParams, type Inverse, type StretchSkip } from './protocol.ts';
-import type { TalkWatcher } from './watcher.ts';
+import type { TalkWatcher, WriteAuthor } from './watcher.ts';
 
 export const sha256 = (s: string | Buffer) => createHash('sha256').update(s).digest('hex');
 
@@ -118,7 +118,7 @@ function safePath(root: string, rel: string): string {
  * Writes the new texts: each announced to the watcher and staged under .sage/tmp, then all
  * renamed into place, so a failure while staging leaves every file untouched.
  */
-export function writeAll(root: string, watcher: TalkWatcher | null, texts: ReadonlyMap<string, string>) {
+export function writeAll(root: string, watcher: TalkWatcher | null, texts: ReadonlyMap<string, string>, author: WriteAuthor = 'app') {
   const tmpDir = path.join(root, '.sage', 'tmp');
   fs.mkdirSync(tmpDir, { recursive: true });
   const staged: [tmp: string, abs: string][] = [];
@@ -133,31 +133,34 @@ export function writeAll(root: string, watcher: TalkWatcher | null, texts: Reado
     for (const [tmp] of staged) fs.rmSync(tmp, { force: true });
     throw e;
   }
-  for (const [rel, text] of texts) watcher?.expectWrite(rel, text);
+  for (const [rel, text] of texts) watcher?.expectWrite(rel, text, author);
   for (const [tmp, abs] of staged) fs.renameSync(tmp, abs);
 }
 
 /** Applies patches (against the given current texts) to disk and returns the inverse. */
-function commit(root: string, watcher: TalkWatcher | null, current: ReadonlyMap<string, string>, patches: readonly Patch[]): Applied {
+function commit(root: string, watcher: TalkWatcher | null, current: ReadonlyMap<string, string>, patches: readonly Patch[], author: WriteAuthor = 'app'): Applied {
   const texts = Object.fromEntries(current);
   let e: Edit;
   try { e = makeEdit(texts, patches); } catch (err) { return failed(err); }
   const next = new Map<string, string>();
   for (const f of new Set(e.patches.map((p) => p.file))) next.set(f, applyPatches(texts[f]!, e.patches, f));
-  writeAll(root, watcher, next);
+  writeAll(root, watcher, next, author);
   const digests: Record<string, string> = {};
   for (const [f, t] of next) digests[f] = sha256(t);
   return { changed: [...next.keys()].sort(), inverse: { patches: e.inverse, digests } };
 }
 
-/** talk.edit: compute against disk, write atomically, return the inverse. */
-export function applyEdit(root: string, watcher: TalkWatcher | null, p: EditParams): Applied {
+/**
+ * talk.edit: compute against disk, write atomically, return the inverse. `author` labels the
+ * writes for the watcher: 'app' for the user's edits, 'claude' for the Claude pane's spine tools.
+ */
+export function applyEdit(root: string, watcher: TalkWatcher | null, p: EditParams, author: WriteAuthor = 'app'): Applied {
   const talk = loadTalk(root);
   if (!talk.spine) throw new RpcError(ErrorCode.EditFailed, `talk.json cannot be loaded: ${talk.diagnostics.find((d) => d.severity === 'error')?.message ?? 'invalid'}`, { code: 'invalid-spine' });
   const e = computeEdit(talk, p);
   const current = new Map<string, string>();
   for (const f of new Set(e.patches.map((x) => x.file))) current.set(f, fs.readFileSync(safePath(root, f), 'utf8'));
-  const out = commit(root, watcher, current, e.patches);
+  const out = commit(root, watcher, current, e.patches, author);
   return e.stretch ? { ...out, stretch: e.stretch } : out;
 }
 

@@ -59,11 +59,22 @@ export function summarize(name: string, input: Record<string, unknown>, talkRoot
       return { summary: (a || 'current time') + (typeof input.around === 'number' ? ` ±${input.around} s` : '') };
     }
     case 'talk_goto': return { summary: at(input) };
+    case 'talk_insert_beat': {
+      const where = s(input.after) ? `after ${s(input.after)}` : s(input.chapter) ? `in ${s(input.chapter)}` : '';
+      return { summary: [`${s(input.id)} "${truncate(s(input.label), 40)}"`, where].filter(Boolean).join(' ') };
+    }
+    case 'talk_set_notes': return { summary: s(input.beat) };
     default: {
       const first = Object.values(input).find((v) => typeof v === 'string') as string | undefined;
       return { summary: first ? truncate(first, 80) : '' };
     }
   }
+}
+
+/** The app's spine tools; their result names the beat they changed (for the canvas to follow). */
+export const SPINE_TOOLS = new Set(['talk_insert_beat', 'talk_set_notes']);
+export function spineToolBeat(result: string): string | undefined {
+  return /^(?:Inserted beat|Set the notes of) ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/.exec(result)?.[1];
 }
 
 function resultText(content: unknown): string {
@@ -224,6 +235,7 @@ export class Translator {
       if (c.status !== 'denied') {
         c.status = b.is_error === true ? 'error' : 'done';
         if (c.status === 'done' && c.path && WRITE_TOOLS.has(c.name)) { const b = this.o.locateBeat?.(c.path, c.input); if (b) c.beat = b; }
+        if (c.status === 'done' && SPINE_TOOLS.has(c.name)) { const b = spineToolBeat(text); if (b) c.beat = b; }
       }
       this.emitTool(id, c, text);
     }

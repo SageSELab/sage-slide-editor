@@ -89,6 +89,7 @@ function claudeBridge(): ClaudeBridge {
     spine: () => session.spine(),
     layout: () => session.layout(),
     build: () => session.build(),
+    edit: (p) => session.edit(p, 'claude'),
     expectWrite: (rel, content, author) => session.expectWrite(rel, content, author),
     notify: (m, p) => peer.notify(m, p),
     request: (m, p, timeoutMs) => peer.request(m, p, timeoutMs),

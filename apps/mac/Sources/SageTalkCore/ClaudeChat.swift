@@ -130,11 +130,14 @@ public final class ClaudeChat {
         } else {
             entries.append(.tool(row))
         }
-        if row.status == .done, let beat = row.beat, ["Write", "Edit", "MultiEdit", "NotebookEdit"].contains(row.name) {
+        if row.status == .done, let beat = row.beat, Self.editingTools.contains(row.name) {
             lastEditedBeat = beat
             if followsClaude { onEditedBeat?(beat) }
         }
     }
+
+    /// Tools whose finished row names a beat Claude changed: file edits and the app's spine tools.
+    public static let editingTools: Set<String> = ["Write", "Edit", "MultiEdit", "NotebookEdit", "talk_insert_beat", "talk_set_notes"]
 
     private func notice(_ text: String, isError: Bool) {
         entries.append(.notice(id: take(), text: text, isError: isError))

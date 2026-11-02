@@ -93,6 +93,24 @@ private actor Sent {
         #expect(followed.isEmpty)
     }
 
+    /// talk_insert_beat / talk_set_notes rows name the beat they changed (the sidecar's
+    /// claude-spine-tools test produces these params): the canvas follows them like file edits.
+    @Test func spineToolRowsAreFollowed() async throws {
+        let chat = ClaudeChat()
+        var followed: [String] = []
+        chat.onEditedBeat = { followed.append($0) }
+        let running = ClaudeProtocol.ToolParams(id: "tu9", name: "talk_insert_beat", summary: "numbers \"Two numbers\" after results.overview", status: .running)
+        chat.apply(method: ClaudeProtocol.Notification.tool, params: try JSONValue.encoding(running))
+        #expect(followed.isEmpty)
+        let done = ClaudeProtocol.ToolParams(id: "tu9", name: "talk_insert_beat", summary: running.summary, status: .done, detail: "Inserted beat results.numbers", beat: "results.numbers")
+        chat.apply(method: ClaudeProtocol.Notification.tool, params: try JSONValue.encoding(done))
+        let notes = ClaudeProtocol.ToolParams(id: "tu10", name: "talk_set_notes", summary: "39", status: .done, beat: "results.overview")
+        chat.apply(method: ClaudeProtocol.Notification.tool, params: try JSONValue.encoding(notes))
+        #expect(followed == ["results.numbers", "results.overview"])
+        #expect(chat.lastEditedBeat == "results.overview")
+        #expect(chat.entries.count == 2)
+    }
+
     @Test func permissionCardsQueueAndResolve() async throws {
         let chat = ClaudeChat()
         let fixture = try JSONDecoder().decode(RPCMessage.self, from: Data(contentsOf: RPCFixtures.directory.appendingPathComponent("claude/app.ask.request.json")))
