@@ -194,4 +194,7 @@ row() { printf '%9.1f MB  %s\n' "$(echo "$(kb "$1") / 1024" | bc -l)" "$2"; }
   row "$SIDE/engine" "  engine"
   row "$APP/Contents/MacOS" "  Swift app executable"
 } | tee "$MAC/build/package-size.txt" >&2
+# Keep build copies out of Launchpad and Spotlight's app list: only /Applications should show.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -u "$APP" >/dev/null 2>&1 || true
 echo "$APP"

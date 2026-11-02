@@ -32,4 +32,7 @@ printf '%s\n' "$REPO" > "$APP/Contents/Resources/sage-repo-path"
 NODE="${SAGE_NODE:-$(command -v node || true)}"
 if [ -n "$NODE" ]; then printf '%s\n' "$NODE" > "$APP/Contents/Resources/sage-node-path"; fi
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
+# Keep build copies out of Launchpad and Spotlight's app list: only /Applications should show.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -u "$PWD/$APP" >/dev/null 2>&1 || true
 echo "$APP"

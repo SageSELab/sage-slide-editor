@@ -10,6 +10,9 @@ TALK="$(cd "$1" && pwd)"; OUT="${2:-build/selftest}"
 rm -rf "$OUT"; mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 APP=$(bash scripts/bundle.sh debug | tail -1)
 SAGE_OPEN="$TALK" SAGE_SELFTEST="$OUT" "$APP/Contents/MacOS/SageTalk"
+# Keep build copies out of Launchpad and Spotlight's app list: only /Applications should show.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -u "$PWD/$APP" >/dev/null 2>&1 || true
 ls "$OUT"
 cat "$OUT/result.txt"
 ! grep -q '^FAIL' "$OUT/result.txt"

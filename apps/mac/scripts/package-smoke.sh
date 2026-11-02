@@ -24,6 +24,9 @@ REPO="$(cd ../.. && pwd)"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/sage-smoke.XXXXXX")"
 WORK="$(cd "$WORK" && pwd -P)"
+# The temp copy stays on disk with the results, but must not linger in Launchpad or Spotlight.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+trap '"$LSREGISTER" -u "$WORK/SAGE Talk.app" >/dev/null 2>&1 || true' EXIT
 APP="$WORK/SAGE Talk.app"
 SIDE="$APP/Contents/Resources/sidecar"
 OUT="$WORK/out"
