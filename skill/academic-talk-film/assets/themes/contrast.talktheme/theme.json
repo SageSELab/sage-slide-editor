@@ -1,0 +1,72 @@
+{
+  "format": "sage-theme/1",
+  "id": "contrast",
+  "name": "High Contrast",
+  "description": "For bright rooms and weak projectors: pure black on white, saturated accents, heavy Inter headings and Atkinson Hyperlegible text; a black dark passage with white ink.",
+  "author": "SAGE Lab",
+  "light": {
+    "bg": "#ffffff",
+    "ink": "#000000",
+    "ink2": "#1f1f1f",
+    "ink3": "#4d4d4d",
+    "line": "rgba(0, 0, 0, 0.3)",
+    "panel": "rgba(0, 0, 0, 0.05)",
+    "accent1": "#0040ff",
+    "accent2": "#c00070",
+    "accent3": "#d03000"
+  },
+  "dark": {
+    "bg": "#000000",
+    "ink": "#ffffff",
+    "ink2": "#e6e6e6",
+    "ink3": "#b3b3b3",
+    "line": "rgba(255, 255, 255, 0.35)",
+    "panel": "rgba(255, 255, 255, 0.1)",
+    "accent1": "#5c8aff",
+    "accent2": "#ff4fa8",
+    "accent3": "#ff7a3d"
+  },
+  "fonts": {
+    "display": {
+      "family": "Inter",
+      "fallback": "system-ui, -apple-system, sans-serif",
+      "source": "google",
+      "id": "inter",
+      "weights": [
+        700,
+        800
+      ]
+    },
+    "body": {
+      "family": "Atkinson Hyperlegible",
+      "fallback": "system-ui, -apple-system, sans-serif",
+      "source": "google",
+      "id": "atkinson-hyperlegible",
+      "weights": [
+        400,
+        700
+      ]
+    },
+    "mono": {
+      "family": "IBM Plex Mono",
+      "fallback": "Menlo, ui-monospace, monospace",
+      "source": "google",
+      "id": "ibm-plex-mono",
+      "weights": [
+        400,
+        600
+      ]
+    }
+  },
+  "type": {
+    "xl": 124,
+    "l": 92,
+    "m": 62,
+    "s": 42,
+    "sub": 36,
+    "cap": 28,
+    "eyebrow": 28,
+    "headingWeight": 800,
+    "headingTracking": 0.7
+  }
+}

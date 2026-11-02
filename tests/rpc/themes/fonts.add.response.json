@@ -1,0 +1,51 @@
+{
+  "jsonrpc": "2.0",
+  "id": 8,
+  "result": {
+    "family": "Lora",
+    "fontFamily": "Lora, Georgia, \"Times New Roman\", serif",
+    "files": [
+      "assets/fonts/lora-latin-400-normal.woff2",
+      "assets/fonts/lora-latin-400-italic.woff2",
+      "assets/fonts/lora-latin-700-normal.woff2",
+      "assets/fonts/lora-latin-700-italic.woff2"
+    ],
+    "edit": {
+      "inverse": {
+        "patches": [
+          {
+            "file": "theme.css",
+            "range": [
+              0,
+              14
+            ],
+            "newText": ""
+          }
+        ],
+        "digests": {
+          "theme.css": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "changed": [
+        "assets/fonts/lora-latin-400-italic.woff2",
+        "assets/fonts/lora-latin-400-normal.woff2",
+        "assets/fonts/lora-latin-700-italic.woff2",
+        "assets/fonts/lora-latin-700-normal.woff2",
+        "theme.css"
+      ],
+      "ok": true,
+      "diagnostics": [],
+      "holds": [
+        {
+          "index": 1,
+          "at": 5,
+          "label": "Title",
+          "backup": false,
+          "beat": "title.title",
+          "chapter": "title",
+          "auto": false
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "format": "sage-theme/1",
+  "id": "slate",
+  "name": "Slate",
+  "description": "Cool and technical: blue-grey slides, slate ink, teal and indigo accents, Space Grotesk headings over IBM Plex Sans; a midnight-navy dark passage.",
+  "author": "SAGE Lab",
+  "light": {
+    "bg": "#f6f8fb",
+    "ink": "#0f172a",
+    "ink2": "#334155",
+    "ink3": "#64748b",
+    "line": "rgba(15, 23, 42, 0.12)",
+    "panel": "rgba(15, 23, 42, 0.04)",
+    "accent1": "#0d9488",
+    "accent2": "#6366f1",
+    "accent3": "#f43f5e"
+  },
+  "dark": {
+    "bg": "#0b1120",
+    "ink": "#f1f5f9",
+    "ink2": "#94a3b8",
+    "ink3": "#64748b",
+    "line": "rgba(148, 163, 184, 0.2)",
+    "panel": "rgba(148, 163, 184, 0.08)",
+    "accent1": "#2dd4bf",
+    "accent2": "#818cf8"
+  },
+  "fonts": {
+    "display": {
+      "family": "Space Grotesk",
+      "fallback": "system-ui, -apple-system, sans-serif",
+      "source": "google",
+      "id": "space-grotesk",
+      "weights": [
+        600,
+        700
+      ]
+    },
+    "body": {
+      "family": "IBM Plex Sans",
+      "fallback": "system-ui, -apple-system, sans-serif",
+      "source": "google",
+      "id": "ibm-plex-sans",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    "mono": {
+      "family": "IBM Plex Mono",
+      "fallback": "Menlo, ui-monospace, monospace",
+      "source": "google",
+      "id": "ibm-plex-mono",
+      "weights": [
+        400,
+        600
+      ]
+    }
+  },
+  "type": {
+    "xl": 124,
+    "l": 92,
+    "m": 62,
+    "s": 40,
+    "sub": 34,
+    "cap": 26,
+    "eyebrow": 26,
+    "headingWeight": 700,
+    "headingTracking": 0.6
+  }
+}

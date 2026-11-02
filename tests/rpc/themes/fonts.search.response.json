@@ -1,0 +1,36 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "fonts": [
+      {
+        "id": "lora",
+        "family": "Lora",
+        "category": "serif",
+        "weights": [
+          400,
+          500,
+          600,
+          700
+        ],
+        "styles": [
+          "italic",
+          "normal"
+        ],
+        "subsets": [
+          "cyrillic",
+          "cyrillic-ext",
+          "latin",
+          "latin-ext",
+          "math",
+          "symbols",
+          "vietnamese"
+        ],
+        "defSubset": "latin",
+        "variable": true,
+        "license": "OFL-1.1"
+      }
+    ],
+    "catalog": "cache"
+  }
+}

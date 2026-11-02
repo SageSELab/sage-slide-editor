@@ -9,7 +9,8 @@ import {
   type BuildResult, type BuildTrigger, type BuiltParams, type ChangedParams, type LayoutResult, type OpenParams,
   type OpenResult, type TalkKind, type EditParams, type EditResult, type Inverse,
 } from './protocol.ts';
-import { applyEdit, applyInverse, type Applied } from './edit.ts';
+import { applyComputed, applyEdit, applyInverse, type Applied } from './edit.ts';
+import type { Patch } from '@sage/core';
 import type { Log } from './rpc.ts';
 import { TalkWatcher, atomicAppWrite, type WatchBatch, type WriteAuthor } from './watcher.ts';
 
@@ -107,6 +108,18 @@ export class Session {
     this.requireBeatFormat('talk.edit');
     const t = this.requireTalk();
     return this.afterWrite(t, applyEdit(t.root, t.watcher, p, author), author);
+  }
+
+  /**
+   * theme.apply, fonts.add: an edit computed from the current texts of `files` (missing ones
+   * read as ''), plus binary files (fonts) written first. Rebuilds and returns the inverse,
+   * like talk.edit; the inverse restores the text files only.
+   */
+  async computedEdit(method: string, files: readonly string[], make: (texts: Readonly<Record<string, string>>) => Patch[],
+    binaries: readonly { rel: string; content: Buffer }[] = [], author: WriteAuthor = 'app'): Promise<EditResult> {
+    this.requireBeatFormat(method);
+    const t = this.requireTalk();
+    return this.afterWrite(t, applyComputed(t.root, t.watcher, files, make, binaries, author), author);
   }
 
   /** talk.revert: apply an inverse unless its files changed since (EditConflict). */

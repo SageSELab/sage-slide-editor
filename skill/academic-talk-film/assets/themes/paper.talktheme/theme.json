@@ -1,0 +1,74 @@
+{
+  "format": "sage-theme/1",
+  "id": "paper",
+  "name": "Paper",
+  "description": "Warm: cream slides, brown ink and burnt-orange accents, Fraunces serif headings over Source Sans; a deep warm-brown dark passage.",
+  "author": "SAGE Lab",
+  "light": {
+    "bg": "#faf6ef",
+    "ink": "#2a2118",
+    "ink2": "#5b4a3a",
+    "ink3": "#8a7764",
+    "line": "rgba(42, 33, 24, 0.14)",
+    "panel": "rgba(42, 33, 24, 0.045)",
+    "accent1": "#c2410c",
+    "accent2": "#a16207",
+    "accent3": "#be123c"
+  },
+  "dark": {
+    "bg": "#16110d",
+    "ink": "#f5ede3",
+    "ink2": "#c9b9a6",
+    "ink3": "#8c7b69",
+    "line": "rgba(255, 240, 220, 0.14)",
+    "panel": "rgba(255, 240, 220, 0.06)",
+    "accent1": "#fb923c",
+    "accent2": "#facc15"
+  },
+  "fonts": {
+    "display": {
+      "family": "Fraunces",
+      "fallback": "Georgia, \"Times New Roman\", serif",
+      "source": "google",
+      "id": "fraunces",
+      "weights": [
+        600,
+        700
+      ]
+    },
+    "body": {
+      "family": "Source Sans 3",
+      "fallback": "system-ui, -apple-system, sans-serif",
+      "source": "google",
+      "id": "source-sans-3",
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ]
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "fallback": "Menlo, ui-monospace, monospace",
+      "source": "google",
+      "id": "jetbrains-mono",
+      "weights": [
+        400,
+        600
+      ]
+    }
+  },
+  "type": {
+    "xl": 124,
+    "l": 92,
+    "m": 62,
+    "s": 40,
+    "sub": 34,
+    "cap": 26,
+    "eyebrow": 28,
+    "headingWeight": 600,
+    "headingTracking": 0.4
+  },
+  "css": ".code { background: #fdf9f3; }"
+}

@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 8,
+  "error": {
+    "code": -32031,
+    "message": "Lora 100 normal: Lora has no latin 100 normal (weights 400, 500, 600, 700; styles italic, normal; subsets latin).",
+    "data": {
+      "code": "variant"
+    }
+  }
+}

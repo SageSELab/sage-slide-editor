@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "ok": false,
+    "problems": [
+      "light.bg: must be a plain CSS value (no ; { } < > or comments)",
+      "fonts.display.id: google fonts need their Fontsource id"
+    ],
+    "missingFonts": []
+  }
+}

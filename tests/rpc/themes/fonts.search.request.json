@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "fonts.search",
+  "params": {
+    "query": "lor",
+    "category": "serif",
+    "limit": 20
+  }
+}

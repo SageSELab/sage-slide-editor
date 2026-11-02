@@ -1,0 +1,54 @@
+{
+  "format": "sage-theme/1",
+  "id": "sage",
+  "name": "SAGE",
+  "description": "The default look: white slides, near-black ink and blue accents, Manrope headings; a black dark passage.",
+  "author": "SAGE Lab",
+  "light": {
+    "bg": "#ffffff",
+    "ink": "#1d1d1f",
+    "ink2": "#515154",
+    "ink3": "#86868b",
+    "line": "rgba(0, 0, 0, 0.12)",
+    "panel": "rgba(0, 0, 0, 0.035)",
+    "accent1": "#0a84ff",
+    "accent2": "#bf5af2",
+    "accent3": "#ff375f"
+  },
+  "dark": {
+    "bg": "#000",
+    "ink": "#f5f5f7",
+    "ink2": "#a1a1a6",
+    "ink3": "#6e6e73",
+    "line": "rgba(255, 255, 255, 0.14)",
+    "panel": "rgba(255, 255, 255, 0.06)"
+  },
+  "fonts": {
+    "display": {
+      "family": "Manrope",
+      "fallback": "-apple-system, \"SF Pro Display\", system-ui, sans-serif",
+      "source": "engine"
+    },
+    "body": {
+      "family": "SF Pro Text",
+      "fallback": "-apple-system, system-ui, \"Segoe UI\", Roboto, sans-serif",
+      "source": "system"
+    },
+    "mono": {
+      "family": "Menlo",
+      "fallback": "ui-monospace, \"SF Mono\", Consolas, monospace",
+      "source": "system"
+    }
+  },
+  "type": {
+    "xl": 124,
+    "l": 92,
+    "m": 62,
+    "s": 40,
+    "sub": 34,
+    "cap": 26,
+    "eyebrow": 28,
+    "headingWeight": 700,
+    "headingTracking": 1
+  }
+}

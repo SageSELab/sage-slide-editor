@@ -18,6 +18,9 @@ import { publishParamCheckers, type PublishMethodName } from './protocol.ts';
 import { RpcPeer, type Log } from './rpc.ts';
 import { Session } from './session.ts';
 import { checkSetup, installBrowser } from './setup.ts';
+import { THEME_CONCURRENT, themeParamCheckers, type ThemeMethodName } from './protocol.ts';
+import { FontCatalog, Themer, builtinThemesDir } from './themes/index.ts';
+import { DEFAULT_PLUGIN_DIR } from './claude/bridge.ts';
 
 const VERSION = '0.0.0';
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 } as const;
@@ -78,6 +81,31 @@ method('talk.watch', (p: WatchParams) => ({ watching: session.setWatching(p.enab
 // Editing (Phase 3)
 method('talk.edit', (p: EditParams) => session.edit(p));
 method('talk.revert', (p: Inverse) => session.revert(p));
+
+// --- Themes and fonts ------------------------------------------------------------------------
+// theme.apply, theme.extract, fonts.add and fonts.list are queued like edits; the others need no
+// talk and skip the queue (a font download must not hold up a build).
+const themer = new Themer({
+  get root() { return session.root; },
+  get kind() { return session.kind; },
+  spine: () => session.spine(),
+  computedEdit: (method, files, make, binaries, author) => session.computedEdit(method, files, make, binaries, author),
+}, { builtins: builtinThemesDir(process.env.SAGE_PLUGIN_DIR ?? DEFAULT_PLUGIN_DIR), catalog: new FontCatalog({ log: (level, msg) => log(level, msg) }) });
+function themeMethod<M extends ThemeMethodName>(name: M, fn: (params: never) => unknown) {
+  peer.handle(name, (params) => {
+    if (shuttingDown) throw new RpcError(ErrorCode.ShuttingDown, 'sidecar is shutting down');
+    const problems = themeParamCheckers[name](params);
+    if (problems.length) throw new RpcError(ErrorCode.InvalidParams, problems.join('; '), { problems });
+    return fn(params as never);
+  }, { concurrent: THEME_CONCURRENT.includes(name) });
+}
+themeMethod('theme.validate', (p) => themer.validate(p));
+themeMethod('theme.save', (p) => themer.save(p));
+themeMethod('theme.apply', (p) => themer.apply(p));
+themeMethod('theme.extract', (p) => themer.extract(p ?? {}));
+themeMethod('fonts.search', (p) => themer.searchFonts(p));
+themeMethod('fonts.add', (p) => themer.addFont(p));
+themeMethod('fonts.list', () => themer.listFonts());
 
 // --- Claude bridge (Phase 4) ---------------------------------------------------------------
 // One bridge per open talk, created on the first claude.* call and closed with the talk.

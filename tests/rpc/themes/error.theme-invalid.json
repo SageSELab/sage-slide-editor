@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "error": {
+    "code": -32030,
+    "message": "slate.talktheme is not a valid sage-theme/1 theme: light.bg: must be a plain CSS value (no ; { } < > or comments)",
+    "data": {
+      "problems": [
+        "light.bg: must be a plain CSS value (no ; { } < > or comments)"
+      ]
+    }
+  }
+}

@@ -11,6 +11,8 @@
 // apps/mac/Sources/SageTalkCore/SidecarClient.swift, and both sides decode the fixtures in
 // tests/rpc/*.json.
 
+import { parseTheme, type Theme } from '@sage/core';
+
 export const JSONRPC = '2.0' as const;
 /** Bumped on any incompatible change; reported by app.ping. */
 export const PROTOCOL_VERSION = 1 as const;
@@ -409,7 +411,7 @@ export function checkInverse(v: unknown, at: string): Problems {
   ];
 }
 
-function checkEditResult(r: unknown): Problems {
+export function checkEditResult(r: unknown): Problems {
   if (!isObj(r)) return ['result: expected an object'];
   const s = r.stretch;
   return [
@@ -1104,4 +1106,218 @@ export const setupNotificationCheckers: { [N in SetupNotificationName]: (p: unkn
     ...want(isNum(v.fraction) && v.fraction >= 0 && v.fraction <= 1, 'params.fraction: expected a number in 0...1'),
     ...strs(v, ['message'], 'params'),
   ]),
+};
+
+// =======================================================================================
+// Themes and fonts (docs/rpc.md "Themes and fonts"): sage-theme/1 packages (.talktheme
+// folders), applying one to the open talk, and Google fonts embedded into assets/fonts.
+// Fixtures: tests/rpc/themes/, checked by themes-protocol.test.ts and ThemeProtocolTests.swift.
+// theme.validate, theme.save and fonts.search need no open talk and skip the request queue.
+// =======================================================================================
+
+/** theme.json of a .talktheme (sage-theme/1; the schema is @sage/core's ThemeSchema). */
+export type ThemeDoc = Theme;
+
+export interface ThemeValidateParams {
+  /** An absolute path to a .talktheme folder, or ... */
+  path?: string;
+  /** ... a theme.json object. Exactly one of the two. */
+  theme?: unknown;
+}
+export interface ThemeValidateResult {
+  ok: boolean;
+  /** `field.path: message`, empty when ok. */
+  problems: string[];
+  /** The parsed theme (when its theme.json is valid). */
+  theme?: ThemeDoc;
+  /** Font files the package should hold and does not (path only); they are downloaded on save or apply. */
+  missingFonts: string[];
+}
+
+export interface ThemeSaveParams {
+  /** Absolute path ending in .talktheme; created or replaced. */
+  path: string;
+  theme: unknown;
+}
+export interface ThemeSaveResult {
+  path: string;
+  theme: ThemeDoc;
+  /** Package-relative font files (fonts/<file>.woff2). */
+  fonts: string[];
+}
+
+export interface ThemeApplyParams {
+  /** Absolute path of a .talktheme folder. */
+  path: string;
+}
+export interface ThemeApplyResult {
+  theme: ThemeDoc;
+  /** Talk-relative font files the theme embeds (assets/fonts/...). */
+  fonts: string[];
+  /** As talk.edit: talk.revert with edit.inverse restores the theme.css that was there. */
+  edit: EditResult;
+}
+
+export interface ThemeExtractParams {
+  /** Write the talk's theme there as a .talktheme (absolute, ending in .talktheme). Absent: only return it. */
+  path?: string;
+  id?: string;
+  name?: string;
+  description?: string;
+}
+export interface ThemeExtractResult {
+  theme: ThemeDoc;
+  path?: string;
+  fonts: string[];
+}
+
+export interface FontInfoWire {
+  id: string;
+  family: string;
+  category: string;
+  weights: number[];
+  styles: string[];
+  subsets: string[];
+  defSubset: string;
+  variable: boolean;
+  license: string;
+}
+export interface FontsSearchParams {
+  /** Family name or part of it; empty: a suggested list. */
+  query: string;
+  category?: string;
+  /** Default 40, at most 200. */
+  limit?: number;
+}
+export interface FontsSearchResult {
+  fonts: FontInfoWire[];
+  /** Where the catalog came from: the cache, the network, or a stale cache (offline). */
+  catalog: 'cache' | 'network' | 'stale';
+}
+
+export interface FontsAddParams {
+  /** Fontsource id from fonts.search. */
+  id: string;
+  /** Default: 400 and 700 where the font has them. */
+  weights?: number[];
+  /** Default ['normal']. */
+  styles?: ('normal' | 'italic')[];
+  /** Default latin. */
+  subset?: string;
+}
+export interface FontsAddResult {
+  family: string;
+  /** The CSS font-family value to use: the family quoted, then a fallback for its category. */
+  fontFamily: string;
+  /** Talk-relative files (assets/fonts/...). */
+  files: string[];
+  edit: EditResult;
+}
+
+export interface EmbeddedFont { family: string; id: string; subset: string; weights: number[]; styles: string[]; files: string[] }
+export interface FontsListResult { fonts: EmbeddedFont[] }
+
+export interface ThemeMethods {
+  'theme.validate': { params: ThemeValidateParams; result: ThemeValidateResult };
+  /** Writes a .talktheme (theme.json, generated theme.css, fonts/ downloaded as needed). */
+  'theme.save': { params: ThemeSaveParams; result: ThemeSaveResult };
+  /** Restyles the open talk: fonts into assets/fonts, the theme blocks into theme.css, then rebuilds. */
+  'theme.apply': { params: ThemeApplyParams; result: ThemeApplyResult };
+  /** The open talk's current theme; with path, saved as a .talktheme. */
+  'theme.extract': { params: ThemeExtractParams | undefined; result: ThemeExtractResult };
+  'fonts.search': { params: FontsSearchParams; result: FontsSearchResult };
+  /** Downloads a Google font into assets/fonts and adds its @font-face rules (the fonts block). */
+  'fonts.add': { params: FontsAddParams; result: FontsAddResult };
+  'fonts.list': { params: Empty | undefined; result: FontsListResult };
+}
+export type ThemeMethodName = keyof ThemeMethods;
+export const THEME_METHOD_NAMES: readonly ThemeMethodName[] = ['theme.validate', 'theme.save', 'theme.apply', 'theme.extract', 'fonts.search', 'fonts.add', 'fonts.list'];
+/** These need no open talk and skip the request queue. */
+export const THEME_CONCURRENT: readonly ThemeMethodName[] = ['theme.validate', 'theme.save', 'fonts.search'];
+
+export const ThemeErrorCode = {
+  /** theme.save / theme.apply: the theme does not validate. data.problems. */
+  ThemeInvalid: -32030,
+  /** A font could not be found, embedded (license) or downloaded. data.code: unknown-font, license, variant, network, not-woff2. */
+  FontFailed: -32031,
+} as const;
+
+const themePath = (v: unknown) => absPath(v) && String(v).endsWith('.talktheme') && !String(v).split('/').includes('..');
+const isWeight = (w: unknown) => isInt(w) && w >= 100 && w <= 900 && w % 100 === 0;
+const FONT_STYLES = ['normal', 'italic'];
+const checkThemeDoc = (v: unknown, at: string): Problems => parseTheme(v).problems.map((p) => `${at}.${p}`);
+const checkFontInfo = (x: unknown, at: string) => shape(x, at, ['id', 'family', 'category', 'weights', 'styles', 'subsets', 'defSubset', 'variable', 'license'], [], (f) => [
+  ...strs(f, ['id', 'family', 'category', 'defSubset', 'license'], at),
+  ...checkList(f.weights, `${at}.weights`, (w, a) => want(isInt(w), `${a}: expected an integer`)),
+  ...strList(f.styles, `${at}.styles`), ...strList(f.subsets, `${at}.subsets`),
+  ...want(typeof f.variable === 'boolean', `${at}.variable: expected a boolean`),
+]);
+const fontFiles = (v: unknown, at: string, prefix: string) => checkList(v, at, (x, a) => want(typeof x === 'string' && x.startsWith(prefix) && x.endsWith('.woff2') && !x.includes('..'), `${a}: expected ${prefix}<file>.woff2`));
+
+export const themeParamCheckers: { [M in ThemeMethodName]: (p: unknown) => Problems } = {
+  'theme.validate': (p) => shape(p, 'params', [], ['path', 'theme'], (v) => [
+    ...want((v.path === undefined) !== (v.theme === undefined), 'params: expected exactly one of path, theme'),
+    ...want(v.path === undefined || themePath(v.path), 'params.path: expected an absolute .talktheme path'),
+  ]),
+  'theme.save': (p) => shape(p, 'params', ['path', 'theme'], [], (v) => [
+    ...want(themePath(v.path), 'params.path: expected an absolute .talktheme path'),
+    ...want(isObj(v.theme), 'params.theme: expected an object'),
+  ]),
+  'theme.apply': (p) => shape(p, 'params', ['path'], [], (v) => want(themePath(v.path), 'params.path: expected an absolute .talktheme path')),
+  'theme.extract': (p) => (p === undefined ? [] : shape(p, 'params', [], ['path', 'id', 'name', 'description'], (v) => [
+    ...want(v.path === undefined || themePath(v.path), 'params.path: expected an absolute .talktheme path'),
+    ...want(v.id === undefined || (typeof v.id === 'string' && /^[a-z0-9][a-z0-9-]{0,62}$/.test(v.id)), 'params.id: expected lowercase letters, digits and -'),
+    ...optStrAt(v, 'name', 'params'), ...optStrAt(v, 'description', 'params'),
+  ])),
+  'fonts.search': (p) => shape(p, 'params', ['query'], ['category', 'limit'], (v) => [
+    ...want(typeof v.query === 'string' && v.query.length <= 200, 'params.query: expected a string'),
+    ...optStrAt(v, 'category', 'params'),
+    ...want(v.limit === undefined || (isInt(v.limit) && v.limit >= 1 && v.limit <= 200), 'params.limit: expected 1...200'),
+  ]),
+  'fonts.add': (p) => shape(p, 'params', ['id'], ['weights', 'styles', 'subset'], (v) => [
+    ...want(typeof v.id === 'string' && /^[a-z0-9][a-z0-9-]{0,62}$/.test(v.id), 'params.id: expected a Fontsource id'),
+    ...want(v.weights === undefined || (Array.isArray(v.weights) && v.weights.length > 0 && v.weights.every(isWeight)), 'params.weights: expected weights 100...900'),
+    ...want(v.styles === undefined || (Array.isArray(v.styles) && v.styles.length > 0 && v.styles.every((s) => FONT_STYLES.includes(s as string))), "params.styles: expected 'normal' and/or 'italic'"),
+    ...want(v.subset === undefined || (typeof v.subset === 'string' && /^[a-z0-9-]+$/.test(v.subset)), 'params.subset: expected a subset name'),
+  ]),
+  'fonts.list': (p) => checkEmpty(p),
+};
+
+export const themeResultCheckers: { [M in ThemeMethodName]: (r: unknown) => Problems } = {
+  'theme.validate': (r) => shape(r, 'result', ['ok', 'problems', 'missingFonts'], ['theme'], (v) => [
+    ...want(typeof v.ok === 'boolean', 'result.ok: expected a boolean'),
+    ...strList(v.problems, 'result.problems'),
+    ...(v.theme === undefined ? [] : checkThemeDoc(v.theme, 'result.theme')),
+    ...fontFiles(v.missingFonts, 'result.missingFonts', 'fonts/'),
+  ]),
+  'theme.save': (r) => shape(r, 'result', ['path', 'theme', 'fonts'], [], (v) => [
+    ...want(themePath(v.path), 'result.path: expected an absolute .talktheme path'),
+    ...checkThemeDoc(v.theme, 'result.theme'),
+    ...fontFiles(v.fonts, 'result.fonts', 'fonts/'),
+  ]),
+  'theme.apply': (r) => shape(r, 'result', ['theme', 'fonts', 'edit'], [], (v) => [
+    ...checkThemeDoc(v.theme, 'result.theme'),
+    ...fontFiles(v.fonts, 'result.fonts', 'assets/fonts/'),
+    ...checkEditResult(v.edit).map((p) => p.replace(/^result/, 'result.edit')),
+  ]),
+  'theme.extract': (r) => shape(r, 'result', ['theme', 'fonts'], ['path'], (v) => [
+    ...checkThemeDoc(v.theme, 'result.theme'),
+    ...want(v.path === undefined || themePath(v.path), 'result.path: expected an absolute .talktheme path'),
+    ...fontFiles(v.fonts, 'result.fonts', 'fonts/'),
+  ]),
+  'fonts.search': (r) => shape(r, 'result', ['fonts', 'catalog'], [], (v) => [
+    ...checkList(v.fonts, 'result.fonts', checkFontInfo),
+    ...oneOf(v.catalog, ['cache', 'network', 'stale'], 'result.catalog'),
+  ]),
+  'fonts.add': (r) => shape(r, 'result', ['family', 'fontFamily', 'files', 'edit'], [], (v) => [
+    ...strs(v, ['family', 'fontFamily'], 'result'),
+    ...fontFiles(v.files, 'result.files', 'assets/fonts/'),
+    ...checkEditResult(v.edit).map((p) => p.replace(/^result/, 'result.edit')),
+  ]),
+  'fonts.list': (r) => shape(r, 'result', ['fonts'], [], (v) => checkList(v.fonts, 'result.fonts', (x, at) => shape(x, at, ['family', 'id', 'subset', 'weights', 'styles', 'files'], [], (f) => [
+    ...strs(f, ['family', 'id', 'subset'], at),
+    ...checkList(f.weights, `${at}.weights`, (w, a) => want(isWeight(w), `${a}: expected a weight`)),
+    ...strList(f.styles, `${at}.styles`),
+    ...fontFiles(f.files, `${at}.files`, 'assets/fonts/'),
+  ]))),
 };

@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "theme.apply",
+  "params": {
+    "path": "/Users/kevin/Library/Application Support/SAGE Talk/Themes/slate.talktheme"
+  }
+}

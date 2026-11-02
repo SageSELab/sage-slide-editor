@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 8,
+  "method": "fonts.add",
+  "params": {
+    "id": "lora",
+    "weights": [
+      400,
+      700
+    ],
+    "styles": [
+      "normal",
+      "italic"
+    ]
+  }
+}

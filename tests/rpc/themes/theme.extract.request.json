@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "theme.extract",
+  "params": {
+    "path": "/Users/kevin/Desktop/My Slate.talktheme",
+    "name": "My Slate"
+  }
+}

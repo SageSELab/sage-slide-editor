@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 9,
+  "result": {
+    "fonts": [
+      {
+        "family": "Lora",
+        "id": "lora",
+        "subset": "latin",
+        "weights": [
+          400,
+          700
+        ],
+        "styles": [
+          "normal",
+          "italic"
+        ],
+        "files": [
+          "assets/fonts/lora-latin-400-italic.woff2",
+          "assets/fonts/lora-latin-400-normal.woff2",
+          "assets/fonts/lora-latin-700-italic.woff2",
+          "assets/fonts/lora-latin-700-normal.woff2"
+        ]
+      }
+    ]
+  }
+}

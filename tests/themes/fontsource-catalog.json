@@ -1,0 +1,450 @@
+[
+ {
+  "id": "atkinson-hyperlegible",
+  "family": "Atkinson Hyperlegible",
+  "subsets": [
+   "latin",
+   "latin-ext"
+  ],
+  "weights": [
+   400,
+   700
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": false,
+  "lastModified": "2025-09-05",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "fraunces",
+  "family": "Fraunces",
+  "subsets": [
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700,
+   800,
+   900
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-10",
+  "category": "serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "ibm-plex-mono",
+  "family": "IBM Plex Mono",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": false,
+  "lastModified": "2025-09-16",
+  "category": "monospace",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "ibm-plex-sans",
+  "family": "IBM Plex Sans",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-08",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "inter",
+  "family": "Inter",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "greek-ext",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700,
+   800,
+   900
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-10",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "inter-tight",
+  "family": "Inter Tight",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "greek-ext",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700,
+   800,
+   900
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-16",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "jetbrains-mono",
+  "family": "JetBrains Mono",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700,
+   800
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-11",
+  "category": "monospace",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "lora",
+  "family": "Lora",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "latin",
+   "latin-ext",
+   "math",
+   "symbols",
+   "vietnamese"
+  ],
+  "weights": [
+   400,
+   500,
+   600,
+   700
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-11",
+  "category": "serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "manrope",
+  "family": "Manrope",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   200,
+   300,
+   400,
+   500,
+   600,
+   700,
+   800
+  ],
+  "styles": [
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-05",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "noto-sans-jp",
+  "family": "Noto Sans JP",
+  "subsets": [
+   "cyrillic",
+   "japanese",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700,
+   800,
+   900
+  ],
+  "styles": [
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2026-10-01",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "playfair-display",
+  "family": "Playfair Display",
+  "subsets": [
+   "cyrillic",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   400,
+   500,
+   600,
+   700,
+   800,
+   900
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-11",
+  "category": "serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "roboto-mono",
+  "family": "Roboto Mono",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   100,
+   200,
+   300,
+   400,
+   500,
+   600,
+   700
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2026-05-05",
+  "category": "monospace",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "source-sans-3",
+  "family": "Source Sans 3",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "greek-ext",
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   200,
+   300,
+   400,
+   500,
+   600,
+   700,
+   800,
+   900
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2026-10-01",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "space-grotesk",
+  "family": "Space Grotesk",
+  "subsets": [
+   "latin",
+   "latin-ext",
+   "vietnamese"
+  ],
+  "weights": [
+   300,
+   400,
+   500,
+   600,
+   700
+  ],
+  "styles": [
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": true,
+  "lastModified": "2025-09-05",
+  "category": "sans-serif",
+  "license": "OFL-1.1",
+  "type": "google"
+ },
+ {
+  "id": "ubuntu",
+  "family": "Ubuntu",
+  "subsets": [
+   "cyrillic",
+   "cyrillic-ext",
+   "greek",
+   "greek-ext",
+   "latin",
+   "latin-ext"
+  ],
+  "weights": [
+   300,
+   400,
+   500,
+   700
+  ],
+  "styles": [
+   "italic",
+   "normal"
+  ],
+  "defSubset": "latin",
+  "variable": false,
+  "lastModified": "2025-09-02",
+  "category": "sans-serif",
+  "license": "UFL-1.0",
+  "type": "google"
+ }
+]

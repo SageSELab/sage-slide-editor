@@ -118,7 +118,7 @@ function safePath(root: string, rel: string): string {
  * Writes the new texts: each announced to the watcher and staged under .sage/tmp, then all
  * renamed into place, so a failure while staging leaves every file untouched.
  */
-export function writeAll(root: string, watcher: TalkWatcher | null, texts: ReadonlyMap<string, string>, author: WriteAuthor = 'app') {
+export function writeAll(root: string, watcher: TalkWatcher | null, texts: ReadonlyMap<string, string | Buffer>, author: WriteAuthor = 'app') {
   const tmpDir = path.join(root, '.sage', 'tmp');
   fs.mkdirSync(tmpDir, { recursive: true });
   const staged: [tmp: string, abs: string][] = [];
@@ -180,4 +180,32 @@ export function applyInverse(root: string, watcher: TalkWatcher | null, inv: Inv
     throw new RpcError(ErrorCode.EditConflict, `${conflicts.join(', ')} changed since this edit; it can no longer be undone`, { files: conflicts });
   }
   return commit(root, watcher, current, inv.patches);
+}
+
+/**
+ * A computed text edit (theme.apply, fonts.add): `make` gets the current texts of `files`
+ * (a missing file reads as '', and is created) and returns patches against them. Binary files
+ * are written first, each announced and atomic, and are not part of the inverse: an undo
+ * restores the text files and leaves the extra files (fonts) in place, unreferenced.
+ */
+export function applyComputed(
+  root: string, watcher: TalkWatcher | null, files: readonly string[], make: (texts: Readonly<Record<string, string>>) => Patch[],
+  binaries: readonly { rel: string; content: Buffer }[] = [], author: WriteAuthor = 'app',
+): Applied {
+  const current = new Map<string, string>();
+  for (const f of files) {
+    const abs = safePath(root, f);
+    current.set(f, fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : '');
+  }
+  const patches = make(Object.fromEntries(current));
+  const written: string[] = [];
+  for (const b of binaries) {
+    const abs = safePath(root, b.rel);
+    if (fs.existsSync(abs) && fs.readFileSync(abs).equals(b.content)) continue;
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    writeAll(root, watcher, new Map([[b.rel, b.content]]), author);
+    written.push(b.rel);
+  }
+  const out = commit(root, watcher, current, patches, author);
+  return written.length ? { ...out, changed: [...new Set([...out.changed, ...written])].sort() } : out;
 }
