@@ -218,6 +218,25 @@ Fixtures: `talk.edit.request.<op>[-variant].json` (one per op), `talk.edit.respo
 `talk.revert.{request,response}.json`, `talk.built.notification.edit.json`,
 `error.edit-failed.json`, `error.edit-conflict.json`.
 
+### Canvas messages (WKScriptMessage, not RPC)
+
+In edit mode the app injects `packages/engine/src/canvas.js` into the canvas film (never into
+a build, a presentation or a published file). It posts `{kind: 'canvas', ...}` to the `sage`
+message handler; the app turns each into a `talk.edit`. Numbers are stage px (1920x1080),
+whole px; `left`/`top` are the element's CSS left/top.
+
+| `type` | Fields | App does |
+|---|---|---|
+| `select` | `{id: null}` or `{id, tag, left, top, width, height, fontSize, movable, editable, html, src}` | shows it in the inspector |
+| `move` | `{id, left, top}` (drag end, or arrow nudges after 300 ms of quiet) | `setStyle {left, top}` |
+| `resize` | `{id, left, top, width, height}` | `setStyle {left, top, width, height}` |
+| `text` | `{id, html}` (in-place edit committed and changed) | `setText` |
+| `refused` | `{id, reason: 'block-children'}` | says why the text cannot be edited in place |
+
+The app drives it with `SageCanvas.enable()`, `disable()`, `select(id, {silent})` (restores
+the selection after a reload) and `key(name, {shift})` (keys the app's menus catch first).
+`packages/engine/test/canvas.test.ts` records these messages in Playwright WebKit.
+
 ## Phase 4 additions (not in protocol 1)
 
 - Methods: `claude.send {text, attachments}`, `claude.interrupt`, `claude.respond {requestId,
