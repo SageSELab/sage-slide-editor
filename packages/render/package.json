@@ -1,0 +1,22 @@
+{
+  "name": "@sage/render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic frame rendering of compiled talk films in headless Chromium (talkc shoot, the talk_frame tool, exports)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "playwright": "1.64.1"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pixelmatch": "^8.0.0",
+    "pngjs": "^7.0.0"
+  }
+}
