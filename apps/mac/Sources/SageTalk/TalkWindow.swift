@@ -44,7 +44,6 @@ struct TalkWindow: View {
                 Button { model.prev() } label: { Label("Previous", systemImage: "backward.end.fill") }
                 Button { model.next() } label: { Label("Next Hold", systemImage: "play.fill") }
             }
-            ToolbarItem { EditModeButton(model: model) }
         }
     }
 
@@ -75,7 +74,7 @@ struct TalkWindow: View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
                 Color.black
-                if model.talk != nil { FilmViewRepresentable(film: model.canvas) }
+                if model.talk != nil { CanvasHost(model: model, anchor: model.formatBarAnchor) }
                 if let err = model.error {
                     // A failed rebuild keeps the last good film visible underneath.
                     Label(err, systemImage: "exclamationmark.triangle.fill")

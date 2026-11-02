@@ -30,12 +30,18 @@ final class TalkWindowModel {
     /// Navigator sections the user folded.
     var collapsed: Set<String> = []
 
-    // Editing (Phase 3; TalkWindowModel+Editing.swift)
-    /// The canvas shows the editing overlay (⌘E).
-    var editMode = false
+    // Editing (Phase 3; TalkWindowModel+Editing.swift). No mode: the canvas is editable
+    // whenever the film is paused and the talk is beat-format.
     var rightPane: RightPane = .inspector
     /// The object selected on the canvas, as it last reported it.
     var selection: CanvasObject?
+    /// The id of the element whose text has the caret (in-place text editing), if any.
+    var textEditing: String?
+    /// The formatting at the text selection while editing text (the format bar's state).
+    var textState: CanvasTextState?
+    /// The format bar's Font button: set by whoever provides a font picker (pickFont(for:)).
+    @ObservationIgnored var onPickFont: ((CanvasObject) -> Void)?
+    @ObservationIgnored var pendingColor: Task<Void, Never>?
     /// The human's undo stack and the edit pipeline to the sidecar.
     let edits = EditSession()
     /// talk.json as last read (beat labels, notes, holds, flags for the inspector and menus).
@@ -73,7 +79,7 @@ final class TalkWindowModel {
         let thumbs = ThumbnailStore()
         thumbnails = thumbs
         presentation = PresentationController(thumbnails: thumbs)
-        presentation.onEnd = { [weak self] t in self?.canvas.seek(t) }
+        presentation.onEnd = { [weak self] t in self?.presentingEnded(at: t) }
         canvas.onReady = { [weak self] info in self?.filmBooted(info) }
         canvas.onState = { [weak self] t, playing in self?.filmMoved(t, playing) }
         canvas.onLoadError = { [weak self] msg in self?.error = msg }
@@ -142,7 +148,8 @@ final class TalkWindowModel {
         selectedHold = nil; error = nil; status = nil; diagnostics = []
         filmURL = nil
         filmRoot = nil
-        selection = nil; spine = nil; changedBeats = []; spineBeforeExternal = nil; materials = []
+        selection = nil; textEditing = nil; textState = nil
+        spine = nil; changedBeats = []; spineBeforeExternal = nil; materials = []
         edits.reset()
         edits.service = nil
         resetPublishing(folder)
@@ -270,7 +277,7 @@ final class TalkWindowModel {
                 ?? filmRoot.appendingPathComponent(".sage/thumbs", isDirectory: true)
             thumbnails.setFilm(filmURL, talkRoot: filmRoot, cacheDirectory: cacheDir, holds: holds)
         }
-        if editMode { Task { await restoreEditing() } }
+        Task { await restoreEditing() } // the overlay, on an editable talk
     }
 
     private func filmMoved(_ t: Double, _ playing: Bool) {
@@ -291,15 +298,22 @@ final class TalkWindowModel {
     }
 
     func scrub(to t: Double) { canvas.scrub(t) }
-    // In edit mode the overlay gets the arrow keys and Return first (nudge, caret, commit).
-    func next() { forwardKey("ArrowRight") { $0.canvas.next() } }
-    func prev() { forwardKey("ArrowLeft") { $0.canvas.prev() } }
-    func through() { forwardKey("Enter") { $0.canvas.through() } }
+    // The transport's buttons always drive the film (playing commits any text being edited).
+    func next() { canvas.next() }
+    func prev() { canvas.prev() }
+    func through() { canvas.through() }
+    // The Play menu's keys (→, ←, Return) go to the canvas overlay first: with an object
+    // selected they nudge it or edit its text, and with the caret in text they move it or
+    // commit; otherwise they drive the film.
+    func nextKey() { forwardKey("ArrowRight") { $0.next() } }
+    func prevKey() { forwardKey("ArrowLeft") { $0.prev() } }
+    func throughKey() { forwardKey("Enter") { $0.through() } }
 
     /// Play > Present / Rehearse, from the canvas's current time.
     func present(_ mode: PresenterState.Mode, offscreen: Bool = false) {
         guard let filmURL, let filmRoot, !holds.isEmpty else { return }
         canvas.pause()
+        suspendEditingForPresenting()
         presentation.start(mode, film: filmURL, readAccess: filmRoot, holds: holds, duration: duration,
                            at: t, title: talk?.name ?? "Talk", offscreen: offscreen)
     }

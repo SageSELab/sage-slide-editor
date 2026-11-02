@@ -1,46 +1,54 @@
 import AppKit
 import SageTalkCore
 
-// Editing (Phase 3, PLAN 5.3-5.4): edit mode on the canvas, the edits the canvas overlay and
-// the inspector ask for, beat operations, undo/redo, and external changes. Every edit goes to
-// the sidecar at once (talk.edit); the sidecar rebuilds and the canvas reloads at the same
-// time with the same selection (filmBooted -> restoreEditing).
+// Editing (Phase 3, PLAN 5.3-5.4): the canvas overlay, the edits it and the inspector ask
+// for, the format bar, beat operations, undo/redo, and external changes. There is no edit
+// mode: on a beat-format talk the canvas is editable whenever the film is paused (the overlay
+// steps aside by itself while it plays) and never while presenting. Every edit goes to the
+// sidecar at once (talk.edit); the sidecar rebuilds and the canvas reloads at the same time
+// with the same selection (filmBooted -> restoreEditing).
 extension TalkWindowModel {
     var canEdit: Bool { talk?.kind == .beatFormat && filmURL != nil }
 
-    // MARK: Edit mode
+    /// The canvas takes clicks and keys for editing now (paused, not presenting).
+    var canvasEditable: Bool { canEdit && !playing && !presentation.isPresenting }
 
-    func toggleEditMode() { setEditMode(!editMode) }
-
-    func setEditMode(_ on: Bool) {
-        guard on != editMode, !on || canEdit else { return }
-        editMode = on
-        if on {
-            canvas.pause()
-            Task { await restoreEditing() }
-        } else {
-            canvas.disableEditing()
-            selection = nil
-        }
-    }
+    // MARK: The overlay
 
     /// (Re-)enables the overlay after a load and restores the selection without reporting it.
     func restoreEditing() async {
-        guard editMode else { return }
+        guard canEdit, !presentation.isPresenting else { return }
         let id = selection?.id
+        textEditing = nil; textState = nil // a reload ends text editing
         let obj = await canvas.enableEditing(select: id)
-        guard editMode else { return }
+        guard canEdit, !presentation.isPresenting else { return }
         if id != nil { selection = obj } // nil when the object no longer exists
+    }
+
+    /// Presenting never shows the overlay: save any text being edited, then take it away.
+    func suspendEditingForPresenting() {
+        guard canEdit else { return }
+        Task {
+            await saveCanvasText()
+            canvas.disableEditing()
+            selection = nil; textEditing = nil; textState = nil
+        }
+    }
+
+    /// The presentation ended at `t`: the canvas goes there and is editable again.
+    func presentingEnded(at t: Double) {
+        canvas.seek(t)
+        Task { await restoreEditing() }
     }
 
     /// Selects an object on the canvas by id (inspector, self-test).
     func selectObject(_ id: String?) async {
-        guard editMode else { return }
+        guard canEdit else { return }
         selection = await canvas.canvasSelect(id, silent: true)
     }
 
     func forwardKey(_ name: String, otherwise: @escaping @MainActor (TalkWindowModel) -> Void) {
-        guard editMode else { return otherwise(self) }
+        guard canvasEditable else { return otherwise(self) }
         Task {
             if !(await canvas.canvasKey(name)) { otherwise(self) }
         }
@@ -50,7 +58,16 @@ extension TalkWindowModel {
 
     func handleCanvas(_ msg: CanvasMessage) {
         switch msg {
-        case .select(let obj): selection = obj
+        case .select(let obj):
+            selection = obj
+            if obj?.id != textEditing { textEditing = nil; textState = nil }
+        case .rect(let id, let rect):
+            if selection?.id == id { selection?.rect = rect }
+        case .editing(let id):
+            textEditing = id
+            if id == nil { textState = nil }
+        case .format(let state):
+            if state.id == textEditing { textState = state }
         case .refused(let id, _):
             status = "#\(id) has block content; edit its text in the source or ask Claude."
         default:
@@ -67,20 +84,81 @@ extension TalkWindowModel {
 
     @discardableResult
     func applyNow(_ op: EditOp) async -> SidecarProtocol.EditResult? {
+        await saveCanvasText()
         let r = await edits.perform(op)
         if r == nil, let e = edits.lastError { error = e; reloadCanvas() } // drop the overlay's optimistic change
         return r
     }
 
+    /// Text being edited in place is saved before any other edit (whose rebuild reloads the
+    /// canvas and would lose it).
+    func saveCanvasText() async {
+        guard textEditing != nil else { return }
+        let msg = await canvas.takeCanvasText()
+        textEditing = nil; textState = nil
+        if let op = msg?.editOp {
+            let r = await edits.perform(op)
+            if r == nil, let e = edits.lastError { error = e }
+        }
+    }
+
     func undo() {
         if Self.textFieldHasFocus { NSApp.sendAction(Selector(("undo:")), to: nil, from: nil); return }
+        // The caret is in canvas text: ⌘Z belongs to the text until it is committed.
+        if textEditing != nil { if let um = canvas.webView.undoManager, um.canUndo { um.undo() }; return }
         Task { await undoNow() }
     }
 
     func redo() {
         if Self.textFieldHasFocus { NSApp.sendAction(Selector(("redo:")), to: nil, from: nil); return }
+        if textEditing != nil { if let um = canvas.webView.undoManager, um.canRedo { um.redo() }; return }
         Task { await redoNow() }
     }
+
+    // MARK: The format bar
+
+    /// The object the format bar and the inspector's text controls act on.
+    var formatTarget: CanvasObject? {
+        guard let o = selection, o.editable, canEdit, !presentation.isPresenting else { return nil }
+        return o
+    }
+
+    /// The format bar's toggles: the selected range's state while editing one, else the element's.
+    var formatState: (bold: Bool, italic: Bool, underline: Bool, color: String) {
+        if let s = textState, s.range, s.id == formatTarget?.id { return (s.bold, s.italic, s.underline, s.color) }
+        let t = formatTarget?.text ?? CanvasTextInfo()
+        return (t.bold, t.italic, t.underline, t.color)
+    }
+
+    /// Applies a format command: to the selected text range in place while editing one (saved
+    /// with the text), otherwise to the whole object (setStyle, through the canvas's `style`
+    /// message, which saves any text being edited first).
+    func format(_ f: CanvasFormat) {
+        guard formatTarget != nil else { return }
+        Task { await canvas.canvasFormat(f) }
+    }
+
+    /// A colour from the colour well: the panel reports every change while dragging, so only
+    /// the last one in a quarter second is applied.
+    func formatColor(_ hex: String) {
+        pendingColor?.cancel()
+        pendingColor = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            self?.format(.color(hex))
+        }
+    }
+
+    /// The Font button's hook: whoever provides a font picker sets `onPickFont` and applies the
+    /// choice with `applyFont(_:)`.
+    var canPickFont: Bool { onPickFont != nil }
+
+    func pickFont(for object: CanvasObject) {
+        onPickFont?(object)
+    }
+
+    /// Sets the selected object's font family (a CSS font-family value, e.g. `"Inter Tight", sans-serif`).
+    func applyFont(_ family: String) { format(.fontFamily(family)) }
 
     @discardableResult
     func undoNow() async -> SidecarProtocol.EditResult? {

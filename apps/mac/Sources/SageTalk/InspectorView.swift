@@ -49,10 +49,6 @@ private struct ObjectInspector: View {
     var body: some View {
         if !model.canEdit {
             EmptyHint("Read-only talk", systemImage: "lock", "Editing needs a beat-format talk (talk.json).")
-        } else if !model.editMode {
-            EmptyHint("Nothing selected", systemImage: "cursorarrow.rays", "Turn on Edit mode to select objects on the canvas.") {
-                Button("Edit Canvas (⌘E)") { model.setEditMode(true) }.accessibilityIdentifier("inspector.edit-mode")
-            }
         } else if let o = model.selection {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 8) {
@@ -75,10 +71,20 @@ private struct ObjectInspector: View {
                     if !o.movable { Hint("Not positioned (no position:absolute), so it moves with its container.") }
                 }
                 InspectorSection("Text", systemImage: "textformat") {
+                    if o.editable {
+                        Row("Style") {
+                            TextStyleToggles(model: model)
+                            TextColorWell(model: model)
+                        }
+                    }
                     Row("Size") { NumberField("px", o.fontSize, id: "font") { model.setStyle(o.id, .px(fontSize: $0)) } }
+                    if o.editable {
+                        Row("Align") { AlignmentPicker(model: model, object: o) }
+                        Row("Font") { FontButton(model: model, object: o) }
+                    }
                     if o.editable, let html = o.html {
                         TextCommitField(title: "Content", value: html, axis: .vertical, id: "text") { model.apply(.setText(id: o.id, html: $0)) }
-                        Hint("Inline tags (<b>, <span class=…>) are kept. Double-click the text on the canvas to edit it in place.")
+                        Hint("Inline tags (<b>, <span class=…>) are kept. Click the selected text on the canvas, or just type, to edit it in place; select words to make only them bold or coloured.")
                     }
                 }
                 if o.tag == "img" {
@@ -89,7 +95,7 @@ private struct ObjectInspector: View {
             }
         } else {
             EmptyHint("Nothing selected", systemImage: "cursorarrow.click.2",
-                      "Click an object on the canvas, or press Tab to cycle through them. Drag to move, use the handles to resize, double-click text to edit it.")
+                      "Pause the film and click an object on the canvas, or press Tab to cycle through them. Drag to move, use the handles to resize, click selected text to type in it.")
         }
     }
 }

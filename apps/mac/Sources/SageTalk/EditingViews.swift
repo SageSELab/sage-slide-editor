@@ -22,18 +22,3 @@ struct BeatMenu: View {
         }
     }
 }
-
-/// The toolbar's Edit toggle (⌘E in the Edit menu).
-struct EditModeButton: View {
-    @Bindable var model: TalkWindowModel
-
-    var body: some View {
-        Toggle(isOn: Binding(get: { model.editMode }, set: { model.setEditMode($0) })) {
-            Label("Edit", systemImage: "cursorarrow.rays")
-        }
-        .toggleStyle(.button)
-        .disabled(!model.canEdit)
-        .help(model.editMode ? "Stop editing the canvas (⌘E)" : "Edit the canvas: select, move, resize, edit text (⌘E)")
-        .accessibilityIdentifier("toolbar.edit-mode")
-    }
-}

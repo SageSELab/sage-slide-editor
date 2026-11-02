@@ -40,18 +40,12 @@ struct SageTalkApp: App {
                 .disabled(!model.canPublish || model.publishing.exporting)
             }
             // Undo/redo of the app's own edits (inverses kept by EditSession). A focused text
-            // field keeps its own undo.
+            // field, and canvas text with the caret in it, keep their own undo.
             CommandGroup(replacing: .undoRedo) {
-                Button(model.edits.undoTitle) { model.undo() }
+                Button(model.textEditing != nil ? "Undo Typing" : model.edits.undoTitle) { model.undo() }
                     .keyboardShortcut("z")
-                Button(model.edits.redoTitle) { model.redo() }
+                Button(model.textEditing != nil ? "Redo Typing" : model.edits.redoTitle) { model.redo() }
                     .keyboardShortcut("z", modifiers: [.command, .shift])
-            }
-            CommandGroup(after: .undoRedo) {
-                Divider()
-                Button(model.editMode ? "Stop Editing Canvas" : "Edit Canvas") { model.toggleEditMode() }
-                    .keyboardShortcut("e")
-                    .disabled(!model.canEdit)
             }
             CommandMenu("Play") {
                 Button("Present") { model.present(.present) }
@@ -63,9 +57,10 @@ struct SageTalkApp: App {
                 Button("End Presentation") { model.presentation.end() }
                     .disabled(!model.presentation.isPresenting)
                 Divider()
-                Button("Next Hold") { model.next() }.keyboardShortcut(.rightArrow, modifiers: [])
-                Button("Previous Hold") { model.prev() }.keyboardShortcut(.leftArrow, modifiers: [])
-                Button("Play Through") { model.through() }.keyboardShortcut(.return, modifiers: [])
+                // The keys go to the canvas first (nudge, text caret, commit); see nextKey().
+                Button("Next Hold") { model.nextKey() }.keyboardShortcut(.rightArrow, modifiers: [])
+                Button("Previous Hold") { model.prevKey() }.keyboardShortcut(.leftArrow, modifiers: [])
+                Button("Play Through") { model.throughKey() }.keyboardShortcut(.return, modifiers: [])
             }
         }
         Settings { SettingsView() }
