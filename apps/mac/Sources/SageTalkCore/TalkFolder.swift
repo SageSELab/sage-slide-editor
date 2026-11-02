@@ -54,9 +54,14 @@ public struct Hold: Codable, Equatable, Identifiable, Sendable {
     public var at: Double
     public var label: String
     public var backup: Bool
+    /// The chapter id (beat-format talks, from talk.layout or the engine); nil for legacy decks.
+    public var chapter: String?
+    /// Speaker notes (the engine's `T.cps[i].notes`).
+    public var notes: String?
     public var id: Int { index }
-    public init(index: Int, at: Double, label: String, backup: Bool = false) {
+    public init(index: Int, at: Double, label: String, backup: Bool = false, chapter: String? = nil, notes: String? = nil) {
         self.index = index; self.at = at; self.label = label; self.backup = backup
+        self.chapter = chapter; self.notes = notes
     }
 
     /// Parses the engine's `?cplist` output: lines of "n time label".

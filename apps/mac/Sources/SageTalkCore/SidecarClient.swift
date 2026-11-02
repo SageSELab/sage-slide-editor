@@ -62,7 +62,7 @@ public enum SidecarProtocol {
         public var beat: String
         public var chapter: String
         public var auto: Bool
-        public var hold: Hold { Hold(index: index, at: at, label: label, backup: backup) }
+        public var hold: Hold { Hold(index: index, at: at, label: label, backup: backup, chapter: chapter) }
     }
 
     public struct OpenParams: Codable, Equatable, Sendable {
