@@ -296,8 +296,14 @@ export interface WirePatch { file: string; range: [number, number]; newText: str
 /** Undoes one edit. `digests`: sha256 (hex) of each touched file as the edit left it. */
 export interface Inverse { patches: WirePatch[]; digests: Record<string, string> }
 
-/** Inline-style properties: numbers are px, strings are CSS values, null removes. */
-export interface StyleArgs { left?: number | string | null; top?: number | string | null; width?: number | string | null; height?: number | string | null; fontSize?: number | string | null }
+/**
+ * Inline-style properties: numbers are px (fontWeight: unitless), strings are CSS values, null
+ * removes. The text keys (color ... textDecoration) take strings only, fontWeight also a number.
+ */
+export interface StyleArgs {
+  left?: number | string | null; top?: number | string | null; width?: number | string | null; height?: number | string | null; fontSize?: number | string | null;
+  color?: string | null; textAlign?: string | null; fontWeight?: number | string | null; fontStyle?: string | null; fontFamily?: string | null; textDecoration?: string | null;
+}
 
 /** talk.edit ops and their args. Element ops find the scene holding #id unless `scene` names it. */
 export interface EditOps {
@@ -358,10 +364,15 @@ function checkArgsShape(a: unknown, at: string, spec: Record<string, [required: 
 const propsOf = (allowed: Record<string, (v: unknown) => boolean>) => (v: unknown) =>
   isObj(v) && Object.entries(v).every(([k, x]) => k in allowed && allowed[k]!(x));
 const styleValue = (v: unknown) => v === null || isNum(v) || isStr(v);
+const styleText = nullable((v) => isStr(v) && v.trim().length > 0);
+const STYLE_PROPS = {
+  left: styleValue, top: styleValue, width: styleValue, height: styleValue, fontSize: styleValue,
+  color: styleText, textAlign: styleText, fontWeight: styleValue, fontStyle: styleText, fontFamily: styleText, textDecoration: styleText,
+};
 
 const EDIT_ARGS: Record<EditOpName, Record<string, [boolean, (v: unknown) => boolean, string]>> = {
   setText: { id: [true, isStr, 'a string'], html: [true, isStr, 'a string'], scene: [false, isStr, 'a string'] },
-  setStyle: { id: [true, isStr, 'a string'], style: [true, propsOf({ left: styleValue, top: styleValue, width: styleValue, height: styleValue, fontSize: styleValue }), 'left/top/width/height/fontSize as number, string or null'], scene: [false, isStr, 'a string'] },
+  setStyle: { id: [true, isStr, 'a string'], style: [true, propsOf(STYLE_PROPS), 'left/top/width/height/fontSize/fontWeight as number, string or null; color/textAlign/fontStyle/fontFamily/textDecoration as string or null'], scene: [false, isStr, 'a string'] },
   setAttr: { id: [true, isStr, 'a string'], name: [true, isStr, 'a string'], value: [true, (v) => v === null || v === true || isStr(v), 'a string, true or null'], scene: [false, isStr, 'a string'] },
   insertBeat: {
     chapter: [true, isStr, 'a string'], index: [true, (v) => isInt(v) && v >= 0, 'a non-negative integer'],

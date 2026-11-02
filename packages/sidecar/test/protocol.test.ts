@@ -72,7 +72,9 @@ describe('editing fixtures', () => {
     const check = paramCheckers['talk.edit'];
     expect(check({ op: 'setHold', args: { ref: 'a.b', hold: -1 } })).toEqual(['params.args.hold: expected a non-negative number or null']);
     expect(check({ op: 'nope', args: {} })[0]).toMatch(/^params.op: expected one of/);
-    expect(check({ op: 'setStyle', args: { id: 'x', style: { color: 'red' } } })).toHaveLength(1);
+    expect(check({ op: 'setStyle', args: { id: 'x', style: { position: 'fixed' } } })).toHaveLength(1);
+    expect(check({ op: 'setStyle', args: { id: 'x', style: { color: 5 } } })).toHaveLength(1);
+    expect(check({ op: 'setStyle', args: { id: 'x', style: { color: '#fff', textAlign: 'center', fontWeight: 700, fontStyle: null } } })).toEqual([]);
     expect(check({ op: 'setText', args: { id: 'x', html: 'y', extra: 1 } })).toEqual(["params.args: unexpected 'extra'"]);
     expect(check({ op: 'insertBeat', args: { chapter: 'c', index: 0, beat: { id: 'b' } } })).toHaveLength(1);
     expect(paramCheckers['talk.revert']({ patches: [{ file: '/etc/passwd', range: [0, 1], newText: '' }], digests: {} })).toEqual(['params.patches[0].file: expected a relative path']);

@@ -122,16 +122,46 @@ public struct StyleArgs: Codable, Equatable, Sendable {
     public var width: Settable<StyleValue>?
     public var height: Settable<StyleValue>?
     public var fontSize: Settable<StyleValue>?
+    // Text formatting (format bar, inspector): CSS strings; fontWeight may also be a number.
+    public var color: Settable<StyleValue>?
+    public var textAlign: Settable<StyleValue>?
+    public var fontWeight: Settable<StyleValue>?
+    public var fontStyle: Settable<StyleValue>?
+    public var fontFamily: Settable<StyleValue>?
+    public var textDecoration: Settable<StyleValue>?
     public init(left: Settable<StyleValue>? = nil, top: Settable<StyleValue>? = nil, width: Settable<StyleValue>? = nil,
-                height: Settable<StyleValue>? = nil, fontSize: Settable<StyleValue>? = nil) {
+                height: Settable<StyleValue>? = nil, fontSize: Settable<StyleValue>? = nil,
+                color: Settable<StyleValue>? = nil, textAlign: Settable<StyleValue>? = nil, fontWeight: Settable<StyleValue>? = nil,
+                fontStyle: Settable<StyleValue>? = nil, fontFamily: Settable<StyleValue>? = nil, textDecoration: Settable<StyleValue>? = nil) {
         self.left = left; self.top = top; self.width = width; self.height = height; self.fontSize = fontSize
+        self.color = color; self.textAlign = textAlign; self.fontWeight = fontWeight
+        self.fontStyle = fontStyle; self.fontFamily = fontFamily; self.textDecoration = textDecoration
     }
-    private enum CodingKeys: String, CodingKey { case left, top, width, height, fontSize }
+    private enum CodingKeys: String, CodingKey { case left, top, width, height, fontSize, color, textAlign, fontWeight, fontStyle, fontFamily, textDecoration }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(left: try c.decodeSettable(StyleValue.self, forKey: .left), top: try c.decodeSettable(StyleValue.self, forKey: .top),
-                  width: try c.decodeSettable(StyleValue.self, forKey: .width), height: try c.decodeSettable(StyleValue.self, forKey: .height),
-                  fontSize: try c.decodeSettable(StyleValue.self, forKey: .fontSize))
+        func v(_ k: CodingKeys) throws -> Settable<StyleValue>? { try c.decodeSettable(StyleValue.self, forKey: k) }
+        self.init(left: try v(.left), top: try v(.top), width: try v(.width), height: try v(.height), fontSize: try v(.fontSize),
+                  color: try v(.color), textAlign: try v(.textAlign), fontWeight: try v(.fontWeight),
+                  fontStyle: try v(.fontStyle), fontFamily: try v(.fontFamily), textDecoration: try v(.textDecoration))
+    }
+    /// True when only text-formatting keys are set.
+    public var isTextFormat: Bool {
+        left == nil && top == nil && width == nil && height == nil && fontSize == nil &&
+            (color != nil || textAlign != nil || fontWeight != nil || fontStyle != nil || fontFamily != nil || textDecoration != nil)
+    }
+    /// The undo menu's name for this style change.
+    public var title: String {
+        if width != nil || height != nil { return "Resize" }
+        if fontSize != nil { return "Font Size" }
+        if left != nil || top != nil { return "Move" }
+        if fontFamily != nil { return "Font" }
+        if color != nil { return "Text Color" }
+        if textAlign != nil { return "Alignment" }
+        if fontWeight != nil { return "Bold" }
+        if fontStyle != nil { return "Italic" }
+        if textDecoration != nil { return "Underline" }
+        return "Style"
     }
     /// Pixel values; nil leaves a property alone.
     public static func px(left: Double? = nil, top: Double? = nil, width: Double? = nil, height: Double? = nil, fontSize: Double? = nil) -> StyleArgs {
@@ -287,8 +317,7 @@ public enum EditOp: Codable, Equatable, Sendable {
     public var title: String {
         switch self {
         case .setText: "Edit Text"
-        case .setStyle(_, let s, _):
-            s.width != nil || s.height != nil ? "Resize" : s.fontSize != nil ? "Font Size" : "Move"
+        case .setStyle(_, let s, _): s.title
         case .setAttr(_, let name, _, _): name == "src" ? "Replace Image" : "Set Attribute"
         case .insertBeat: "Insert Beat"
         case .deleteBeat: "Delete Beat"

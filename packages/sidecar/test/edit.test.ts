@@ -41,6 +41,8 @@ describe('talk.edit on a temp copy', () => {
       check: (_r, root) => expect(fs.readFileSync(path.join(root, 'scenes/line.html'), 'utf8')).toContain('>How far <b>are</b> we?</h1>') },
     { name: 'setStyle', p: { op: 'setStyle', args: { id: 'c1-bench', style: { top: 870, height: 150, fontSize: 30 } } },
       check: (_r, root) => expect(fs.readFileSync(path.join(root, 'scenes/line.html'), 'utf8')).toContain('style="position:absolute;left:120px;top:870px;width:1500px;height:150px;font-size:30px"') },
+    { name: 'setStyle (text)', p: { op: 'setStyle', args: { id: 't-g', style: { color: '#ff2d78', textAlign: 'center', fontWeight: 700, fontStyle: 'italic', textDecoration: 'underline', fontFamily: '"Inter Tight", sans-serif' } } },
+      check: (_r, root) => expect(fs.readFileSync(path.join(root, 'scenes/line.html'), 'utf8')).toContain('style="margin-top:8px;font-size:104px;color:#ff2d78;text-align:center;font-weight:700;font-style:italic;text-decoration:underline;font-family:&quot;Inter Tight&quot;, sans-serif"') },
     { name: 'setAttr', p: { op: 'setAttr', args: { id: 'c1-eye', name: 'title', value: 'APR' } },
       check: (_r, root) => expect(fs.readFileSync(path.join(root, 'scenes/line.html'), 'utf8')).toContain('id="c1-eye" data-a style="position:absolute;left:120px;top:110px" title="APR"') },
     { name: 'insertBeat', p: { op: 'insertBeat', args: { chapter: 'line', index: 1, beat: { id: 'beat-1', label: 'New beat', hold: 2 } } },

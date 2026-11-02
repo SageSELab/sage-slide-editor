@@ -75,10 +75,40 @@ export interface StyleProps {
   width?: number | string | null | undefined;
   height?: number | string | null | undefined;
   fontSize?: number | string | null | undefined;
+  // Text formatting (the canvas's format bar and the inspector). Strings are CSS values;
+  // fontWeight also takes a number (written without a unit, e.g. 700).
+  color?: string | null | undefined;
+  textAlign?: string | null | undefined;
+  fontWeight?: number | string | null | undefined;
+  fontStyle?: string | null | undefined;
+  fontFamily?: string | null | undefined;
+  textDecoration?: string | null | undefined;
 }
 
+/** The properties setStyle writes. */
+export const STYLE_KEYS = ['left', 'top', 'width', 'height', 'fontSize', 'color', 'textAlign', 'fontWeight', 'fontStyle', 'fontFamily', 'textDecoration'] as const;
+/** Properties whose numbers are written without a unit. */
+const UNITLESS = new Set(['fontWeight']);
+
 const kebab = (p: string) => p.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
-const cssValue = (v: number | string) => (typeof v === 'number' ? `${+v.toFixed(3)}px` : v);
+const cssValue = (v: number | string, key = '') =>
+  (typeof v === 'number' ? `${+v.toFixed(3)}${UNITLESS.has(key) ? '' : 'px'}` : v);
+
+/**
+ * A string must be a single declaration's value: outside quoted strings no `;`, braces, angle
+ * brackets, line breaks or stray quotes, which would end the declaration (or the attribute)
+ * and smuggle in others.
+ */
+function checkStyleValue(key: string, v: unknown) {
+  if (v === null || v === undefined) return;
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) throw new EditError('bad-style', `${key}: not a finite number`);
+    return;
+  }
+  if (typeof v !== 'string') throw new EditError('bad-style', `${key}: expected a number, a string or null`);
+  const bare = v.replace(/"[^"\n\r]*"|'[^'\n\r]*'/g, '');
+  if (!v.trim() || /[;{}<>"'\n\r\\]/.test(bare)) throw new EditError('bad-style', `${key}: ${JSON.stringify(v)} is not a single CSS value`);
+}
 
 interface Decl { name: string; start: number; end: number; valueStart: number; valueEnd: number }
 
@@ -128,8 +158,8 @@ export function patchStyle(css: string, props: Readonly<Record<string, number | 
         if (x.end >= css.length) { const prev = css.lastIndexOf(';', x.start - 1); if (prev >= 0 && !css.slice(prev + 1, x.start).trim() && !edits.some((q) => q.e > prev)) s = prev; }
         edits.push({ s, e, t: '' });
       }
-    } else if (d && v !== null) edits.push({ s: d.valueStart, e: d.valueEnd, t: cssValue(v) });
-    else if (v !== null) appends.push(`${name}${sep}${cssValue(v)}`);
+    } else if (d && v !== null) edits.push({ s: d.valueStart, e: d.valueEnd, t: cssValue(v, key) });
+    else if (v !== null) appends.push(`${name}${sep}${cssValue(v, key)}`);
   }
   edits.sort((a, b) => b.s - a.s);
   for (const x of edits) out = out.slice(0, x.s) + x.t + out.slice(x.e);
@@ -141,8 +171,15 @@ export function patchStyle(css: string, props: Readonly<Record<string, number | 
   return out;
 }
 
-/** Set position/size properties in #id's inline style. Numbers are px; null removes (every occurrence). */
+/**
+ * Set STYLE_KEYS properties in #id's inline style. Numbers are px (fontWeight: unitless),
+ * strings CSS values; null removes (every occurrence).
+ */
 export function setStyle(scene: SourceFile, id: string, props: StyleProps): Edit {
+  for (const [k, v] of Object.entries(props)) {
+    if (!(STYLE_KEYS as readonly string[]).includes(k)) throw new EditError('bad-style', `setStyle cannot set ${k}`);
+    checkStyleValue(k, v);
+  }
   const el = byId(scene, id), text = scene.text;
   const loc = el.loc.attrs?.style;
   const vr = loc ? attrValueRange(text, loc) : null;

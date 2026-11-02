@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "id": 43,
+  "method": "talk.edit",
+  "params": {
+    "op": "setStyle",
+    "args": {
+      "id": "t-g",
+      "style": {
+        "color": "#ff2d78",
+        "textAlign": "center",
+        "fontWeight": 700,
+        "fontStyle": "italic",
+        "fontFamily": "\"Inter Tight\", sans-serif",
+        "textDecoration": null
+      }
+    }
+  }
+}

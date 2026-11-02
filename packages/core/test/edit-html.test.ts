@@ -102,6 +102,27 @@ describe('setStyle', () => {
     expect(patchStyle('position:absolute;left:1px;top:2px', { top: null })).toBe('position:absolute;left:1px');
     expect(patchStyle('', { fontSize: 36 })).toBe('font-size:36px');
   });
+  it('writes text formatting: color, alignment, weight (unitless), style, family, decoration', () => {
+    const text = '<h1 id="T" style="position:absolute;left:10px">a</h1>';
+    const e = setStyle(file(text), 'T', {
+      color: '#ff2d78', textAlign: 'center', fontWeight: 700, fontStyle: 'italic', fontFamily: '"Inter Tight", sans-serif', textDecoration: 'underline',
+    });
+    expect(applyPatches(text, e.patches)).toBe(
+      '<h1 id="T" style="position:absolute;left:10px;color:#ff2d78;text-align:center;font-weight:700;font-style:italic;font-family:&quot;Inter Tight&quot;, sans-serif;text-decoration:underline">a</h1>');
+    const back = setStyle(file(applyPatches(text, e.patches)), 'T', { fontWeight: null, color: 'rgb(1, 2, 3)' });
+    expect(applyPatches(applyPatches(text, e.patches), back.patches)).toContain('color:rgb(1, 2, 3);text-align:center;font-style:italic');
+    expect(applyPatches(applyPatches(text, e.patches), back.patches)).not.toContain('font-weight');
+  });
+  it('refuses unknown properties and values that are not a single CSS value', () => {
+    const text = '<h1 id="T">a</h1>';
+    const code = (fn: () => unknown) => { try { fn(); } catch (e) { return (e as { code?: string }).code; } return undefined; };
+    expect(code(() => setStyle(file(text), 'T', { position: 'fixed' } as never))).toBe('bad-style');
+    expect(code(() => setStyle(file(text), 'T', { color: 'red; position:fixed' }))).toBe('bad-style');
+    expect(code(() => setStyle(file(text), 'T', { fontFamily: '"Inter, serif' }))).toBe('bad-style');
+    expect(code(() => setStyle(file(text), 'T', { fontFamily: '"a;b", serif' }))).toBeUndefined(); // ; inside quotes is fine
+    expect(code(() => setStyle(file(text), 'T', { color: '' }))).toBe('bad-style');
+    expect(code(() => setStyle(file(text), 'T', { fontSize: Number.NaN }))).toBe('bad-style');
+  });
   it('adds a style attribute when there is none', () => {
     const text = '<div id="T"\n  class="x">a</div>';
     const e = setStyle(file(text), 'T', { left: 10, top: 20 });

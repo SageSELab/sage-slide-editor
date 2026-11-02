@@ -185,7 +185,7 @@ interface EditResult {
 | `op` | `args` |
 |---|---|
 | `setText` | `{id, html, scene?}`: inner HTML of `#id` |
-| `setStyle` | `{id, style: {left?, top?, width?, height?, fontSize?}, scene?}`: numbers are px, strings raw CSS, `null` removes |
+| `setStyle` | `{id, style: {left?, top?, width?, height?, fontSize?, color?, textAlign?, fontWeight?, fontStyle?, fontFamily?, textDecoration?}, scene?}`: numbers are px (`fontWeight`: unitless), strings one CSS value each (no `;`, braces or line breaks outside quotes; else EditFailed `bad-style`), `null` removes. The text keys take strings only (`fontWeight` also a number) |
 | `setAttr` | `{id, name, value: string \| true \| null, scene?}` (`true` = bare attribute, `null` removes) |
 | `insertBeat` | `{chapter, index, beat: {id, label, notes?, hold?}}`; also adds an empty `Talk.beat` stub |
 | `deleteBeat` | `{ref}` (`'chapter.beat'`); also removes its registration |

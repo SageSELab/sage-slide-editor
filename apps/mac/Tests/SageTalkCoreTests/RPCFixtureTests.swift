@@ -118,6 +118,21 @@ enum RPCFixtures {
         #expect(hold.contains(#""hold":null"#))
     }
 
+    @Test func textStyleKeysRoundTripTheFixture() throws {
+        let msg = try JSONDecoder().decode(RPCMessage.self, from: RPCFixtures.data("talk.edit.request.setStyle-text.json"))
+        let op = try #require(msg.params).decode(as: EditOp.self)
+        let style = StyleArgs(color: .set(.css("#ff2d78")), textAlign: .set(.css("center")), fontWeight: .set(.px(700)),
+                              fontStyle: .set(.css("italic")), fontFamily: .set(.css("\"Inter Tight\", sans-serif")), textDecoration: .remove)
+        #expect(op == .setStyle(id: "t-g", style: style))
+        #expect(style.isTextFormat && !StyleArgs.px(left: 1).isTextFormat)
+        let json = String(decoding: try JSONEncoder().encode(op), as: UTF8.self)
+        #expect(json.contains(#""textDecoration":null"#) && json.contains(#""fontWeight":700"#))
+        #expect(EditOp.setStyle(id: "a", style: StyleArgs(fontWeight: .set(.css("700")))).title == "Bold")
+        #expect(EditOp.setStyle(id: "a", style: StyleArgs(color: .set(.css("red")))).title == "Text Color")
+        #expect(EditOp.setStyle(id: "a", style: StyleArgs(textAlign: .set(.css("left")))).title == "Alignment")
+        #expect(EditOp.setStyle(id: "a", style: .px(left: 1, top: 2)).title == "Move")
+    }
+
     @Test func parseErrorKeepsNullId() throws {
         let message = try JSONDecoder().decode(RPCMessage.self, from: RPCFixtures.data("error.parse-error.json"))
         #expect(message.id == nil)
