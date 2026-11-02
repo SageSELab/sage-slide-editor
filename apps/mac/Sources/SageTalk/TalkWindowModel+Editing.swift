@@ -122,7 +122,7 @@ extension TalkWindowModel {
         guard textEditing != nil else { return }
         let msg = await canvas.takeCanvasText()
         textEditing = nil; textState = nil
-        if let op = msg?.editOp { await perform(op, fromCanvas: true) }
+        if let op = msg?.editOp { _ = await perform(op, fromCanvas: true) }
     }
 
     func undo() {
