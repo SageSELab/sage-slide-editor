@@ -68,6 +68,9 @@ method('talk.watch', (p: WatchParams) => ({ watching: session.setWatching(p.enab
 
 peer.onClose(() => void shutdown('stdin closed'));
 process.stdout.on('error', () => void shutdown('stdout closed', 0));
+// If the app died, its end of the log pipe is gone too. Without a listener every log line then
+// raises EPIPE as an uncaught exception, whose handler logs again, and the sidecar never exits.
+process.stderr.on('error', () => {});
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('uncaughtException', (e) => { log('error', `uncaught: ${e.stack ?? e}`); });
