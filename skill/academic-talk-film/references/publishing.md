@@ -15,13 +15,13 @@ asset is inlined. It warns when a private label or a speaker note would ship. Th
 section describes the legacy path for hand-written single-file decks:
 
 ```
-cd talk && python3 build-public.py <slug>      # writes public/<slug>.html
+cd talk && python3 build-public.py <slug>      # legacy decks: writes public/<slug>.html
 ```
 
-Before building, make sure the markers are placed (see engine-api.md): private regions around the follow-up chapter, backups, and recruiting slide; a public end card inside `<!-- public:start … public:end -->` with the paper title, authors, links (code, archive, lab), and logos; `DURATION` with both values. Shoot the public file at its first hold and its last time to confirm the title autoplays and the end card renders:
+Before building, make sure the markers are placed (see legacy/engine-api-v1.md): private regions around the follow-up chapter, backups, and recruiting slide; a public end card inside `<!-- public:start … public:end -->` with the paper title, authors, links (code, archive, lab), and logos; `DURATION` with both values. Shoot the public file at its first hold and its last time to confirm the title autoplays and the end card renders:
 
 ```
-bash <skill>/scripts/shoot.sh talk/public/<slug>.html 4.9 244.8
+bash <skill>/scripts/legacy/shoot.sh talk/public/<slug>.html 4.9 244.8
 ```
 
 ## Where it goes
@@ -53,4 +53,4 @@ Pull from the lab site (`public/images/`), the personal site, co-authors' facult
 
 ## README for the talk folder
 
-Keys, URL parameters, file list, hold count ("N main holds plus M backups"), and the editing workflow (E, serve.py, overrides block). Update the hold count whenever holds change.
+Keys, URL parameters, file list, the talkc commands, and the hold count ("N main holds plus M backups"; `talkc layout`). Update the hold count whenever holds change.

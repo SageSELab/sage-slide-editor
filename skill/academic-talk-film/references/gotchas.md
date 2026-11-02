@@ -1,39 +1,94 @@
-# Gotchas met while building the ISSTA 2026 deck, and the fixes
+# Gotchas for sage-talk/1 talks, and the fixes
 
-**An element is visible before its entrance (or a screen is dimmed early).** WAAPI: the first animation that touches a property on an element fills both ways, so a one-keyframe `T.out` registered as the first opacity animation makes the element visible from t=0. Fixes: bring the element in with a from-0 keyframe first (`T.in`, or `T.show` which uses `[{opacity:0},{opacity:1}]`), or start a flash with an explicit from-1 keyframe (`[{opacity:1},{opacity:.15,offset:.02},{opacity:1}]`). Never register a `T.out` for an element that is never brought in.
+The compiler and validator now catch what used to be the commonest failures: a script syntax
+error blanking the stage (`script-syntax`, the build refuses), an entrance starting before its
+hold (`ghost-entrance`, and `ghost-visible` under `--render`), a chapter label flipping on the
+hold (markers are derived), times to shift after inserting a beat (times are beat-relative),
+dark windows and durations to recompute (derived from the spine), duplicate ids, missing assets,
+a selector that matches nothing. Run `talkc validate talk/ --render` (or `talk_layout` in the
+app) after every round and fix every error before looking at frames. What remains:
 
-**A hold shows a ghost of the next tile.** The next element's `T.in` started before the hold time. Put the hold after the current motion ends and start the next element's motion at least 0.1 s after the hold. For builds: step spacing = longest micro-animation + 0.6 s.
+## Format rules the tools cannot fix for you
 
-**Chapter label flips on the hold instead of after it.** Chapter markers at exactly the hold time win the `<=` comparison. Put each marker 0.1 s after the chapter's first hold.
+**Never re-indent or reformat scene HTML.** Scenes are emitted verbatim. A code pane is
+`white-space: pre`, so the indentation inside it is content; a reformat moved the ISSTA panes
+by up to 9,671 px. Edit scenes with exact, minimal replacements, and keep long lines long.
 
-**Descenders clipped while a headline blurs in.** Blur filters clip at the box. talk.css adds padding-bottom and a negative margin on display type; keep that and never put `overflow:hidden` on text containers.
+**Text the film rewrites at runtime is edited in motion code, not in the scene.** `B.count`,
+`B.type` and `B.set(…, { text })` own their element's text while the film plays; the markup is
+only the value before the first step. Change the number in the `B.count(…, to)` call, the
+string in the `B.set` step, or the helper's data array (`lib/term.js` lines, `lib/bars.js`
+rows). The SAGE app refuses an in-place text edit on such an element (`runtime-text`).
 
-**Typed text leaves a white box before it starts.** `T.type` must empty the element at p≤0 (it does in the bundled engine). If you write a custom tween, handle p=0.
+**The initial state lives in markup.** A `B.set` track starts from the value captured at
+registration. If an element must start hidden, styled or with other text, write that in the
+scene; a step at t = 0 of a later beat is not the same thing (it shows the markup until then).
 
-**Stray text appears outside its pane.** A `.scene` is full-stage; an absolutely positioned child with the wrong `left/top` lands on another pane. Shoot the frame and use `&at=x,y` to find who painted there.
+**Leave the previous pane at t = 0 of the beat that replaces it,** not at the end of the beat
+that shows it: motion after the hold of beat k belongs to beat k+1 (boundary rule). A `B.out`
+in beat k that runs past its hold is a ghost in reverse: the pane is half gone at the hold.
 
-**Edit mode shows outlines but nothing can be focused.** Later scenes stack above the current one and swallow clicks. talk.css already sets `pointer-events:none` on everything in the stage while editing and `auto` on `.ed` targets; keep those rules if you edit the CSS.
+**The first animation on a property decides what shows before it.** Bring an element in with
+a from-0 keyframe (`B.in`, `B.show`, `[{opacity:0},{opacity:1}]`) the first time any beat
+touches it. Never register a `B.out` for an element no beat brings in. A flash on a visible
+element starts from an explicit value (`[{opacity:1},{opacity:.15,offset:.02},{opacity:1}]`).
+The validator warns (`first-owner-opacity`); moving or deleting a beat can create the problem
+in another beat, so validate after every structural edit.
 
-**⌘S asks to save a new file.** Chrome refuses the File System Access API from `file://`. Serve the deck with `serve.py` (double-click `Edit talk.command`); the save then goes straight to `index.html`.
+**A hold before the motion ends is allowed, and only a warning.** Use it on purpose (a heat
+map still filling while Kevin talks) and say so in a comment; otherwise move the hold.
 
-**Shifting times after inserting or removing a beat.** Use `scripts/shift-times.py index.html "<start marker>" "<end marker>" <delta> [--min N] [--prefix c4]` to add delta to every `c4 + N` literal in the block, then update the chapter `at` values, `DURATION`, the dark-window logic (driven by chapter `dark` flags in the starter, hard-coded times in older decks), and the public build's duration. Re-list holds with `cplist.sh` and compare against the previous list.
+**Element ids are unique across all scenes and layers** (`duplicate-element-id`). Prefix them
+by chapter (`c4-h`, `c4-s`).
 
-**Removing a hold whose content a later hold builds on.** Check whether the next hold adds to the same pane (`T.in` of more elements without `T.out` of the current ones). If so, remove only the `cp(...)` line and merge its notes; if the content is self-contained, cut the segment and shift.
+**Assets go in `assets/`.** The build copies only that folder (`asset-not-in-build` warns
+about anything else); the public build inlines what scenes and the theme reference.
 
-**Moving a segment to the backups.** The backup must recreate the state it needs: show the device at the right position, reveal the code lines it depends on (`tline` each), fade `#black` out if the backup is light. Elements already faded out by the main flow can be brought back with `T.in`.
+**A lib file that generates DOM throws if its container is missing,** which stops every later
+script (`record-script-failed`, a blank or half-built film). Copy a starter helper only with
+the markup it expects, and list lib files in dependency order (`codepane.js` before `term.js`).
 
-**A new element on an existing pane overlaps a stroke or line drawn in world coordinates.** The chapter-1 timeline sits at y=680 across the title; keep title-pane additions above 660 or below 700.
+**`B.at` and `B.T` are escape hatches** (absolute times). They bypass hold seeding and the
+ghost checks; keep them inside helpers that genuinely need the absolute clock.
 
-**Headless screenshots come out blank.** Usually a script syntax error. Check with `node -e "const s=require('fs').readFileSync('index.html','utf8');const m=s.match(/<script>([\s\S]*)<\/script>/);new Function(m[1])"`. Also always run Chrome from inside the talk folder with an absolute `file://` URL, and use `--virtual-time-budget=3000`.
+**Backups must recreate the state they need.** Kevin jumps to a backup directly: show the
+device at the right position, reveal the code lines it depends on, fade `#black` out if the
+backup is light (set `"dark": false` on that beat). Elements an earlier beat faded out can be
+brought back with `B.in`.
 
-**Headless playback tests are unreliable.** Under virtual time, rAF does not advance, so `T.play()` stays at t=0. Test states with `?t=` (deterministic render), not by playing.
+**Removing a hold whose content a later hold builds on.** If the next beat only adds to the
+same pane, merge the two beats (move the motion into one registration, keep one spine entry,
+merge the notes) rather than deleting the motion with the beat.
 
-**Python on this machine is 3.6.** No `fromisoformat`, no walrus, no `capture_output`, no `directory=` on `SimpleHTTPRequestHandler`. ImageMagick's `convert` is a broken x86 binary; use `sips` for crops and resizes, and Chrome headless for anything else.
+## Rendering
 
-**Git commit messages with apostrophes.** Write the message to a file with `printf` and use `git commit -F file`; heredocs in the tool shell break on quotes.
+**Stray text outside its pane.** A `.scene` is full-stage; an absolutely positioned child with
+the wrong `left/top` lands on another pane. Shoot the frame; `&hide=sel` isolates who painted.
 
-**Fonts.** Manrope is bundled as a latin-subset woff2 and inlined into the public build; system fonts for text and mono. No CDN links, the deck must work offline on the podium laptop.
+**Descenders clipped while a headline blurs in.** Blur filters clip at the box. talk.css pads
+display type; never put `overflow:hidden` on text containers.
 
-**Images.** Headshots as 240 px square JPEGs cropped with `sips -c H W --cropOffset y x` after `--resampleWidth`; rendered round via CSS. QR codes as SVG from the `qrcode` npm package (see publishing.md). Logos grayscaled at 0.8 opacity on the light stage, `brightness(0) invert(1)` on the dark close.
+**Do not test playback, test instants.** Under headless virtual time rAF does not advance; use
+`?t=` frames (`talkc shoot`, `talk_frame`). Do not sample exactly on a `B.set` step time when
+comparing frames: the step applies from its time inclusive.
 
-**Double-blind.** A follow-up under review is "a follow-up study" / "ongoing work" on screen and in notes; the venue is never typed anywhere in the deck, including README and commit messages.
+**3D in thumbnails.** The app's navigator thumbnails flatten 3D transforms; `talk_frame` and
+`talkc shoot` render with Chromium and show 3D correctly. Judge 3D beats from those.
+
+## Environment
+
+**Python on this machine is 3.6.** No `fromisoformat`, no walrus, no `capture_output`. Prefer
+Node (24) for data mining scripts. ImageMagick's `convert` is a broken x86 binary; use `sips`.
+
+**Git commit messages with apostrophes.** Write the message to a file and `git commit -F file`.
+
+**Fonts.** Manrope is a latin-subset woff2 in `assets/` (talk.css loads it from there); system
+fonts for text and mono. No CDN links: the deck must work offline on the podium laptop.
+
+**Images.** Headshots as 240 px square JPEGs (`sips --resampleWidth`, then `-c H W
+--cropOffset y x`), rendered round via CSS. QR codes as SVG from the `qrcode` npm package (see
+publishing.md). Logos grayscaled at 0.8 opacity on the light stage, `brightness(0) invert(1)`
+on the dark close.
+
+**Double-blind.** A follow-up under review is "a follow-up study" or "ongoing work" on screen,
+in notes, in talk.json, in README and in commit messages; the venue is never typed anywhere.
