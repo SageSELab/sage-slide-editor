@@ -1,0 +1,15 @@
+{
+  "name": "sage-slide-editor",
+  "private": true,
+  "packageManager": "pnpm@10.18.0",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0",
+    "@types/node": "^24.0.0"
+  }
+}

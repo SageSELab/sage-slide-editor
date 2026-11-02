@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+*.bak
+.sage/
+build/
+tests/out/
+spikes/**/out/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+spikes/**/logs/
+spikes/**/sandbox/
+tests/golden/out/
+spikes/**/out-*/
