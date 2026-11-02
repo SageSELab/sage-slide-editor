@@ -33,6 +33,7 @@ final class TalkWindowModel {
     // Editing (Phase 3; TalkWindowModel+Editing.swift)
     /// The canvas shows the editing overlay (⌘E).
     var editMode = false
+    var rightPane: RightPane = .inspector
     /// The object selected on the canvas, as it last reported it.
     var selection: CanvasObject?
     /// The human's undo stack and the edit pipeline to the sidecar.

@@ -4,11 +4,11 @@ import SwiftUI
 /// The navigator column's tabs: the holds, and the talk's materials (PLAN 5.2, 7).
 enum NavigatorTab: String, CaseIterable { case beats = "Beats", materials = "Materials" }
 
+/// The right column's tabs. Kept on the model so a permission prompt or the self-test can switch it.
+enum RightPane: String, CaseIterable { case inspector = "Inspector", claude = "Claude" }
+
 struct TalkWindow: View {
     @Bindable var model: TalkWindowModel
-    @State private var rightPane: RightPane = .inspector
-
-    enum RightPane: String, CaseIterable { case inspector = "Inspector", claude = "Claude" }
 
     var body: some View {
         NavigationSplitView {
@@ -19,18 +19,18 @@ struct TalkWindow: View {
                 .navigationSplitViewColumnWidth(min: 560, ideal: 900)
         } detail: {
             VStack(spacing: 0) {
-                Picker("", selection: $rightPane) {
+                Picker("", selection: $model.rightPane) {
                     ForEach(RightPane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden().padding(10)
                 Divider()
-                switch rightPane {
+                switch model.rightPane {
                 case .inspector: InspectorView(model: model)
                 case .claude: ClaudePane(chat: model.chat)
                 }
             }
             // A permission request needs an answer: show it.
-            .onChange(of: model.chat.pendingPermission?.id) { _, id in if id != nil { rightPane = .claude } }
+            .onChange(of: model.chat.pendingPermission?.id) { _, id in if id != nil { model.rightPane = .claude } }
             .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
         }
         .navigationTitle(model.talk?.displayName ?? "SAGE Talk")

@@ -80,6 +80,8 @@ extension SelfTest {
         log.append("hold: \(rel.value) -> \(newHold); stack \(model.edits.undoStack.map(\.title))")
         await shot(model, out, "edit-hold.png")
         if let win = model.canvas.webView.window {
+            model.rightPane = .inspector
+            try? await Task.sleep(for: .milliseconds(300)) // let SwiftUI lay out the inspector
             await writeWindow(win, films: [model.canvas], to: out.appendingPathComponent("edit-window.png"))
         }
 
