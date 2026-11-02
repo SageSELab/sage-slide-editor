@@ -231,7 +231,10 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     """
 
     /// Document end: report holds, notes, chapters and duration once the engine has booted
-    /// and its fonts are loaded.
+    /// and its fonts are loaded. The engine's own in-page editor (edit.js: E toggles it, and
+    /// while it is on Space, the arrows and stage clicks stop driving the film) is switched off:
+    /// in the app, editing is the canvas overlay's, and a stray E must not trap the canvas in a
+    /// mode the app cannot see or leave.
     private static let bridgeJS = """
     (function () {
       const post = (m) => { try { window.webkit.messageHandlers.sage.postMessage(m); } catch (e) {} };
@@ -241,6 +244,8 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         if (!T && ++tries < 200) return;
         clearInterval(wait);
         if (!T) return;
+        try { if (T.editor?.on) T.editor.exit(); } catch (e) {}
+        Object.defineProperty(T, 'editor', { get: () => null, set: () => {}, configurable: true });
         const report = () => post({
           kind: 'ready', t: T.t, duration: T.duration,
           holds: T.cps.map((c) => ({ at: c.at, label: c.label || '', backup: !!c.backup, notes: c.notes || '', id: c.id || '' })),
