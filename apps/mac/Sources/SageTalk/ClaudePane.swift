@@ -124,15 +124,41 @@ struct ClaudePane: View {
                 if let c = chat.lastCost { Text("Last \(ClaudeFormat.usd(c))") }
                 Text("Session \(ClaudeFormat.usd(chat.sessionCost))")
                 if let n = chat.contextTokens { Text("Context \(ClaudeFormat.tokens(n))") }
-                Spacer()
-                if let m = chat.model { Text(m.replacingOccurrences(of: "claude-", with: "")) }
             }
             .lineLimit(1).minimumScaleFactor(0.8)
-            effortControl
+            HStack(spacing: 12) {
+                modelControl
+                effortControl
+                Spacer(minLength: 0)
+            }
         }
         .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
         .padding(.horizontal, 10).padding(.vertical, 4)
         .accessibilityIdentifier("claude.footer")
+    }
+
+    /// The model the next message runs on (claude.send `model`; a running conversation switches
+    /// with setModel, so the context is kept). Remembered across launches.
+    private var modelControl: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "cpu")
+            Picker("Model", selection: $chat.chosenModel) {
+                ForEach(ClaudeProtocol.Model.allCases, id: \.self) { m in
+                    Text(m.label).tag(m)
+                }
+            }
+            .pickerStyle(.menu).labelsHidden().controlSize(.mini).fixedSize()
+            .accessibilityIdentifier("claude.model")
+        }
+        .help(modelHelp)
+    }
+
+    private var modelHelp: String {
+        var lines = ClaudeProtocol.Model.allCases.map { "\($0.label): \($0.detail)" }
+        if let running = chat.model, running != chat.chosenModel.rawValue {
+            lines.append("The conversation is on \(running); the next message switches it.")
+        }
+        return "Claude model for the next message.\n" + lines.joined(separator: "\n")
     }
 
     /// The reasoning effort sent with the next message (the Agent SDK's `effort` option; a running

@@ -52,7 +52,8 @@ final class TalkWindowModel {
     @ObservationIgnored var spineBeforeExternal: SpineSnapshot?
 
     /// The Claude pane (TalkWindowModel+Claude.swift).
-    let chat = ClaudeChat()
+    // The self-test keeps the default model so its renders do not depend on the user's choice.
+    let chat = ClaudeChat(defaults: SelfTest.outDir == nil ? .standard : nil)
     /// talk.json's materials, listed for the Materials sidebar (PLAN 7).
     var materials: [Materials.Entry] = []
     /// The navigator column's tab.
