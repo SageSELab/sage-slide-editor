@@ -1,0 +1,37 @@
+{
+  "jsonrpc": "2.0",
+  "id": 60,
+  "result": {
+    "inverse": {
+      "patches": [
+        {
+          "file": "scenes/line.html",
+          "range": [
+            1873,
+            1876
+          ],
+          "newText": "160"
+        }
+      ],
+      "digests": {
+        "scenes/line.html": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0123456789abcdef0123456789abcdef"
+      }
+    },
+    "changed": [
+      "scenes/line.html"
+    ],
+    "ok": true,
+    "diagnostics": [],
+    "holds": [
+      {
+        "index": 1,
+        "at": 5,
+        "label": "Title",
+        "backup": false,
+        "beat": "line.title",
+        "chapter": "line",
+        "auto": false
+      }
+    ]
+  }
+}

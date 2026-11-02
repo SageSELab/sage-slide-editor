@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "method": "talk.edit",
+  "params": {
+    "op": "setStyle",
+    "args": {
+      "id": "c1-bench",
+      "style": {
+        "left": 120,
+        "top": 880,
+        "width": 1500,
+        "height": 140,
+        "fontSize": null
+      },
+      "scene": "scenes/line.html"
+    }
+  }
+}

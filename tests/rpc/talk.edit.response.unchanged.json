@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 53,
+  "result": {
+    "inverse": {
+      "patches": [],
+      "digests": {}
+    },
+    "changed": [],
+    "ok": true,
+    "diagnostics": []
+  }
+}

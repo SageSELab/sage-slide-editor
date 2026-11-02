@@ -7,8 +7,9 @@ import { sageCore as defaultCore } from './sage-core.ts';
 import {
   ErrorCode, RpcError,
   type BuildResult, type BuildTrigger, type BuiltParams, type ChangedParams, type LayoutResult, type OpenParams,
-  type OpenResult, type TalkKind,
+  type OpenResult, type TalkKind, type EditParams, type EditResult, type Inverse,
 } from './protocol.ts';
+import { applyEdit, applyInverse, type Applied } from './edit.ts';
 import type { Log } from './rpc.ts';
 import { TalkWatcher, atomicAppWrite, type WatchBatch } from './watcher.ts';
 
@@ -23,6 +24,8 @@ export class Session {
   private talk: OpenTalk | null = null;
   private buildChain: Promise<unknown> = Promise.resolve();
   private changeBuildQueued = false;
+  /** Paths written by talk.edit/talk.revert whose rebuild already ran (or is queued). */
+  private builtByEdit = new Set<string>();
 
   constructor(
     private events: SessionEvents,
@@ -62,6 +65,7 @@ export class Session {
     this.talk.watcher?.stop();
     this.log('info', `closed ${this.talk.root}`);
     this.talk = null;
+    this.builtByEdit.clear();
     await this.buildChain.catch(() => {});
   }
 
@@ -94,6 +98,34 @@ export class Session {
     atomicAppWrite(t.watcher, t.root, rel, content);
   }
 
+  /** talk.edit: apply one source edit, rebuild, return the inverse (PLAN 4). */
+  async edit(p: EditParams): Promise<EditResult> {
+    this.requireBeatFormat('talk.edit');
+    const t = this.requireTalk();
+    return this.afterWrite(t, applyEdit(t.root, t.watcher, p));
+  }
+
+  /** talk.revert: apply an inverse unless its files changed since (EditConflict). */
+  async revert(inv: Inverse): Promise<EditResult> {
+    this.requireBeatFormat('talk.revert');
+    const t = this.requireTalk();
+    return this.afterWrite(t, applyInverse(t.root, t.watcher, inv));
+  }
+
+  private async afterWrite(t: OpenTalk, a: Applied): Promise<EditResult> {
+    const result: EditResult = { inverse: a.inverse, changed: a.changed, ok: true, diagnostics: [] };
+    if (a.stretch) result.stretch = a.stretch;
+    if (!a.changed.length) return result;
+    // The watcher will report these paths as 'app'; this build already covers them.
+    for (const f of a.changed) this.builtByEdit.add(f);
+    const b = await this.enqueueBuild('edit');
+    result.ok = b.ok;
+    result.diagnostics = b.diagnostics;
+    if (b.holds) result.holds = b.holds;
+    if (this.talk !== t) throw new RpcError(ErrorCode.NoTalkOpen, 'the talk was closed during the edit');
+    return result;
+  }
+
   /** Resolves when queued builds have finished (shutdown, tests). */
   idle(): Promise<unknown> { return this.buildChain.catch(() => {}); }
 
@@ -121,6 +153,10 @@ export class Session {
     if (this.talk !== t) return; // stale watcher of a closed talk
     if (b.external.length) this.events.changed({ paths: b.external, source: 'external' });
     if (b.app.length) this.events.changed({ paths: b.app, source: 'app' });
+    // App writes that talk.edit already rebuilt need no second build.
+    const covered = !b.external.length && b.app.every((f) => this.builtByEdit.has(f));
+    for (const f of b.app) this.builtByEdit.delete(f);
+    if (covered) return;
     if (t.kind === 'beatFormat' && !this.changeBuildQueued) {
       this.changeBuildQueued = true;
       void this.enqueueBuild('change').catch((e) => this.log('error', `rebuild failed: ${(e as Error).message}`));

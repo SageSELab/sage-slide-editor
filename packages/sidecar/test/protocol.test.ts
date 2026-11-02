@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  ErrorCode, METHOD_NAMES, NOTIFICATION_NAMES, classify, checkErrorObject, notificationCheckers, paramCheckers, resultCheckers,
+  EDIT_OPS, ErrorCode, METHOD_NAMES, NOTIFICATION_NAMES, classify, checkErrorObject, notificationCheckers, paramCheckers, resultCheckers,
   type MethodName, type NotificationName,
 } from '../src/protocol.ts';
 import { RPC_FIXTURES } from './helpers.ts';
@@ -60,6 +60,23 @@ describe('tests/rpc fixtures', () => {
     for (const n of NOTIFICATION_NAMES) expect(seen, n).toContainEqual({ method: n, kind: 'notification' });
     const codes = new Set(files.filter((f) => parseFixtureName(f).kind === 'error').map((f) => (load(f) as { error: { code: number } }).error.code));
     for (const [name, code] of Object.entries(ErrorCode)) if (name !== 'Timeout') expect(codes, name).toContain(code);
+  });
+});
+
+describe('editing fixtures', () => {
+  it('cover every talk.edit op', () => {
+    const ops = files.filter((f) => f.startsWith('talk.edit.request.')).map((f) => (load(f) as { params: { op: string } }).params.op);
+    for (const op of EDIT_OPS) expect(ops, op).toContain(op);
+  });
+  it('reject bad args', () => {
+    const check = paramCheckers['talk.edit'];
+    expect(check({ op: 'setHold', args: { ref: 'a.b', hold: -1 } })).toEqual(['params.args.hold: expected a non-negative number or null']);
+    expect(check({ op: 'nope', args: {} })[0]).toMatch(/^params.op: expected one of/);
+    expect(check({ op: 'setStyle', args: { id: 'x', style: { color: 'red' } } })).toHaveLength(1);
+    expect(check({ op: 'setText', args: { id: 'x', html: 'y', extra: 1 } })).toEqual(["params.args: unexpected 'extra'"]);
+    expect(check({ op: 'insertBeat', args: { chapter: 'c', index: 0, beat: { id: 'b' } } })).toHaveLength(1);
+    expect(paramCheckers['talk.revert']({ patches: [{ file: '/etc/passwd', range: [0, 1], newText: '' }], digests: {} })).toEqual(['params.patches[0].file: expected a relative path']);
+    expect(paramCheckers['talk.revert']({ patches: [], digests: { 'a.html': 'xyz' } })).toEqual(['params.digests: expected {file: sha256 hex}']);
   });
 });
 

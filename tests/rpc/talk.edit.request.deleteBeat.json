@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 46,
+  "method": "talk.edit",
+  "params": {
+    "op": "deleteBeat",
+    "args": {
+      "ref": "line.beat-1"
+    }
+  }
+}

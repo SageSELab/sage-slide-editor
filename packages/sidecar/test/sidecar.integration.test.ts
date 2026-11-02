@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ErrorCode, classify, notificationCheckers, resultCheckers,
-  type BuiltParams, type ChangedParams, type LayoutResult, type MethodName, type NotificationName, type OpenResult,
+  type BuiltParams, type ChangedParams, type EditResult, type LayoutResult, type MethodName, type NotificationName, type OpenResult,
 } from '../src/protocol.ts';
 import { eventually, spineStats, tempTalk } from './helpers.ts';
 
@@ -115,6 +115,36 @@ describe('sidecar process', () => {
     expect(await c.exited).toEqual({ code: 0, signal: null });
     expect(c.problems).toEqual([]);
     expect(c.stderr.join('')).toContain('shutting down: app.shutdown');
+  });
+
+  it('edits over RPC: talk.edit writes as the app, talk.revert undoes, a stale inverse conflicts', async () => {
+    const { root, c } = setup();
+    await c.request('talk.open', { path: root });
+    await new Promise((r) => setTimeout(r, 300));
+    const scene = path.join(root, 'scenes/line.html');
+    const original = fs.readFileSync(scene, 'utf8');
+
+    const ed = await c.request<EditResult>('talk.edit', { op: 'setStyle', args: { id: 'c1-eye', style: { left: 160 } } });
+    expect(ed.changed).toEqual(['scenes/line.html']);
+    expect(ed.ok).toBe(true);
+    expect(fs.readFileSync(scene, 'utf8')).toContain('id="c1-eye" data-a style="position:absolute;left:160px;top:110px"');
+    expect(c.notes.some((n) => n.method === 'talk.built' && (n.params as BuiltParams).trigger === 'edit')).toBe(true);
+    const changed = await c.waitFor<ChangedParams>('talk.changed', (p) => p.paths.includes('scenes/line.html'));
+    expect(changed.source).toBe('app');
+    // The edit's own build covers the watcher's report: no change-triggered rebuild follows.
+    await new Promise((r) => setTimeout(r, 400));
+    expect(c.notes.filter((n) => n.method === 'talk.built' && (n.params as BuiltParams).trigger === 'change')).toEqual([]);
+
+    const redo = await c.request<EditResult>('talk.revert', ed.inverse);
+    expect(fs.readFileSync(scene, 'utf8')).toBe(original);
+
+    // Someone else edits the file; the redo inverse no longer applies.
+    await new Promise((r) => setTimeout(r, 300));
+    fs.appendFileSync(scene, '\n<!-- claude was here -->\n');
+    await expect(c.request('talk.revert', redo.inverse)).rejects.toMatchObject({ code: ErrorCode.EditConflict, data: { files: ['scenes/line.html'] } });
+    expect(fs.readFileSync(scene, 'utf8')).toBe(original + '\n<!-- claude was here -->\n');
+    await expect(c.request('talk.edit', { op: 'setText', args: { id: 'nope', html: 'x' } })).rejects.toMatchObject({ code: ErrorCode.EditFailed, data: { code: 'no-element' } });
+    expect(c.problems).toEqual([]);
   });
 
   it('returns structured errors', async () => {

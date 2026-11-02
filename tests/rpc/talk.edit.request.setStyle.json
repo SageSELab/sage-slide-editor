@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "method": "talk.edit",
+  "params": {
+    "op": "setStyle",
+    "args": {
+      "id": "c1-eye",
+      "style": {
+        "left": 160,
+        "top": 110
+      }
+    }
+  }
+}

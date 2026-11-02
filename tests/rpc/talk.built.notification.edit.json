@@ -1,0 +1,21 @@
+{
+  "jsonrpc": "2.0",
+  "method": "talk.built",
+  "params": {
+    "ok": true,
+    "diagnostics": [],
+    "ms": 412,
+    "trigger": "edit",
+    "holds": [
+      {
+        "index": 1,
+        "at": 5,
+        "label": "Title",
+        "backup": false,
+        "beat": "line.title",
+        "chapter": "line",
+        "auto": false
+      }
+    ]
+  }
+}

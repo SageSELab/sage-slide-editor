@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 53,
+  "method": "talk.edit",
+  "params": {
+    "op": "setBeat",
+    "args": {
+      "ref": "line.title",
+      "props": {
+        "label": "Opening",
+        "backup": null
+      }
+    }
+  }
+}

@@ -5,7 +5,7 @@
 // Phase 4 adds the Agent SDK bridge here: a `claude.*` method family (send, interrupt,
 // approve) and `claude.*` notifications (stream deltas, tool rows, cost), plus sidecar -> app
 // requests (`app.ask` for the approval sheet, `app.frame` for talk_frame) through peer.request().
-import { PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, type MethodName, type OpenParams, type WatchParams } from './protocol.ts';
+import { PROTOCOL_VERSION, RpcError, ErrorCode, paramCheckers, type MethodName, type OpenParams, type WatchParams, type EditParams, type Inverse } from './protocol.ts';
 import { RpcPeer, type Log } from './rpc.ts';
 import { Session } from './session.ts';
 
@@ -65,6 +65,9 @@ method('talk.close', async () => { await session.close(); return {}; });
 method('talk.build', () => session.build());
 method('talk.layout', () => session.layout());
 method('talk.watch', (p: WatchParams) => ({ watching: session.setWatching(p.enabled) }));
+// Editing (Phase 3)
+method('talk.edit', (p: EditParams) => session.edit(p));
+method('talk.revert', (p: Inverse) => session.revert(p));
 
 peer.onClose(() => void shutdown('stdin closed'));
 process.stdout.on('error', () => void shutdown('stdout closed', 0));

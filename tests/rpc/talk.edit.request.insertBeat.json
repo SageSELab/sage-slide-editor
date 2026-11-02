@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 45,
+  "method": "talk.edit",
+  "params": {
+    "op": "insertBeat",
+    "args": {
+      "chapter": "line",
+      "index": 2,
+      "beat": {
+        "id": "beat-1",
+        "label": "New beat",
+        "hold": 2
+      }
+    }
+  }
+}

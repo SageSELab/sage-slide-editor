@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 61,
+  "error": {
+    "code": -32010,
+    "message": "no element #c1-dots in any scene file (generated elements cannot be edited here)",
+    "data": {
+      "code": "no-element"
+    }
+  }
+}

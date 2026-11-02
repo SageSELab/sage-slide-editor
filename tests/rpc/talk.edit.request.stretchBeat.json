@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 52,
+  "method": "talk.edit",
+  "params": {
+    "op": "stretchBeat",
+    "args": {
+      "ref": "line.fifteen",
+      "factor": 1.25
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 47,
+  "method": "talk.edit",
+  "params": {
+    "op": "duplicateBeat",
+    "args": {
+      "ref": "line.fifteen",
+      "newId": "fifteen-2",
+      "label": "Fifteen years (copy)"
+    }
+  }
+}

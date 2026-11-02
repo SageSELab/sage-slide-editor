@@ -1,0 +1,75 @@
+{
+  "jsonrpc": "2.0",
+  "id": 52,
+  "result": {
+    "inverse": {
+      "patches": [
+        {
+          "file": "beats/line.js",
+          "range": [
+            1205,
+            1208
+          ],
+          "newText": "0.4"
+        },
+        {
+          "file": "talk.json",
+          "range": [
+            1544,
+            1547
+          ],
+          "newText": "8.4"
+        }
+      ],
+      "digests": {
+        "beats/line.js": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0123456789abcdef0123456789abcdef",
+        "talk.json": "baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0123456789abcdef0123456789abcdef"
+      }
+    },
+    "changed": [
+      "beats/line.js",
+      "talk.json"
+    ],
+    "ok": true,
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "code": "hold-before-motion-end",
+        "message": "line.fifteen holds at 10.5 s, before its motion ends at 10.9 s",
+        "beat": "line.fifteen"
+      }
+    ],
+    "holds": [
+      {
+        "index": 1,
+        "at": 5,
+        "label": "Title",
+        "backup": false,
+        "beat": "line.title",
+        "chapter": "line",
+        "auto": false
+      },
+      {
+        "index": 2,
+        "at": 15.5,
+        "label": "Fifteen years",
+        "backup": false,
+        "beat": "line.fifteen",
+        "chapter": "line",
+        "auto": false
+      }
+    ],
+    "stretch": {
+      "stretched": 12,
+      "skipped": [
+        {
+          "file": "beats/line.js",
+          "line": 21,
+          "col": 3,
+          "call": "W.px(B, 160, 1280, 0.6, 7.0, 'inOut')",
+          "reason": "helper call receives B; its time arguments are unknown"
+        }
+      ]
+    }
+  }
+}

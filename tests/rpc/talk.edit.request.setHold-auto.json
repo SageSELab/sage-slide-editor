@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 50,
+  "method": "talk.edit",
+  "params": {
+    "op": "setHold",
+    "args": {
+      "ref": "line.title",
+      "hold": null
+    }
+  }
+}

@@ -82,14 +82,15 @@ enum RPCFixtures {
             let e = try #require(message.error)
             let known = [P.ErrorCode.parseError, P.ErrorCode.invalidRequest, P.ErrorCode.methodNotFound, P.ErrorCode.invalidParams,
                          P.ErrorCode.internalError, P.ErrorCode.notATalk, P.ErrorCode.noTalkOpen, P.ErrorCode.unsupportedForKind,
-                         P.ErrorCode.shuttingDown, P.ErrorCode.timeout]
+                         P.ErrorCode.shuttingDown, P.ErrorCode.timeout, P.ErrorCode.editFailed, P.ErrorCode.editConflict]
             #expect(known.contains(e.code), "unknown error code \(e.code)")
         }
     }
 
     @Test func coversEveryMethodAndNotification() {
         let parsed = RPCFixtures.names.compactMap(RPCFixtures.parse)
-        let methods = [P.Method.ping, P.Method.shutdown, P.Method.open, P.Method.close, P.Method.build, P.Method.layout, P.Method.watch]
+        let methods = [P.Method.ping, P.Method.shutdown, P.Method.open, P.Method.close, P.Method.build, P.Method.layout, P.Method.watch,
+                       P.Method.edit, P.Method.revert]
         for m in methods {
             #expect(parsed.contains { $0 == (m, .request) }, "\(m) request fixture")
             #expect(parsed.contains { $0 == (m, .response) }, "\(m) response fixture")
@@ -97,6 +98,24 @@ enum RPCFixtures {
         for n in [P.Notification.changed, P.Notification.built] {
             #expect(parsed.contains { $0 == (n, .notification) }, "\(n) fixture")
         }
+    }
+
+    @Test func everyEditOpHasARequestFixture() throws {
+        var seen: Set<String> = []
+        for name in RPCFixtures.names where name.hasPrefix("talk.edit.request.") {
+            let msg = try JSONDecoder().decode(RPCMessage.self, from: RPCFixtures.data(name))
+            seen.insert(try #require(msg.params).decode(as: EditOp.self).name)
+        }
+        #expect(seen == Set(EditOp.allNames))
+    }
+
+    @Test func editOpsKeepExplicitNulls() throws {
+        let op = EditOp.setStyle(id: "a", style: StyleArgs(left: .set(.px(10)), fontSize: .remove))
+        let json = String(decoding: try JSONEncoder().encode(op), as: UTF8.self)
+        #expect(json.contains(#""fontSize":null"#) && !json.contains("width"))
+        #expect(try JSONDecoder().decode(EditOp.self, from: Data(json.utf8)) == op)
+        let hold = String(decoding: try JSONEncoder().encode(EditOp.setHold(ref: "a.b", hold: nil)), as: UTF8.self)
+        #expect(hold.contains(#""hold":null"#))
     }
 
     @Test func parseErrorKeepsNullId() throws {
@@ -112,6 +131,8 @@ enum RPCFixtures {
         switch method {
         case P.Method.open: try roundTrip(params, as: P.OpenParams.self)
         case P.Method.watch: try roundTrip(params, as: P.WatchParams.self)
+        case P.Method.edit: try roundTrip(params, as: EditOp.self)
+        case P.Method.revert: try roundTrip(params, as: P.Inverse.self)
         default:
             // Parameterless methods: absent, or an empty object.
             #expect(params == nil || params == .object([:]), "\(method) takes no params")
@@ -126,6 +147,7 @@ enum RPCFixtures {
         case P.Method.build: try roundTrip(result, as: P.BuildResult.self)
         case P.Method.layout: try roundTrip(result, as: P.LayoutResult.self)
         case P.Method.watch: try roundTrip(result, as: P.WatchResult.self)
+        case P.Method.edit, P.Method.revert: try roundTrip(result, as: P.EditResult.self)
         default: Issue.record("no typed struct for \(method) result")
         }
     }

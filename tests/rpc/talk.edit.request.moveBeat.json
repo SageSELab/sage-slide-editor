@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 48,
+  "method": "talk.edit",
+  "params": {
+    "op": "moveBeat",
+    "args": {
+      "ref": "line.fifteen",
+      "chapter": "line",
+      "index": 0
+    }
+  }
+}

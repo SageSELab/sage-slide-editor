@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 62,
+  "error": {
+    "code": -32011,
+    "message": "scenes/line.html changed since this edit; it can no longer be undone",
+    "data": {
+      "files": [
+        "scenes/line.html"
+      ]
+    }
+  }
+}

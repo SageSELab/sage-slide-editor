@@ -139,7 +139,7 @@ export interface WatchResult {
 /** Empty object result (talk.close, app.shutdown). */
 export type Empty = Record<string, never>;
 
-export interface Methods {
+export interface Methods extends EditMethods {
   'app.ping': { params: Empty | undefined; result: PingResult };
   /** Replies, then closes the talk and exits 0. Closing stdin has the same effect. */
   'app.shutdown': { params: Empty | undefined; result: Empty };
@@ -169,7 +169,8 @@ export interface ChangedParams {
   source: ChangeSource;
 }
 
-export type BuildTrigger = 'open' | 'request' | 'change';
+/** 'edit': the build talk.edit / talk.revert ran after writing (see the editing section). */
+export type BuildTrigger = 'open' | 'request' | 'change' | 'edit';
 
 export interface BuiltParams extends BuildResult {
   trigger: BuildTrigger;
@@ -200,6 +201,9 @@ export const ErrorCode = {
   UnsupportedForKind: -32002,
   ShuttingDown: -32003,
   Timeout: -32004,
+  // Editing (see the editing section)
+  EditFailed: -32010,
+  EditConflict: -32011,
 } as const;
 export type ErrorCodeName = keyof typeof ErrorCode;
 
@@ -213,7 +217,7 @@ export class RpcError extends Error {
   }
 }
 
-export const METHOD_NAMES: readonly MethodName[] = ['app.ping', 'app.shutdown', 'talk.open', 'talk.close', 'talk.build', 'talk.layout', 'talk.watch'];
+export const METHOD_NAMES: readonly MethodName[] = ['app.ping', 'app.shutdown', 'talk.open', 'talk.close', 'talk.build', 'talk.layout', 'talk.watch', 'talk.edit', 'talk.revert'];
 export const NOTIFICATION_NAMES: readonly NotificationName[] = ['talk.changed', 'talk.built'];
 
 // ---------------------------------------------------------------------------------------
@@ -280,6 +284,155 @@ export function checkBuildResult(v: unknown, at = 'result'): Problems {
   return [...keys(v, at, ['ok', 'diagnostics', 'ms']), ...checkBuildFields(v, at)];
 }
 
+// ---------------------------------------------------------------------------------------
+// Editing (Phase 3): talk.edit, talk.revert. Types, op argument shapes and validators.
+// The app keeps the undo stack; the sidecar only applies edits and inverses, and refuses an
+// inverse whose files changed since it was issued (EditConflict).
+// ---------------------------------------------------------------------------------------
+
+/** A byte-range replacement in a talk file ([start, end) UTF-16 offsets, as @sage/core's Patch). */
+export interface WirePatch { file: string; range: [number, number]; newText: string }
+
+/** Undoes one edit. `digests`: sha256 (hex) of each touched file as the edit left it. */
+export interface Inverse { patches: WirePatch[]; digests: Record<string, string> }
+
+/** Inline-style properties: numbers are px, strings are CSS values, null removes. */
+export interface StyleArgs { left?: number | string | null; top?: number | string | null; width?: number | string | null; height?: number | string | null; fontSize?: number | string | null }
+
+/** talk.edit ops and their args. Element ops find the scene holding #id unless `scene` names it. */
+export interface EditOps {
+  setText: { id: string; html: string; scene?: string };
+  setStyle: { id: string; style: StyleArgs; scene?: string };
+  setAttr: { id: string; name: string; value: string | true | null; scene?: string };
+  insertBeat: { chapter: string; index: number; beat: { id: string; label: string; notes?: string; hold?: number } };
+  deleteBeat: { ref: string };
+  duplicateBeat: { ref: string; newId: string; label?: string };
+  moveBeat: { ref: string; chapter: string; index: number };
+  setHold: { ref: string; hold: number | null };
+  setNotes: { ref: string; notes: string | null };
+  stretchBeat: { ref: string; factor: number };
+  setBeat: { ref: string; props: { label?: string; backup?: boolean | null; dark?: boolean | null } };
+  setChapter: { chapter: string; props: { label?: string; dark?: boolean | null; private?: boolean | null; backup?: boolean | null } };
+}
+export type EditOpName = keyof EditOps;
+export const EDIT_OPS: readonly EditOpName[] = ['setText', 'setStyle', 'setAttr', 'insertBeat', 'deleteBeat', 'duplicateBeat', 'moveBeat', 'setHold', 'setNotes', 'stretchBeat', 'setBeat', 'setChapter'];
+
+export type EditParams = { [K in EditOpName]: { op: K; args: EditOps[K] } }[EditOpName];
+
+export interface StretchSkip { file: string; line: number; col: number; call: string; reason: string }
+
+export interface EditResult {
+  /** Apply with talk.revert to undo; empty patches when the edit changed nothing. */
+  inverse: Inverse;
+  /** Talk-relative paths written, sorted. */
+  changed: string[];
+  /** The rebuild after the write (skipped, ok:true and no diagnostics, when nothing changed). */
+  ok: boolean;
+  diagnostics: Diagnostic[];
+  /** Fresh hold list after a successful rebuild. */
+  holds?: Hold[];
+  /** stretchBeat only: calls rewritten, and those left alone. */
+  stretch?: { stretched: number; skipped: StretchSkip[] };
+}
+
+export interface EditMethods {
+  /** Applies one source edit atomically (writes announced to the watcher, so source 'app'), then rebuilds. */
+  'talk.edit': { params: EditParams; result: EditResult };
+  /** Applies an inverse from a previous talk.edit/talk.revert result. EditConflict if a file changed since. */
+  'talk.revert': { params: Inverse; result: EditResult };
+}
+
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const optStr = (v: unknown) => v === undefined || isStr(v);
+const nullable = (ok: (v: unknown) => boolean) => (v: unknown) => v === null || ok(v);
+const isBool = (v: unknown) => typeof v === 'boolean';
+
+function checkArgsShape(a: unknown, at: string, spec: Record<string, [required: boolean, ok: (v: unknown) => boolean, what: string]>): Problems {
+  if (!isObj(a)) return [`${at}: expected an object`];
+  const req = Object.keys(spec).filter((k) => spec[k]![0]), opt = Object.keys(spec).filter((k) => !spec[k]![0]);
+  const p = keys(a, at, req, opt);
+  for (const [k, [, ok, what]] of Object.entries(spec)) if (k in a && !ok(a[k])) p.push(`${at}.${k}: expected ${what}`);
+  return p;
+}
+const propsOf = (allowed: Record<string, (v: unknown) => boolean>) => (v: unknown) =>
+  isObj(v) && Object.entries(v).every(([k, x]) => k in allowed && allowed[k]!(x));
+const styleValue = (v: unknown) => v === null || isNum(v) || isStr(v);
+
+const EDIT_ARGS: Record<EditOpName, Record<string, [boolean, (v: unknown) => boolean, string]>> = {
+  setText: { id: [true, isStr, 'a string'], html: [true, isStr, 'a string'], scene: [false, isStr, 'a string'] },
+  setStyle: { id: [true, isStr, 'a string'], style: [true, propsOf({ left: styleValue, top: styleValue, width: styleValue, height: styleValue, fontSize: styleValue }), 'left/top/width/height/fontSize as number, string or null'], scene: [false, isStr, 'a string'] },
+  setAttr: { id: [true, isStr, 'a string'], name: [true, isStr, 'a string'], value: [true, (v) => v === null || v === true || isStr(v), 'a string, true or null'], scene: [false, isStr, 'a string'] },
+  insertBeat: {
+    chapter: [true, isStr, 'a string'], index: [true, (v) => isInt(v) && v >= 0, 'a non-negative integer'],
+    beat: [true, (v) => isObj(v) && keys(v, 'beat', ['id', 'label'], ['notes', 'hold']).length === 0 && isStr(v.id) && isStr(v.label) && optStr(v.notes) && (v.hold === undefined || (isNum(v.hold) && v.hold >= 0)), '{id, label, notes?, hold?}'],
+  },
+  deleteBeat: { ref: [true, isStr, 'a string'] },
+  duplicateBeat: { ref: [true, isStr, 'a string'], newId: [true, isStr, 'a string'], label: [false, isStr, 'a string'] },
+  moveBeat: { ref: [true, isStr, 'a string'], chapter: [true, isStr, 'a string'], index: [true, (v) => isInt(v) && v >= 0, 'a non-negative integer'] },
+  setHold: { ref: [true, isStr, 'a string'], hold: [true, nullable((v) => isNum(v) && v >= 0), 'a non-negative number or null'] },
+  setNotes: { ref: [true, isStr, 'a string'], notes: [true, nullable(isStr), 'a string or null'] },
+  stretchBeat: { ref: [true, isStr, 'a string'], factor: [true, (v) => isNum(v) && v > 0, 'a positive number'] },
+  setBeat: { ref: [true, isStr, 'a string'], props: [true, propsOf({ label: isStr, backup: nullable(isBool), dark: nullable(isBool) }), '{label?, backup?, dark?}'] },
+  setChapter: { chapter: [true, isStr, 'a string'], props: [true, propsOf({ label: isStr, dark: nullable(isBool), private: nullable(isBool), backup: nullable(isBool) }), '{label?, dark?, private?, backup?}'] },
+};
+
+export function checkPatch(v: unknown, at: string): Problems {
+  if (!isObj(v)) return [`${at}: expected an object`];
+  const r = v.range;
+  return [
+    ...keys(v, at, ['file', 'range', 'newText']),
+    ...want(isStr(v.file) && v.file.length > 0 && !v.file.startsWith('/'), `${at}.file: expected a relative path`),
+    ...want(Array.isArray(r) && r.length === 2 && isInt(r[0]) && isInt(r[1]) && r[0] >= 0 && r[1] >= r[0], `${at}.range: expected [start, end] with 0 <= start <= end`),
+    ...want(isStr(v.newText), `${at}.newText: expected a string`),
+  ];
+}
+
+export function checkInverse(v: unknown, at: string): Problems {
+  if (!isObj(v)) return [`${at}: expected an object`];
+  const d = v.digests;
+  return [
+    ...keys(v, at, ['patches', 'digests']),
+    ...checkList(v.patches, `${at}.patches`, checkPatch),
+    ...want(isObj(d) && Object.values(d).every((x) => isStr(x) && /^[0-9a-f]{64}$/.test(x)), `${at}.digests: expected {file: sha256 hex}`),
+  ];
+}
+
+function checkEditResult(r: unknown): Problems {
+  if (!isObj(r)) return ['result: expected an object'];
+  const s = r.stretch;
+  return [
+    ...keys(r, 'result', ['inverse', 'changed', 'ok', 'diagnostics'], ['holds', 'stretch']),
+    ...checkInverse(r.inverse, 'result.inverse'),
+    ...checkList(r.changed, 'result.changed', (x, at) => want(isStr(x) && !x.startsWith('/'), `${at}: expected a relative path`)),
+    ...want(typeof r.ok === 'boolean', 'result.ok: expected a boolean'),
+    ...checkList(r.diagnostics, 'result.diagnostics', checkDiagnostic),
+    ...(r.holds === undefined ? [] : checkList(r.holds, 'result.holds', checkHold)),
+    ...(s === undefined ? [] : !isObj(s) ? ['result.stretch: expected an object'] : [
+      ...keys(s, 'result.stretch', ['stretched', 'skipped']),
+      ...want(isInt(s.stretched) && s.stretched >= 0, 'result.stretch.stretched: expected a non-negative integer'),
+      ...checkList(s.skipped, 'result.stretch.skipped', (x, at) => isObj(x)
+        ? [...keys(x, at, ['file', 'line', 'col', 'call', 'reason']), ...want(isStr(x.file) && isInt(x.line) && isInt(x.col) && isStr(x.call) && isStr(x.reason), `${at}: bad field types`)]
+        : [`${at}: expected an object`]),
+    ]),
+  ];
+}
+
+export const editParamCheckers: { [M in keyof EditMethods]: (p: unknown) => Problems } = {
+  'talk.edit': (p) => {
+    if (!isObj(p)) return ['params: expected an object'];
+    const problems = keys(p, 'params', ['op', 'args']);
+    if (!EDIT_OPS.includes(p.op as EditOpName)) return [...problems, `params.op: expected one of ${EDIT_OPS.join(', ')}`];
+    return [...problems, ...checkArgsShape(p.args, 'params.args', EDIT_ARGS[p.op as EditOpName])];
+  },
+  'talk.revert': (p) => checkInverse(p, 'params'),
+};
+
+export const editResultCheckers: { [M in keyof EditMethods]: (r: unknown) => Problems } = {
+  'talk.edit': checkEditResult,
+  'talk.revert': checkEditResult,
+};
+
 export const paramCheckers: { [M in MethodName]: (p: unknown) => Problems } = {
   'app.ping': (p) => checkEmpty(p),
   'app.shutdown': (p) => checkEmpty(p),
@@ -298,6 +451,7 @@ export const paramCheckers: { [M in MethodName]: (p: unknown) => Problems } = {
     if (!isObj(p)) return ['params: expected an object'];
     return [...keys(p, 'params', ['enabled']), ...want(typeof p.enabled === 'boolean', 'params.enabled: expected a boolean')];
   },
+  ...editParamCheckers,
 };
 
 export const resultCheckers: { [M in MethodName]: (r: unknown) => Problems } = {
@@ -338,6 +492,7 @@ export const resultCheckers: { [M in MethodName]: (r: unknown) => Problems } = {
     if (!isObj(r)) return ['result: expected an object'];
     return [...keys(r, 'result', ['watching']), ...want(typeof r.watching === 'boolean', 'result.watching: expected a boolean')];
   },
+  ...editResultCheckers,
 };
 
 export const notificationCheckers: { [N in NotificationName]: (p: unknown) => Problems } = {
@@ -354,7 +509,7 @@ export const notificationCheckers: { [N in NotificationName]: (p: unknown) => Pr
     return [
       ...keys(p, 'params', ['ok', 'diagnostics', 'ms', 'trigger'], ['holds']),
       ...checkBuildFields(p, 'params'),
-      ...want(p.trigger === 'open' || p.trigger === 'request' || p.trigger === 'change', 'params.trigger: bad value'),
+      ...want(p.trigger === 'open' || p.trigger === 'request' || p.trigger === 'change' || p.trigger === 'edit', 'params.trigger: bad value'),
       ...(p.holds === undefined ? [] : checkList(p.holds, 'params.holds', checkHold)),
     ];
   },

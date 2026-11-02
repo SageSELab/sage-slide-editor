@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 44,
+  "method": "talk.edit",
+  "params": {
+    "op": "setAttr",
+    "args": {
+      "id": "c1-eye",
+      "name": "data-a",
+      "value": null
+    }
+  }
+}

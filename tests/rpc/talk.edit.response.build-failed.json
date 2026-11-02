@@ -1,0 +1,33 @@
+{
+  "jsonrpc": "2.0",
+  "id": 54,
+  "result": {
+    "inverse": {
+      "patches": [
+        {
+          "file": "beats/line.js",
+          "range": [
+            300,
+            301
+          ],
+          "newText": ""
+        }
+      ],
+      "digests": {
+        "beats/line.js": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0123456789abcdef0123456789abcdef"
+      }
+    },
+    "changed": [
+      "beats/line.js"
+    ],
+    "ok": false,
+    "diagnostics": [
+      {
+        "severity": "error",
+        "code": "script-syntax",
+        "message": "syntax error: Unexpected token (12:3)",
+        "file": "beats/line.js:12:4"
+      }
+    ]
+  }
+}

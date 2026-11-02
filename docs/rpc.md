@@ -96,7 +96,7 @@ Notes:
 | Notification | Params |
 |---|---|
 | `talk.changed` | `{paths: string[], source: 'app' \| 'external'}` |
-| `talk.built` | `{ok, diagnostics, ms, trigger: 'open' \| 'request' \| 'change', holds?}` |
+| `talk.built` | `{ok, diagnostics, ms, trigger: 'open' \| 'request' \| 'change' \| 'edit', holds?}` |
 
 The folder watcher uses `fs.watch` with `recursive`, which is FSEvents on macOS. It debounces
 events for 150 ms (`SAGE_WATCH_DEBOUNCE_MS`). It ignores `build/`, `.sage/`, `node_modules/`,
@@ -151,6 +151,72 @@ edits use this path. Phase 4 Claude edits arrive through the Agent SDK's Edit to
 
 To change the protocol, edit `protocol.ts`, the Swift structs, this page and the fixtures
 together.
+
+## Editing (Phase 3)
+
+Every human edit is written to disk at once through `@sage/core`'s source-edit functions
+(PLAN 2, autosave rule). The app keeps the undo stack; the sidecar only applies edits and
+inverses. Source lives in `packages/sidecar/src/edit.ts`; Swift types in
+`apps/mac/Sources/SageTalkCore/EditProtocol.swift`.
+
+| Method | Params | Result | Errors |
+|---|---|---|---|
+| `talk.edit` | `{op, args}` (below) | `EditResult` | NoTalkOpen, UnsupportedForKind, InvalidParams, EditFailed |
+| `talk.revert` | `Inverse` | `EditResult` | NoTalkOpen, UnsupportedForKind, InvalidParams, EditConflict |
+
+```ts
+interface WirePatch { file: string; range: [start, end]; newText: string }  // UTF-16 offsets
+interface Inverse { patches: WirePatch[]; digests: { [file: string]: string /* sha256 hex */ } }
+interface EditResult {
+  inverse: Inverse;          // apply with talk.revert to undo (its result's inverse redoes)
+  changed: string[];         // talk-relative paths written, sorted
+  ok: boolean;               // the rebuild after the write
+  diagnostics: Diagnostic[];
+  holds?: Hold[];            // after a successful rebuild
+  stretch?: { stretched: number; skipped: { file, line, col, call, reason }[] };  // stretchBeat
+}
+```
+
+| `op` | `args` |
+|---|---|
+| `setText` | `{id, html, scene?}`: inner HTML of `#id` |
+| `setStyle` | `{id, style: {left?, top?, width?, height?, fontSize?}, scene?}`: numbers are px, strings raw CSS, `null` removes |
+| `setAttr` | `{id, name, value: string \| true \| null, scene?}` (`true` = bare attribute, `null` removes) |
+| `insertBeat` | `{chapter, index, beat: {id, label, notes?, hold?}}`; also adds an empty `Talk.beat` stub |
+| `deleteBeat` | `{ref}` (`'chapter.beat'`); also removes its registration |
+| `duplicateBeat` | `{ref, newId, label?}` |
+| `moveBeat` | `{ref, chapter, index}` (index after removal); across chapters the registration moves and is renamed |
+| `setHold` | `{ref, hold: number \| null}` (`null`: auto hold) |
+| `setNotes` | `{ref, notes: string \| null}` |
+| `stretchBeat` | `{ref, factor}` |
+| `setBeat` | `{ref, props: {label?, backup?, dark?}}` (flags: `null` removes) |
+| `setChapter` | `{chapter, props: {label?, dark?, private?, backup?}}` |
+
+- Element ops find the one scene file (layers, chapter scenes, public scene) whose source has
+  `#id`. `scene` names it explicitly. An id that only exists in generated DOM is EditFailed
+  with `data.code: 'no-element'`.
+- The edit is computed against the files as they are on disk. Every touched file is announced
+  to the watcher and staged under `.sage/tmp/` before any is renamed into place, so the
+  watcher reports the paths with `source: 'app'`, and a failure while staging writes nothing.
+- The sidecar then rebuilds and sends `talk.built` with `trigger: 'edit'` before replying. The
+  watcher's later batch for the same paths is still reported as `talk.changed` (`app`), but
+  triggers no second build.
+- An edit that changes nothing returns an empty inverse and `changed: []`, and does not build.
+- `talk.revert` refuses an inverse when any file in `digests` no longer hashes to its digest
+  (EditConflict, `data.files` lists them), and writes nothing. So an undo never overwrites an
+  external or Claude edit made since. The app clears its undo stack on any `external` change
+  anyway; the digest check covers the race between the two.
+- A failed rebuild is `ok: false` with diagnostics; the files are still written (and the
+  inverse still applies).
+
+| Code | Name | Meaning |
+|---|---|---|
+| -32010 | EditFailed | The core refused the edit. `data.code` is the core's code (`no-element`, `duplicate-element`, `no-end-tag`, `no-beat`, `no-chapter`, `duplicate-beat`, `bad-index`, `bad-prop`, `no-scene`, `invalid-spine`, ...) |
+| -32011 | EditConflict | `talk.revert`: a file changed since the inverse was issued. `data.files` |
+
+Fixtures: `talk.edit.request.<op>[-variant].json` (one per op), `talk.edit.response[.variant].json`,
+`talk.revert.{request,response}.json`, `talk.built.notification.edit.json`,
+`error.edit-failed.json`, `error.edit-conflict.json`.
 
 ## Phase 4 additions (not in protocol 1)
 

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 43,
+  "method": "talk.edit",
+  "params": {
+    "op": "setAttr",
+    "args": {
+      "id": "logo",
+      "name": "src",
+      "value": "assets/logo-2.png"
+    }
+  }
+}

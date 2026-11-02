@@ -1,0 +1,46 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "inverse": {
+      "patches": [
+        {
+          "file": "scenes/line.html",
+          "range": [
+            1873,
+            1876
+          ],
+          "newText": "120"
+        }
+      ],
+      "digests": {
+        "scenes/line.html": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0123456789abcdef0123456789abcdef"
+      }
+    },
+    "changed": [
+      "scenes/line.html"
+    ],
+    "ok": true,
+    "diagnostics": [],
+    "holds": [
+      {
+        "index": 1,
+        "at": 5,
+        "label": "Title",
+        "backup": false,
+        "beat": "line.title",
+        "chapter": "line",
+        "auto": false
+      },
+      {
+        "index": 2,
+        "at": 13.4,
+        "label": "Fifteen years",
+        "backup": false,
+        "beat": "line.fifteen",
+        "chapter": "line",
+        "auto": false
+      }
+    ]
+  }
+}

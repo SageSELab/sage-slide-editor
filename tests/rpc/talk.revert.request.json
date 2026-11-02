@@ -1,0 +1,20 @@
+{
+  "jsonrpc": "2.0",
+  "id": 60,
+  "method": "talk.revert",
+  "params": {
+    "patches": [
+      {
+        "file": "scenes/line.html",
+        "range": [
+          1873,
+          1876
+        ],
+        "newText": "120"
+      }
+    ],
+    "digests": {
+      "scenes/line.html": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0123456789abcdef0123456789abcdef"
+    }
+  }
+}

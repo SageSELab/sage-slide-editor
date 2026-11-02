@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 40,
+  "method": "talk.edit",
+  "params": {
+    "op": "setText",
+    "args": {
+      "id": "t-g",
+      "html": "How far <b>are</b> we?"
+    }
+  }
+}
