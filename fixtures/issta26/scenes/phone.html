@@ -1,0 +1,39 @@
+  <!-- ===================== CHAPTER 2 · INSIDE THE PHONE (captions) ===================== -->
+  <div class="scene" id="c2">
+    <div class="eyebrow" id="c2-eye" data-a style="position:absolute;left:120px;top:60px">Inside a UI-centric app</div>
+    <div class="laylabel" id="ll1" data-a style="left:1200px;top:580px">Layout<small>Views and their hierarchy, declared in XML</small></div>
+    <div class="laylabel" id="ll2" data-a style="left:1200px;top:450px">Event listeners<small>Code the framework calls on a tap or a long press</small></div>
+    <div class="laylabel" id="ll3" data-a style="left:1200px;top:320px">State<small>Values the screen keeps between events</small></div>
+    <div class="laylabel" id="ll4" data-a style="left:1200px;top:190px">Lifecycle<small>Callbacks when the screen is paused, destroyed, re-created</small></div>
+    <!-- the user's side of each paradigm: a second, smaller phone -->
+    <div id="miniwrap" data-a style="position:absolute;left:880px;top:190px;width:223px;height:459px">
+      <div class="device" style="left:0;top:0;transform:scale(.62);transform-origin:0 0"><div class="notch"></div><div class="screen">
+        <div class="hn" id="mhn">
+          <div class="status"><span>11:49</span><span>▾ ◢ ▮</span></div>
+          <div class="list" style="overflow:hidden"><div id="m-list">
+            <div class="cm first mrow" id="m-c1" style="--c:transparent"><div class="hd"><b>Thorrez</b> · 2 hrs</div><div class="tx">[2024]<br>And it looks like this is the draft, and it was published on the author's blog here: <span class="lnk">https://telefoncek.si/2024/05/2024-05-30-grapheneos-and-fore…</span></div></div>
+            <div class="cm mrow" id="m-c2" style="--d:1;--c:#e3c344"><div class="hd"><b>azalemeth</b> · 1 hr</div><div class="tx">I really love GrapheneOS but I _wish_ there was a version in which you could get a root shell and extract private data of apps you install when verified as the user. The developers are on record as saying that root blows a hole in their security model (it does!) but if there was _some_ way of doing it safely, it would be my ideal OS.</div></div>
+            <div class="cm mrow" id="m-c3" style="--d:2;--c:#4fa3d9"><div class="hd"><b>djrj477dhsnv</b> · 47 mins</div><div class="tx">I wish this as well. I make a userdebug build myself to get adb root, which isn't difficult, but would be a lot nicer if it were officially supported.</div></div>
+            <div class="cm mrow" id="m-c4" style="--d:3;--c:#b56fd6"><div class="hd"><b>lmiric</b> · 23 mins</div><div class="tx">That's interesting. Can you share a guide for doing that?</div></div>
+          </div></div>
+          <div class="menu" id="m-menu" style="top:120px"><div><i>●</i>View user (Thorrez)</div><div><i>↗</i>Share comment link</div><div><i>⧉</i>Copy text</div><div><i>↩</i>Reply</div></div>
+          <div class="touch" id="m-fg" style="left:150px;top:120px"></div>
+          <div id="m-flash" style="position:absolute;inset:0;background:#fff;opacity:0;z-index:9"></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="xmlchip" id="xmlchip" data-a style="left:880px;top:670px"><code>&lt;TextView android:id="@+id/comment_body"
+          android:layout_width="match_parent" /&gt;</code></div>
+    <h2 class="h-m" id="pc1" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">The user sees what is declared by developers.</h2>
+    <h2 class="h-m" id="pc2" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">When the user acts, the framework decides which listener runs, and when.</h2>
+    <h2 class="h-m" id="pc3" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">Changes made by user actions need to be tracked in state.</h2>
+    <h2 class="h-m" id="pc4" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">Apps need to handle users rotating the screen, or leaving the app and coming back.</h2>
+    <div id="c2-types" style="position:absolute;left:760px;top:300px">
+      <h2 class="h-l" id="c2-th" data-a>Four kinds of UI bugs</h2>
+      <p class="cap" id="c2-tc" data-a style="margin-top:16px">Johnson et al., AndroR2+ · 180 real Android bug reports</p>
+    </div>
+    <div class="typechip" id="tc1" data-a style="left:760px;top:520px;background:var(--crash)">Crash</div>
+    <div class="typechip" id="tc2" data-a style="left:900px;top:520px;background:var(--output)">Output</div>
+    <div class="typechip" id="tc3" data-a style="left:1060px;top:520px;background:var(--cosmetic)">Cosmetic</div>
+    <div class="typechip" id="tc4" data-a style="left:1250px;top:520px;background:var(--nav)">Navigation</div>
+  </div>

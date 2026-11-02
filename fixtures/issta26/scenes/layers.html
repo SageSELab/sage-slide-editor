@@ -1,0 +1,56 @@
+  <!-- ===================== CHAPTER 1 · THE LINE (world layers scrolled by the camera) ===================== -->
+  <svg class="world" id="wsvg" viewBox="0 0 4200 1080" width="4200" height="1080" xmlns="http://www.w3.org/2000/svg">
+    <path id="line" d="M 120 680 L 1420 680 L 3300 680 L 3300 440 A 40 40 0 0 1 3340 400 L 3540 400 A 40 40 0 0 1 3580 440 L 3580 920 A 40 40 0 0 1 3540 960 L 3340 960 A 40 40 0 0 1 3300 920 L 3300 680"/>
+    <path id="qm" d="M 3400 620 A 40 40 0 1 1 3440 660 L 3440 700"/>
+    <circle id="qdot" cx="3440" cy="740" r="8" fill="#1d1d1f" data-a/>
+  </svg>
+  <div class="world" id="whtml"></div>
+
+  <div id="slideno"></div>
+
+  <!-- ===================== THE DEVICE (persists from chapter 2 on) ===================== -->
+  <div class="rig" id="rig" data-a style="left:1110px;top:310px">
+    <div class="tilt" id="tilt">
+      <div class="device" style="left:0;top:0"><div class="notch"></div><div class="screen">
+        <div class="hn" id="hn">
+          <div class="status"><span>11:49</span><span>▾ ◢ ▮</span></div>
+          <div class="list" style="overflow:hidden"><div id="hnlist">
+            <div class="cm first" style="--c:transparent"><div class="hd"><b>Thorrez</b> · 2 hrs</div><div class="tx" id="cm1tx"><span id="yr">[2024]</span><br>And it looks like this is the draft, and it was published on the author's blog here: <span class="lnk" id="lnk">https://telefoncek.si/2024/05/2024-05-30-grapheneos-and-fore…</span></div></div>
+            <div class="cm" style="--d:1;--c:#e3c344"><div class="hd"><b>azalemeth</b> · 1 hr</div><div class="tx">I really love GrapheneOS but I _wish_ there was a version in which you could get a root shell and extract private data of apps you install when verified as the user. The developers are on record as saying that root blows a hole in their security model (it does!) but if there was _some_ way of doing it safely, so I can modify applications I as the user wish to, it would be my ideal OS.</div></div>
+            <div class="cm" style="--d:2;--c:#4fa3d9"><div class="hd"><b>djrj477dhsnv</b> · 47 mins</div><div class="tx">I wish this as well. I make a userdebug build myself to get adb root, which isn't difficult, but would be a lot nicer if it were officially supported.</div></div>
+            <div class="cm" style="--d:3;--c:#b56fd6"><div class="hd"><b>lmiric</b> · 23 mins</div><div class="tx">That's interesting. Can you share a guide for doing that?</div></div>
+            <div class="cm" style="--d:1;--c:#e3c344"><div class="hd"><b>subscribed</b> · 1 hr</div><div class="tx">You can't have a cake and eat it. A root access is a big hole, there's no way mainline will support it.</div></div>
+          </div>
+          </div>
+          <div class="menu" id="menu">
+            <div><i>●</i>View user (Thorrez)</div><div><i>↗</i>Share comment link</div><div><i>⧉</i>Copy text</div><div><i>⌗</i>Select text</div><div><i>▲</i>Vote up</div><div><i>▽</i>Unvote</div><div><i>▼</i>Vote down (experimental)</div><div><i>↩</i>Reply</div>
+          </div>
+          <div class="browser" id="browser">
+            <div class="bar">WebView Browser Tester 66.0.3359.158</div>
+            <div class="url">https://telefoncek.si/2024/05/2024-05-30-grapheneos…</div>
+            <h1>Telefoncek.si</h1>
+            <div class="nav">• Vizitka • O Pravokator.si • Pravno obvestilo • Predavanja in knjige • Varnost GSM •</div>
+            <h2>GrapheneOS and forensic extraction of data</h2>
+            <div class="date">Objavljeno: 29. 05. 2024</div>
+            <div class="ph"></div>
+          </div>
+          <div class="crash" id="crash"><b>Harmonic has stopped</b><span>java.lang.NullPointerException<br>at CommentsFragment.onItemClick</span><div class="btn">CLOSE APP</div></div>
+          <div class="settings" id="settings"><div class="tb">‹ &nbsp;Settings</div><div class="it">Theme</div><div class="it">Font size</div><div class="it">Open links in</div><div class="it">Account</div></div>
+          <div class="gl" id="gl">
+            <div class="gl-bar">≡ &nbsp;GPSLogger</div>
+            <div class="gl-row"><b>STATUS</b>Logging stopped</div>
+            <div class="gl-row"><b>FORMATS</b>GPX · KML · CSV</div>
+            <div class="gl-row"><b>LAST POINT</b>28.6024, −81.2001</div>
+            <div class="gl-drawer" id="gl-drawer"><div>General options</div><div>Logging details</div><div>Performance</div><div id="gl-item">Auto send, email and upload</div><div>Custom URL</div></div>
+            <div class="gl-crash" id="gl-crash"><b>GPSLogger has stopped</b><span>java.lang.NullPointerException<br>at GpsMainActivity.launchPreferenceScreen</span><div class="btn">CLOSE APP</div></div>
+          </div>
+          <div class="touch" id="fg" style="left:150px;top:120px"><svg viewBox="0 0 80 80" style="position:absolute;inset:-12px;width:82px;height:82px"><circle id="ring" cx="40" cy="40" r="36" fill="none" stroke="#1d1d1f" stroke-width="4" transform="rotate(-90 40 40)"/></svg></div>
+        </div>
+      </div></div>
+      <!-- exploded layers -->
+      <div class="lay wire" data-a style="visibility:hidden"><i style="top:48px;height:36px"></i><i style="top:100px;height:140px"></i><i style="top:258px;height:120px"></i><i style="top:392px;height:84px"></i><i style="top:490px;height:60px"></i><i style="top:562px;height:70px"></i></div>
+      <div class="lay listen" data-a style="visibility:hidden"><b style="top:118px">onLongClick → onItemClick()</b><b style="top:206px">onClickATag → openLink()</b><b style="top:300px">onLongClick → onItemClick()</b><b style="top:420px">onClick → expand()</b></div>
+      <div class="lay state" data-a style="visibility:hidden"><div class="card">comments: <span>List&lt;Comment&gt;</span><br>expanded: <span id="st-exp">true</span><br>scrollY: <span id="st-scr">0</span><br>disableATagClick: <span>false</span></div></div>
+      <div class="lay life" data-a style="visibility:hidden"><b style="top:140px" id="lc1">onCreate()</b><b style="top:200px" id="lc2">onResume()</b><b style="top:260px" id="lc3">onPause()</b><b style="top:320px" id="lc4">onStop()</b><b style="top:380px" id="lc5">onDestroy()</b></div>
+    </div>
+  </div>

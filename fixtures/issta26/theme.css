@@ -1,0 +1,27 @@
+/* ISSTA 2026 per-talk tweaks on top of talk.css (ported verbatim from the original <style> block). */
+/* Per-talk tweaks on top of talk.css */
+.code { white-space: normal; font-size: 20px; line-height: 30px; }
+.code .ln { white-space: pre; height: 30px; }
+.code .ln.new { height: 0; }
+.logos { display: flex; gap: 46px; align-items: center; filter: grayscale(1); opacity: .8; }
+.logos img { height: 54px; width: auto; }
+.logos img.sage { height: 62px; }
+.authors-line { font-size: 29px; line-height: 1.5; color: var(--ink-2); }
+.authors-line b { color: var(--ink); font-weight: 600; }
+#wsvg path { fill: none; stroke: var(--ink); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+#wsvg { z-index: 1; } #whtml { z-index: 2; }
+#black { z-index: 3; } .rig { z-index: 4; } #c2, #c3, #c4, #c5, #c6, #c7, #c8 { z-index: 5; }
+.lane .ln-l { z-index: 3; background: var(--bg); width: 312px; height: 150px; top: 0; padding-top: 30px; }
+.lane .dq { z-index: 1; } .lane .gate { z-index: 2; }
+.hmg { grid-template-columns: 170px repeat(50, 26px); } .hmg .cl { width: 26px; height: 26px; }
+.pcard .code .ln.new { height: 0; }
+.shot { position: absolute; width: 200px; border-radius: 22px; overflow: hidden; box-shadow: 0 0 0 6px #111, 0 0 0 7px #333, 0 24px 60px rgba(0,0,0,.18); background: #111; }
+.shot img { display: block; width: 100%; }
+.shotcap { position: absolute; font-size: 22px; color: var(--ink-3); }
+.check { position: absolute; width: 96px; height: 96px; border-radius: 50%; background: var(--correct); color: #fff; display: grid; place-items: center; font: 300 60px var(--text); box-shadow: 0 16px 40px rgba(31,138,76,.35); }
+.xmark { position: absolute; width: 96px; height: 96px; border-radius: 50%; background: var(--crash); color: #fff; display: grid; place-items: center; font: 300 56px var(--text); box-shadow: 0 16px 40px rgba(217,59,43,.35); }
+.typechip { position: absolute; font: 700 26px var(--display); color: #fff; padding: 12px 24px; border-radius: 999px; }
+/* Public end card buttons (scenes/end.html; only present in the public build). */
+.endbtn { display: inline-block; padding: 16px 34px; border-radius: 999px; background: var(--ink); color: #fff; font: 700 26px var(--display); text-decoration: none; }
+.endbtn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+.endbtn:hover { background: var(--a1); color: #fff; box-shadow: none; }

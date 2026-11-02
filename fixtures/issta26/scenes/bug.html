@@ -1,0 +1,31 @@
+  <!-- ===================== CHAPTER 3 · ONE BUG, LIVE ===================== -->
+  <div class="scene" id="c3">
+    <div class="eyebrow" id="c3-eye" data-a style="position:absolute;left:120px;top:100px">Harmonic HN · issue #114 · one of the 50 real bugs</div>
+    <div class="report" id="rep" data-a style="left:760px;top:220px;border-top:8px solid var(--crash)">
+      <div class="ih"><span class="ilab red">bug</span><span class="ilab">Harmonic HN · #114</span><span class="ilab green">reproduced · Pixel 2</span></div>
+      <h3>Long-tapping URL (to open comment menu) also opens the URL</h3>
+      <div class="rsteps"><span><i>1</i>Long tap on a URL</span><span><i>2</i>The menu opens, and the link opens too</span></div>
+      <div class="exob"><span class="ex">Expected · only the menu</span><span class="ob">Observed · menu and link together</span></div>
+    </div>
+    <div id="c3-obs" data-a style="position:absolute;left:760px;top:640px;width:1100px"><p class="sub" style="color:var(--correct);font-weight:600">Expected behavior: the long press opens <em>only</em> the menu.</p><p class="sub" style="color:var(--crash);font-weight:600;margin-top:14px">Observed behavior: the menu <em>and</em> the link open simultaneously.</p></div>
+
+    <h2 class="h-m" id="c3-why" data-a style="position:absolute;left:760px;top:92px;width:1100px;font-size:38px;white-space:nowrap">Two listeners on one view that the UI framework controls.</h2>
+    <h2 class="h-m" id="c3-fix" data-a style="position:absolute;left:760px;top:92px;width:1100px;font-size:40px;white-space:nowrap">The fix: implement state that persists.</h2>
+
+    <div class="code" id="pa" data-a style="left:760px;top:170px;width:1040px">
+      <div class="file">CommentsFragment.java · onItemClick(comment, pos, view) · builds the context menu</div><span class="ln">AlertDialog.Builder builder = <span class="k">new</span> AlertDialog.Builder(ctx);</span><span class="ln">builder.setAdapter(adapter, (dialog, which) -&gt; { … });</span><span class="ln"> </span><span class="ln add new">CommentsRecyclerViewAdapter commentAdapter = <span class="k">this</span>.adapter;</span><span class="ln add new">builder.setOnDismissListener(<span class="k">new</span> DialogInterface.OnDismissListener() {</span><span class="ln add new">    @Override</span><span class="ln add new">    <span class="k">public void</span> onDismiss(DialogInterface dialog) {</span><span class="ln add new">        commentAdapter.disableCommentATagClick = <span class="k">false</span>;</span><span class="ln add new">    }</span><span class="ln add new">});</span><span class="ln">AlertDialog dialog = builder.create();</span><span class="ln add new">commentAdapter.disableCommentATagClick = <span class="k">true</span>;</span><span class="ln" id="pa-show">dialog.show();</span>
+    </div>
+    <div class="code" id="pb" data-a style="left:760px;top:690px;width:1040px">
+      <div class="file">CommentsRecyclerViewAdapter.java · ItemViewHolder · one comment row</div><span class="ln add new"><span class="k">public boolean</span> disableCommentATagClick = <span class="k">false</span>;</span><span class="ln" id="pb-long">itemView.setOnLongClickListener(v -&gt; {</span><span class="ln">    commentLongClickListener.onItemClick(comment, pos, v);</span><span class="ln">    <span class="k">return true</span>; });</span><span class="ln" id="pb-click">commentBody.setOnClickATagListener((widget, text, href) -&gt; {</span><span class="ln add new" id="pb-if">    <span class="k">if</span> (disableCommentATagClick) <span class="k">return true</span>;</span><span class="ln" id="pb-open">    Utils.openLinkMaybeHN(widget.getContext(), href);</span><span class="ln">    <span class="k">return true</span>; });</span>
+    </div>
+    <div class="pulse" id="pl1" style="offset-path: path('M 284 304 C 520 304 560 771 760 771')"></div>
+    <div class="pulse" id="pl2" style="offset-path: path('M 284 304 C 520 304 560 861 760 861')"></div>
+    <div class="pulse" id="pl3" style="offset-path: path('M 284 304 C 520 304 560 801 760 801')"></div>
+    <div class="pulse" id="pl4" style="offset-path: path('M 284 304 C 520 304 560 921 760 921')"></div>
+    <div class="check" id="ok1" data-a style="left:380px;top:120px">✓</div>
+
+    <h2 class="h-m" id="c3-none" data-a style="position:absolute;left:760px;top:330px;width:1000px">Five repair tools. Not one produced a patch that passed the tests.</h2>
+    <div id="verd" style="position:absolute;left:760px;top:520px;display:flex;gap:14px;flex-wrap:wrap;width:1120px">
+      <span class="verdict" data-a><i>·</i>RewardRepair</span><span class="verdict" data-a><i>·</i>NTR</span><span class="verdict" data-a><i>·</i>D4C</span><span class="verdict" data-a><i>·</i>ChatRepair</span><span class="verdict" data-a><i>·</i>OpenHands</span>
+    </div>
+  </div>

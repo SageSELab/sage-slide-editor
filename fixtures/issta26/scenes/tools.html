@@ -1,0 +1,47 @@
+  <!-- ===================== CHAPTER 5 · FIVE TOOLS, ONE PIPELINE ===================== -->
+  <div class="scene" id="c5">
+    <div class="eyebrow" id="c5-eye" data-a style="position:absolute;left:120px;top:60px">Five repair techniques</div>
+    <div class="tin" id="tin" data-a>
+      <h4>Each bug, five tools</h4>
+      <div class="issue"><div class="ih"><span class="ilab red">bug</span><span class="ilab">Anglers' Log · #1445</span></div><div class="it">Editing a trip's date fails</div><div class="steps"><span>Create trip</span><span>Edit</span><span>Change date</span><span>Save</span><span class="bad">error</span></div></div>
+      <div class="blk"><span class="k">for</span> (UserDefineObject o : getTrips())
+<span class="loc">  <span class="k">if</span> (trip.overlapsTrip((Trip) o))</span>
+    <span class="k">return true</span>;</div>
+      <div class="have"><span><i style="background:var(--crash)"></i>failing GUI test</span><span><i style="background:var(--alt)"></i>bug report</span><span><i style="background:var(--overfit)"></i>localized line</span></div>
+    </div>
+    <div class="toolcard" id="tc-rr" data-a><h3>RewardRepair</h3><div class="md">Neural machine translation · a pre-trained model, trained with compile and test feedback · ICSE 2022</div>
+      <div class="mech" id="m-rr"><div class="mbox">seq2seq model<small>pre-trained · not tuned on UI code</small></div></div>
+      <div class="desc">Buggy line and method in, patch out. No report, no tests.</div></div>
+    <div class="toolcard" id="tc-ntr" data-a><h3>NTR</h3><div class="md">Fix templates guide an LLM · CodeLlama · 2024</div>
+      <div class="mech"><div class="tpl"><span class="k">if</span> (<span class="hole" id="hole">▢ condition ▢</span><span class="fill" id="fill">!trip.getId().equals(tr.getId())</span>)&nbsp;<span class="k">return true</span>;</div><div class="tpl" style="top:190px;font-size:22px;color:var(--ink-3);font-family:var(--text);font-weight:500">template: <b style="color:var(--ink)">insert a condition</b> → the model fills the hole</div></div>
+      <div class="desc">Pick a repair template, let the model fill the hole.</div></div>
+    <div class="toolcard" id="tc-d4c" data-a><h3>D4C</h3><div class="md">One prompt, the whole function rewritten · GPT-4 · 2024</div>
+      <div class="mech"><div class="tcard" style="left:40px;width:280px"><b>prompt</b>buggy method
+bug report
+failing test
+→ rewrite the function</div><div class="arrow-r" id="d4c-arrow" style="left:370px">→</div><div class="tcard" id="d4c-out" style="left:440px;width:490px"><b>response · the whole method · real patch 62</b><span class="k">for</span> (UserDefineObject object : trips)
+  <span class="k">if</span> (object <span class="k">instanceof</span> Trip &amp;&amp;
+      trip.overlapsTrip((Trip) object))
+    <span class="k">return true</span>;</div></div>
+      <div class="desc">One prompt, the whole function back.</div></div>
+    <div class="toolcard" id="tc-cr" data-a><h3>ChatRepair</h3><div class="md">A conversation with test feedback · GPT-3.5 · ISSTA 2024</div>
+      <div class="mech"><div class="loopring"><svg viewBox="0 0 240 240"><circle cx="120" cy="120" r="96" fill="none" stroke="#e5e5ea" stroke-width="10"/><circle id="loopc" cx="120" cy="120" r="96" fill="none" stroke="#2f6fed" stroke-width="10" stroke-linecap="round" transform="rotate(-90 120 120)"/><text x="120" y="114" text-anchor="middle" font-family="Manrope,sans-serif" font-weight="700" font-size="24" fill="#1d1d1f">patch</text><text x="120" y="142" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="17" fill="#86868b">test · feedback</text></svg></div>
+        <div class="loopnote"><b>1.</b> propose a patch<br><b>2.</b> run the tests<br><b>3.</b> feed the failure back into the prompt<br><b>…</b> up to 100 tries on a real bug</div></div>
+      <div class="desc">Patch, test, feed the failure back. Up to 100 rounds.</div></div>
+    <div class="toolcard" id="tc-oh" data-a><h3>OpenHands</h3><div class="md">A software engineering agent in a sandbox · Qwen2.5-Coder · 2025</div>
+      <div class="mech"><div class="term" id="ohterm" style="left:24px;top:24px;width:920px;height:252px"><div class="hd"><i></i><i></i><i></i><span>sandbox</span></div><span class="l c">cat app/src/main/java/com/cohenadair/anglerslog/model/Logbook.java</span><span class="l o">… public static boolean tripExists(Trip trip) { …</span><span class="l c">edit Logbook.java  tripExists()</span><span class="l c">./gradlew assembleDebug</span><span class="l ok">BUILD SUCCESSFUL in 1m 12s</span></div></div>
+      <div class="desc">Read, edit, run, repeat. One patch per bug.</div></div>
+
+    <h2 class="h-l" id="c5-ph" data-a style="position:absolute;left:120px;top:118px">Patch evaluation methodology</h2>
+    <div id="tminis"></div>
+    <div class="station" id="st1" data-a style="left:270px">Apply<small>splice into the buggy snapshot</small></div>
+    <div class="station" id="st2" data-a style="left:810px">Build<small>Gradle, the whole app</small></div>
+    <div class="station" id="st3" data-a style="left:1350px">Emulator<small>2 GUI tests · Pixel 2 · Android 9</small></div>
+    <div class="lanebox" id="lb1" data-a style="left:120px;--c:var(--correct)">Correct<small>matches the developer's fix</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb2" data-a style="left:440px;--c:var(--alt)">Plausible, not correct<small>passes, does not match</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb3" data-a style="left:760px;--c:var(--overfit)">Overfit<small>passes only by targeting the tests</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb4" data-a style="left:1080px;--c:var(--tfail)">Test failure<small>builds, fails a GUI test</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb5" data-a style="left:1400px;--c:#a1a1a6">Build failure<small>or no usable patch</small><div class="n">0</div></div>
+    <div id="sqs"></div>
+    <div id="c5-total" data-a style="position:absolute;left:120px;top:960px;display:flex;gap:26px;align-items:baseline"><span class="stat-num" id="c5-n" style="font-size:80px">0</span><span class="sub">patches · 1,457 synthetic · 1,592 real · two authors judge every plausible one</span></div>
+  </div>

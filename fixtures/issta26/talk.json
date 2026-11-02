@@ -1,0 +1,489 @@
+{
+  "format": "sage-talk/1",
+  "title": "Automated Program Repair of UI-centric Android Bugs: How Far are We?",
+  "venue": "ISSTA 2026",
+  "stage": {
+    "width": 1920,
+    "height": 1080
+  },
+  "theme": "theme.css",
+  "layers": "scenes/layers.html",
+  "lib": [
+    "lib/world.js",
+    "lib/phone.js",
+    "lib/device.js",
+    "lib/codepane.js",
+    "lib/stations.js",
+    "lib/dots.js",
+    "lib/tools.js",
+    "lib/bars.js",
+    "lib/agents.js",
+    "lib/flow.js",
+    "lib/heatmap.js",
+    "lib/term.js",
+    "lib/slideno.js"
+  ],
+  "defaults": {
+    "holdPad": 0.3,
+    "tail": 0.5
+  },
+  "chapters": [
+    {
+      "id": "line",
+      "label": "The line",
+      "scene": "scenes/line.html",
+      "motion": "beats/line.js",
+      "beats": [
+        {
+          "id": "title",
+          "label": "Title",
+          "notes": "Thank you. I am Kevin Moran from UCF. Joint work with colleagues at UCF, William & Mary, and Minnesota; Junayed Mahmud led it. The question in the title is literal.",
+          "hold": 5
+        },
+        {
+          "id": "fifteen",
+          "label": "Fifteen years",
+          "notes": "One line. GenProg searched over edits. PAR brought templates from human fixes. Defects4J gave everyone a shared benchmark in 2014. Prophet and Angelix, TBar, then translation models, then execution feedback, then a conversation with an LLM, and by 2024 agents.",
+          "hold": 8.5
+        },
+        {
+          "id": "measured",
+          "label": "Where it was measured",
+          "notes": "Every one of these was evaluated on benchmarks like these. They share one property: library and framework code checked by unit tests.",
+          "hold": 7
+        },
+        {
+          "id": "never",
+          "label": "Where it never went",
+          "notes": "The line never reached this. UI-centric programs. Mobile apps. The UI is nearly half of user-facing software, bugs are everywhere in it, and it is hard to test, which is exactly why repair research skipped it.",
+          "hold": 7
+        }
+      ]
+    },
+    {
+      "id": "phone",
+      "label": "Inside the phone",
+      "scene": "scenes/phone.html",
+      "motion": "beats/phone.js",
+      "beats": [
+        {
+          "id": "exploded",
+          "label": "Exploded view",
+          "notes": "Four reasons UI code is different, all visible in Android. The layout lives in XML, not in code. The code that reacts to a tap is a listener, and the framework decides when it runs. The screen has state. And the framework pauses, destroys, and re-creates it. Myers called this inside-out programming.",
+          "hold": 8.5
+        },
+        {
+          "id": "layout",
+          "label": "Layout",
+          "notes": "The layout is declared in XML, not drawn in code. Each view in that file becomes a view on screen, and the framework lays them out.",
+          "hold": 5
+        },
+        {
+          "id": "listeners",
+          "label": "Event listeners",
+          "notes": "The code that reacts to a tap is a listener. The user acts, and the framework decides which listener runs and in what order. Control is inverted. Myers called this inside-out programming.",
+          "hold": 5
+        },
+        {
+          "id": "state",
+          "label": "State",
+          "notes": "The screen has state. Where the user scrolled to, which comment they collapsed. That state is held by the screen, and it has to be kept.",
+          "hold": 5
+        },
+        {
+          "id": "lifecycle",
+          "label": "Lifecycle",
+          "notes": "And the framework pauses, destroys, and re-creates that screen whenever it likes. Rotate the phone, switch apps and come back. Anything the code did not save is gone. The output is a rendered screen, and that is what a repair tool has to reason about.",
+          "hold": 5.5
+        },
+        {
+          "id": "crash",
+          "label": "Crash",
+          "notes": "Prior work on 180 real Android bug reports groups them into four types. Crashes.",
+          "hold": 4
+        },
+        {
+          "id": "output",
+          "label": "Output",
+          "notes": "Output errors: the app computes or shows the wrong thing. These are the most common type in our real bugs.",
+          "hold": 2
+        },
+        {
+          "id": "cosmetic",
+          "label": "Cosmetic",
+          "notes": "Cosmetic issues: clipped, misplaced, or mis-styled components. The function is there, the rendering is wrong.",
+          "hold": 2
+        },
+        {
+          "id": "navigation",
+          "label": "Navigation",
+          "notes": "And navigation issues: the user ends up on the wrong screen, or cannot get to the right one. We use these four types throughout.",
+          "hold": 2
+        }
+      ]
+    },
+    {
+      "id": "bug",
+      "label": "One bug",
+      "scene": "scenes/bug.html",
+      "motion": "beats/bug.js",
+      "beats": [
+        {
+          "id": "bug",
+          "label": "The bug",
+          "notes": "Harmonic is a Hacker News reader. Issue 114, as filed. You long-press a link in a comment. The context menu opens, which is right. And the link opens in the browser, which is wrong.",
+          "hold": 7
+        },
+        {
+          "id": "why",
+          "label": "Why it happens",
+          "notes": "Two listeners on one view. The long press reaches onItemClick and opens the menu. The ordinary click listener on the link fires as well and opens the browser. The framework orders them, and nothing in the code arbitrates.",
+          "hold": 8
+        },
+        {
+          "id": "fix",
+          "label": "The fix",
+          "notes": "The developer added a flag on the adapter. It is set while the menu is showing, consulted by the link listener, and cleared when the menu is dismissed. Nine lines across two methods. The difficulty is not the size. It is knowing that two listeners share a view and that the only way to arbitrate is state that outlives a single event.",
+          "hold": 5
+        },
+        {
+          "id": "fixed",
+          "label": "Fixed",
+          "notes": "Same gesture on the fixed build. The long press opens the menu, the click reaches the flag and stops. No browser.",
+          "hold": 5
+        },
+        {
+          "id": "none",
+          "label": "No tool fixed it",
+          "notes": "None of the five tools in our study produced a plausible patch for this bug. Hold that thought. We come back to it at the end.",
+          "hold": 4.5
+        }
+      ]
+    },
+    {
+      "id": "dfb",
+      "label": "DroidFixBench",
+      "scene": "scenes/dfb.html",
+      "motion": "beats/dfb.js",
+      "beats": [
+        {
+          "id": "title",
+          "label": "DroidFixBench",
+          "notes": "So we built DroidFixBench, the first Android bug benchmark made for program repair.",
+          "hold": 4.5
+        },
+        {
+          "id": "needs",
+          "label": "What a repair tool needs",
+          "notes": "To run any of these tools on a UI bug you need five things, and every one of them was missing from the Android bug datasets that existed. A buggy snapshot that compiles. The fault localized to the statement. The developer's fix. GUI tests that fail on the bug and pass on the fix. And a description. So we built DroidFixBench.",
+          "hold": 8
+        },
+        {
+          "id": "sources",
+          "label": "Three sources",
+          "notes": "Three sources of candidate bugs: our AndroR2+ dataset, the issue trackers of five recently updated F-Droid apps, and the FBO4A reports from Johnson et al. Every candidate then goes through five steps.",
+          "hold": 2.3
+        },
+        {
+          "id": "build",
+          "label": "Build",
+          "notes": "Build the buggy commit. Gradle versions, dead dependencies. Many historical snapshots never build at all.",
+          "hold": 2.1
+        },
+        {
+          "id": "reproduce",
+          "label": "Reproduce",
+          "notes": "Reproduce it on a Pixel 2 emulator with Android 9, following the steps in the report.",
+          "hold": 2
+        },
+        {
+          "id": "localize",
+          "label": "Localize",
+          "notes": "Localize the fault. Diff the buggy and fixed commits; two authors mark the statements that matter.",
+          "hold": 2
+        },
+        {
+          "id": "tests",
+          "label": "Write tests",
+          "notes": "Write two GUI tests, both fail-to-pass: one reproduces the report directly, one reaches the same bug through the surrounding UI.",
+          "hold": 2
+        },
+        {
+          "id": "validate",
+          "label": "Validate",
+          "notes": "Validate. Both tests flip from fail to pass between the buggy and fixed builds. Five steps per bug, and this is where the months went.",
+          "hold": 2
+        },
+        {
+          "id": "fifty",
+          "label": "Fifty real bugs",
+          "notes": "Fifty real bugs from twenty-three apps. Twelve crashes, twenty-five output errors, nine cosmetic, four navigation. Twenty-seven are fixed in one method and twenty-three across several. The largest fix changes ninety-two lines. These are not toy bugs, and this took several person-months.",
+          "hold": 5.5
+        },
+        {
+          "id": "before",
+          "label": "The mutant, before",
+          "notes": "This is launchPreferenceScreen in GPSLogger as the developers wrote it. MDroid+ has ten Android-specific mutation operators. On the next click it applies NullIntent here, and we build the mutant, run it, and describe what we see.",
+          "hold": 2
+        },
+        {
+          "id": "mutant",
+          "label": "A mutant",
+          "notes": "The synthetic half. We ran MDroid+, our Android-specific mutation tool, on the same five apps, keeping only mutants in Activities and Fragments so the bug shows on screen. This one replaces an Intent with null in GPSLogger. We built it, reproduced it on the emulator, and wrote the description from what we saw.",
+          "hold": 5.4
+        },
+        {
+          "id": "synthetic",
+          "label": "Forty-six synthetic bugs",
+          "notes": "Forty-six bugs across ten operators. Single-statement, single-method, with a known fix. They give us the easy end of the difficulty range. The real bugs give us the hard end.",
+          "hold": 3.5
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "label": "Five tools",
+      "scene": "scenes/tools.html",
+      "motion": "beats/tools.js",
+      "beats": [
+        {
+          "id": "rr",
+          "label": "RewardRepair",
+          "notes": "RewardRepair is a neural machine translation model, trained with compilation and test feedback. We used the authors' pre-trained model. It sees the buggy line and its method, nothing else. No report, no tests.",
+          "hold": 5.8
+        },
+        {
+          "id": "ntr",
+          "label": "NTR",
+          "notes": "NTR predicts which fix template applies and then has CodeLlama fill the template in. The templates come from traditional Java repair. None of them was designed for UI code.",
+          "hold": 5
+        },
+        {
+          "id": "d4c",
+          "label": "D4C",
+          "notes": "D4C prompts GPT-4 once with the method, the report, and the failing test, and asks for the whole function back. The response on screen is real patch 62 for this bug. It builds, it passes the tests, and it is not a fix.",
+          "hold": 5
+        },
+        {
+          "id": "cr",
+          "label": "ChatRepair",
+          "notes": "ChatRepair holds a conversation with GPT-3.5. It proposes a patch, runs the tests, and feeds the failure back into the next prompt, up to a hundred times on a real bug. It is the first tool here that sees its own test results.",
+          "hold": 5
+        },
+        {
+          "id": "oh",
+          "label": "OpenHands",
+          "notes": "OpenHands is a software engineering agent. It reads, edits, and runs commands in a sandbox until it decides it is done. We ran it with Qwen2.5-Coder, one patch per bug. Released code and default settings for all five.",
+          "hold": 5
+        },
+        {
+          "id": "pipeline",
+          "label": "Patch evaluation methodology",
+          "notes": "Every patch goes through the same pipeline. Splice it into the buggy snapshot, build the whole app, install it, run the two GUI tests on the emulator. A patch that builds and passes is plausible. Two authors then judge every plausible patch: correct if it is semantically the developer's fix, overfit if it passes only by targeting what the tests check. Three thousand and forty-nine patches.",
+          "hold": 10.2
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "label": "Results",
+      "scene": "scenes/results.html",
+      "motion": "beats/results.js",
+      "beats": [
+        {
+          "id": "rq1",
+          "label": "Effectiveness on synthetic bugs",
+          "notes": "RQ1, the synthetic bugs. Each bar is all of a tool's patches. Green is correct. The three tools built on large LLMs do well: OpenHands is correct on thirty-nine of forty-six, ChatRepair on sixty-seven percent of its patches, D4C on half. NTR, with templates written for traditional code, drops to seventeen percent. RewardRepair, with no report and no tests, almost never. Forty-one of forty-six bugs were fixed by at least one tool.",
+          "hold": 7
+        },
+        {
+          "id": "rq2",
+          "label": "Effectiveness on real bugs",
+          "notes": "RQ2, the real bugs. Same chart, same tools. The green nearly disappears. The best correct rate is OpenHands at twelve percent. ChatRepair reaches thirty-four percent plausible, but most of those do not match the developer. And look at the light gray. For three of the five tools, most patches do not even build. Eleven of fifty bugs were fixed by at least one tool, and they are the simple ones.",
+          "hold": 6.5
+        },
+        {
+          "id": "overview",
+          "label": "Results overview",
+          "notes": "Forty-one of forty-six, eleven of fifty. And the single biggest reason is the most basic one. Sixty-seven percent of the patches for real bugs did not compile. The tools reference things that do not exist in the project.",
+          "hold": 5
+        },
+        {
+          "id": "limits",
+          "label": "A preview of the limitations",
+          "notes": "A preview of what we will see in the taxonomy. TrainerApp, bug 1641: the report says the slider's training type is never stored. The real widget is a Spinner with an id the tools never saw. So they guess. D4C invents a component id and the build fails; ten patches, five different guessed ids. OpenHands invents methods that sound right and do not exist. Another D4C patch adds two methods and leaves them empty. And on FieldBook, NTR navigates to an Activity that does not exist. The tools see one method and a report, and they guess the rest.",
+          "hold": 9.5
+        },
+        {
+          "id": "overfit",
+          "label": "Overfitting",
+          "notes": "And overfitting is real. PSLab, bug 2678. The fix rounds a seek arc's progress into degrees. One plausible patch assigns zero. Both tests pass. Nineteen patches on the real bugs overfit this way. GUI tests are expensive to write, so each bug has two, and two leave room for this.",
+          "hold": 5.5
+        },
+        {
+          "id": "nine",
+          "label": "Nine categories",
+          "notes": "RQ3. We open-coded a statistically significant sample of 379 failed patches across all tools and both datasets. Three annotators, a gold set, two labels per patch. Nine categories. The piles with the green dot are specific to Android UI code.",
+          "hold": 6.5
+        },
+        {
+          "id": "ui",
+          "label": "UI-specific failures",
+          "notes": "Four of the nine categories are specific to UI code: GUI constructs, Android APIs, Activities and Intents, and threading on the UI thread. Together, 159 of 379. Forty-two percent of failures are about the UI, not about Java. And the individual causes are telling. Thirty-seven patches call a method that does not exist. Thirty-five reference a component ID that does not exist. Eighteen reference an Activity that does not exist. The tools are hallucinating the vocabulary of the app.",
+          "hold": 5
+        }
+      ]
+    },
+    {
+      "id": "impl",
+      "label": "Implications",
+      "scene": "scenes/impl.html",
+      "motion": "beats/impl.js",
+      "beats": [
+        {
+          "id": "im1",
+          "label": "Implication 1",
+          "notes": "Four implications for anyone building repair tools for this domain. One. Do not make the tool guess the GUI vocabulary. Component IDs, Activities, Fragments. Fifty-five of the sampled failures hallucinated one of these. Hand them over.",
+          "hold": 4.5
+        },
+        {
+          "id": "im2",
+          "label": "Implication 2",
+          "notes": "Two. Expose the project's APIs. Fifty-two failures called methods that do not exist or called them wrong. The fix is often one class away from the buggy method, and the tool cannot see it.",
+          "hold": 4.5
+        },
+        {
+          "id": "im3",
+          "label": "Implication 3",
+          "notes": "Three. The UI itself is context. Screenshots and recordings of the bug and the surrounding screens carry information the text does not.",
+          "hold": 4.5
+        },
+        {
+          "id": "im4",
+          "label": "Implication 4",
+          "notes": "Four. Put the build in the loop. Seventeen hundred of the three thousand patches never compiled. A tool that compiles before it answers, and reads the compiler's errors, removes that class of failure entirely. Keep that one in mind.",
+          "hold": 5
+        },
+        {
+          "id": "summary",
+          "label": "Summary",
+          "notes": "To sum up. DroidFixBench is the first Android bug benchmark built for program repair. Five techniques, three thousand patches. Modern tools handle small UI bugs; on real ones the best tool fixes six of fifty, and forty-two percent of failures are specifically about UI code. The benchmark, the Docker harness for each tool, every patch, and the codebooks are on GitHub and archived on Zenodo.",
+          "hold": 4
+        }
+      ]
+    },
+    {
+      "id": "omt",
+      "label": "One more thing",
+      "dark": true,
+      "private": true,
+      "scene": "scenes/omt.html",
+      "motion": "beats/omt.js",
+      "beats": [
+        {
+          "id": "omt",
+          "label": "One more thing",
+          "notes": "One more thing.",
+          "hold": 4
+        },
+        {
+          "id": "setup",
+          "label": "The setup",
+          "notes": "Placeholder notes for the example study: three tools, fifty example cases, four settings, six hundred runs. Every number in this chapter is invented for the test fixture.",
+          "hold": 9
+        },
+        {
+          "id": "but",
+          "label": "But",
+          "notes": "Every run of the example study. Fifty cases across, twelve setting rows down. The colours show invented outcomes for the test fixture.",
+          "hold": 8
+        },
+        {
+          "id": "thanks",
+          "label": "Thank you",
+          "notes": "So, how far are we? What remains is the hard part of UI programming, the part that is hard for people too: scope, lifecycle, state, and what a correct fix even is when there are many. The benchmark and the package are public. Thank you. Happy to take questions.",
+          "hold": 5
+        },
+        {
+          "id": "sparsh",
+          "label": "Sparsh",
+          "notes": "And one more thing. Sparsh Pandey is an undergraduate in my lab and a co-author on this paper, and he is applying to PhD programs in CS and software engineering this cycle. If you are recruiting, talk to him.",
+          "hold": 4.5
+        }
+      ]
+    },
+    {
+      "id": "backup",
+      "label": "Backup",
+      "dark": true,
+      "private": true,
+      "backup": true,
+      "motion": "beats/backup.js",
+      "beats": [
+        {
+          "id": "backup",
+          "label": "Backup",
+          "notes": "Backup slides.",
+          "hold": 2
+        },
+        {
+          "id": "agent",
+          "label": "A tool at work",
+          "notes": "An invented transcript of an example tool run. It reads two files and patches one; the check fails; it strengthens the patch and the check passes.",
+          "hold": 30.5
+        },
+        {
+          "id": "headline",
+          "label": "The headline",
+          "notes": "Placeholder headline numbers for the example study. They are invented for the test fixture.",
+          "hold": 5
+        },
+        {
+          "id": "patches",
+          "label": "Twelve variants, one task",
+          "notes": "Placeholder notes for the twelve variants of one example task.",
+          "hold": 8.5
+        },
+        {
+          "id": "tests",
+          "label": "Setting Y",
+          "notes": "Placeholder notes: setting Y changes the outcome more than setting X.",
+          "hold": 6.5
+        },
+        {
+          "id": "why",
+          "label": "Why runs fail",
+          "notes": "Placeholder notes for the six failure categories of the example study.",
+          "hold": 6.5
+        },
+        {
+          "id": "syntax",
+          "label": "One word at a time",
+          "notes": "Each word of the line animates in its turn.",
+          "hold": 3
+        },
+        {
+          "id": "twotests",
+          "label": "Two tests per bug",
+          "notes": "On the fixed build the same test finds the menu and passes. Both tests are fail-to-pass: test 1 reproduces the report directly, test 2 reaches the same bug through the surrounding UI with several assertions. Each test takes about two and a half minutes on the emulator.",
+          "hold": 9.2,
+          "dark": false
+        }
+      ]
+    }
+  ],
+  "public": {
+    "id": "end",
+    "label": "Paper",
+    "tail": 0,
+    "scene": "scenes/end.html",
+    "motion": "beats/end.js",
+    "beats": [
+      {
+        "id": "end",
+        "label": "Paper",
+        "hold": 4
+      }
+    ]
+  }
+}
