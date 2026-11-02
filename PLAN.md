@@ -251,15 +251,26 @@ The runtime does this at page load from `talk.json` plus the registered beats, s
 - `talkc build <talk>` writes `build/index.html` (layers then scenes, theme and spine inlined,
   each lib and beat file as its own script with a `sourceURL` and a syntax check) and copies
   the engine and `assets/` into `build/` so relative font and image paths resolve.
-- `talkc validate <talk>`: unique ids, referenced selectors exist in the right scene, `data-a`
+- `talkc validate <talk> [--public] [--render]`: unique ids, referenced selectors exist in the right scene, `data-a`
   on everything a beat brings in, explicit holds not before motion end, notes present (warn),
   dark chapters have a `#black` fade, private/public markers consistent, assets exist.
+  `--render` (off by default, needs Chromium) adds the browser checks: `ghost-visible`, a
+  `data-a` element visible at a hold that no motion call has touched before it.
 - `talkc layout <talk>` prints the hold list (replaces `cplist.sh`).
-- `talkc shoot <talk> <beat|time>...` renders PNGs with headless Chromium (replaces `shoot.sh`).
-  This is also the renderer behind the app's `talk_frame` tool and exports, because WebKit's
-  `takeSnapshot` flattens 3D transforms (Phase 0).
-- `talkc publish <talk> [slug]` writes the self-contained public file (replaces
-  `build-public.py`; TypeScript because the machine's Python is 3.6).
+- `talkc shoot <talk|film.html> [--holds] [--around S] [--times a,b] [--beats ch.beat,...]
+  [--no-backups] [--out dir]` renders PNGs with headless Chromium (replaces `shoot.sh`; every
+  hold when nothing is selected; default output `build/shots/`, named and with a manifest
+  like `tests/golden`). The renderer is its own package, `@sage/render` (one long-lived
+  browser, one page per film, `T.seek(t)` per frame, byte-identical to a fresh `?t=` load),
+  which is also behind the app's `talk_frame` tool and exports, because WebKit's
+  `takeSnapshot` flattens 3D transforms (Phase 0). `@sage/core` imports it lazily, only for
+  `shoot` and `validate --render`.
+- `talkc publish <talk> [slug] [--out dir]` writes the self-contained public file,
+  `build/public/<slug>.html` (replaces `build-public.py`; TypeScript because the machine's
+  Python is 3.6). The cut comes from the spine: `private` chapters out with their scenes and
+  motion, the `public` block in, notes and `materials` stripped, and lib files whose
+  `Talk.lib` helpers only private beats use left out (the recorder notes who reads which
+  helper). It warns when a private label or a note appears in a file that ships.
 - `talkc import-legacy <index.html>` is **not** planned. The ISSTA deck is ported by hand once
   (Section 9); any future legacy deck can be presented from the app's read-only mode.
 - Source editing API (used by the app): `setText(scene, id, html)`, `setStyle(scene, id,
@@ -470,7 +481,8 @@ the original. Helpers live in `fixtures/issta26/lib/` as the starter library for
 sage-slide-editor/
   PLAN.md
   package.json                 pnpm workspace (Node 24 is installed; no Rust needed)
-  packages/core/               @sage/core: schema (zod), layout, compile, validate, source-edit, cli (talkc)
+  packages/core/               @sage/core: schema (zod), layout, compile, validate, source-edit, publish, cli (talkc)
+  packages/render/             @sage/render: headless Chromium frames (talkc shoot, validate --render, talk_frame, exports)
   packages/engine/             talk.js, talk.css, talk-layout.js, canvas.js, presenter.js, manrope font
   packages/sidecar/            JSON-RPC server, Agent SDK bridge, tools, hooks, watcher, thumbnails
   apps/mac/                    Xcode project: SwiftUI app, WKWebView canvas host, presenter window, sidecar supervisor
@@ -502,14 +514,20 @@ sage-slide-editor/
 Exit: a one-page memo with the three outcomes and any plan changes. The WebKit spike also
 produces the first golden-frame harness, since it has to compare frames anyway.
 
-### Phase 1 — Core and format (largely done 2026-11-01)
+### Phase 1 — Core and format (done 2026-11-02, except CI)
 
 Status: `@sage/core` (schema, loader, recorder, layout, validator, compiler, source-edit API,
-`talkc build|validate|layout`) with 118 tests; ISSTA fully ported and pixel-identical; sidecar
-running on the real core (67 tests) with the Swift client (27 tests); engine font and dash
-fixes applied (Chrome output unchanged, WebKit vs Chromium median 0.99 % to 0.15 %, only the
-five 3D exploded-view holds above 1 %). Remaining: `talkc shoot` and `publish`, so the skill's
-scripts can be retired; the second ghost-check clause; CI wiring of the golden suite.
+`talkc build|validate|layout|shoot|publish`) with 138 tests; `@sage/render` (headless
+Chromium frames, 6 tests, byte-identical to `tests/golden/shoot.mjs`); ISSTA fully ported and
+pixel-identical; sidecar running on the real core (67 tests) with the Swift client (27 tests);
+engine font and dash fixes applied (Chrome output unchanged, WebKit vs Chromium median 0.99 %
+to 0.15 %, only the five 3D exploded-view holds above 1 %). `talkc publish` of the ISSTA port
+matches the original's published file at all 49 holds (byte-identical frames, same hold list),
+loads alone from `file://` with no network, and carries no private text; the agent charts
+moved from `lib/dots.js` and `lib/bars.js` to `lib/agents.js` so the cut can drop them. The
+second ghost clause is `talkc validate --render` (`ghost-visible`); the ISSTA port is clean,
+presented and public. Remaining: CI wiring of the golden suite; retiring the skill's scripts
+waits for skill v2 (SKILL.md now names the `talkc` equivalents next to them).
 
 Schema, layout runtime, compiler, validator, source-edit API, `talkc`, and the full ISSTA port
 passing the frame diff. The skill's scripts replaced by `talkc`.
