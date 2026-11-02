@@ -42,14 +42,14 @@ Talk.beat('backup.patches', (B) => {       // @308.8 (TP)
 Talk.beat('backup.tests', (B) => {         // @317.3 (VL)
   B.out('#c8-fh, #ftree div, #fp1, #fp2, #c8-fcap', 0, { dur: 0.5, stagger: 0.02 });
   B.in('#c8-vh', 0.5, { dur: 0.9, y: 14 });
-  B.lib.bars.vbars(B, 0.8);
+  B.lib.agents.vbars(B, 0.8);
   B.in('#c8-vcap', 3.8, { dur: 1, y: 16 });
 });
 
 Talk.beat('backup.why', (B) => {           // @323.8 (WH)
   B.out('#c8-vh, #vbars > div, #c8-vcap', 0, { dur: 0.5, stagger: 0.03 });
   B.in('#c8-xh', 0.5, { dur: 0.9, y: 14 });
-  B.lib.bars.families(B, 0.9);
+  B.lib.agents.families(B, 0.9);
   B.in('#gps', 3.3, { dur: 1, y: 24 });
 });
 
