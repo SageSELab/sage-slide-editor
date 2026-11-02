@@ -3,7 +3,8 @@ import SageTalkCore
 import WebKit
 
 /// The editing overlay script (packages/engine/src/canvas.js). It is injected into the canvas
-/// film only in edit mode, never into the audience, presenter or thumbnail films.
+/// film of an editable talk (it steps aside on its own while the film plays), never into the
+/// audience, presenter or thumbnail films.
 enum CanvasScript {
     static let relativePath = "packages/engine/src/canvas.js"
 
@@ -55,5 +56,24 @@ extension FilmView {
     func canvasKey(_ name: String, shift: Bool = false) async -> Bool {
         let r = try? await call("return !!(window.SageCanvas && SageCanvas.on && SageCanvas.key(name, { shift }));", ["name": name, "shift": shift])
         return (r as? Bool) ?? false
+    }
+
+    /// A format-bar command on the selected object: "inline" (applied to the selected text
+    /// range, saved when the text is committed), "element" (posted as a `style` message for
+    /// setStyle), or nil (nothing selected, or the film is playing).
+    @discardableResult
+    func canvasFormat(_ f: CanvasFormat) async -> String? {
+        let r = try? await call("return window.SageCanvas && SageCanvas.on ? SageCanvas.format(cmd, value) : null;",
+                                ["cmd": f.command, "value": f.value.map { $0 as Any } ?? NSNull()])
+        return r as? String
+    }
+
+    /// Ends in-place text editing and returns its change (not posted), so the app can save it
+    /// before an edit of its own; nil when nothing was being edited or nothing changed.
+    func takeCanvasText() async -> CanvasMessage? {
+        let body = "if (!window.SageCanvas || !SageCanvas.on) return null; const m = SageCanvas.takeText(); return m ? JSON.stringify(m) : null;"
+        guard let json = try? await call(body) as? String,
+              let obj = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] else { return nil }
+        return CanvasMessage.parse(obj)
     }
 }

@@ -223,4 +223,28 @@ actor FakeEditService: EditService {
         #expect(CanvasMessage.parse(["type": "move", "id": "a"]) == nil)
         #expect(CanvasMessage.parse(["kind": "ready"]) == nil)
     }
+
+    @Test func canvasFormatMessages() {
+        var select: [String: Any] = ["type": "select", "id": "t", "tag": "h1", "left": 0, "top": 0, "width": 900, "height": 120, "fontSize": 104,
+                                     "movable": false, "editable": true, "html": "Hi", "src": NSNull()]
+        select["rect"] = ["x": 120.5, "y": 80, "w": 450, "h": 60]
+        select["text"] = ["bold": true, "italic": false, "underline": false, "color": "#ffffff", "align": "center", "family": "Manrope, sans-serif"]
+        guard case .select(let o?) = CanvasMessage.parse(select) else { Issue.record("select"); return }
+        #expect(o.rect == CanvasRect(x: 120.5, y: 80, w: 450, h: 60))
+        #expect(o.text == CanvasTextInfo(bold: true, color: "#ffffff", align: "center", family: "Manrope, sans-serif"))
+
+        let style = CanvasMessage.parse(["type": "style", "id": "t", "style": ["fontWeight": "400", "textDecoration": NSNull()]])
+        #expect(style == .style(id: "t", style: StyleArgs(fontWeight: .set(.css("400")), textDecoration: .remove)))
+        #expect(style?.editOp?.title == "Bold")
+        #expect(CanvasMessage.parse(["type": "style", "id": "t", "style": ["fontSize": 72]])?.editOp == .setStyle(id: "t", style: .px(fontSize: 72)))
+        #expect(CanvasMessage.parse(["type": "style", "id": "t", "style": [String: Any]()]) == nil)
+
+        #expect(CanvasMessage.parse(["type": "editing", "id": "t"]) == .editing(id: "t"))
+        #expect(CanvasMessage.parse(["type": "editing", "id": NSNull()]) == .editing(id: nil))
+        #expect(CanvasMessage.parse(["type": "editing", "id": "t"])?.editOp == nil)
+        let format = CanvasMessage.parse(["kind": "canvas", "type": "format", "id": "t", "bold": true, "italic": false, "underline": true, "color": "#ff2d78", "range": true])
+        #expect(format == .format(CanvasTextState(id: "t", bold: true, underline: true, color: "#ff2d78", range: true)))
+        #expect(CanvasMessage.parse(["type": "rect", "id": "t", "rect": ["x": 1, "y": 2, "w": 3, "h": 4]]) == .rect(id: "t", rect: CanvasRect(x: 1, y: 2, w: 3, h: 4)))
+        #expect(CanvasFormat.fontSize(72).command == "fontSize" && CanvasFormat.bold.value == nil)
+    }
 }

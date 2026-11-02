@@ -93,10 +93,84 @@ public struct CanvasObject: Codable, Equatable, Sendable {
     public var editable: Bool
     public var html: String?
     public var src: String?
+    /// Where the element is in the canvas web view (points, top-left origin): the format bar floats there.
+    public var rect: CanvasRect?
+    /// Its computed text formatting.
+    public var text: CanvasTextInfo?
     public init(id: String, tag: String = "div", left: Double = 0, top: Double = 0, width: Double = 0, height: Double = 0,
-                fontSize: Double = 16, movable: Bool = true, editable: Bool = false, html: String? = nil, src: String? = nil) {
+                fontSize: Double = 16, movable: Bool = true, editable: Bool = false, html: String? = nil, src: String? = nil,
+                rect: CanvasRect? = nil, text: CanvasTextInfo? = nil) {
         self.id = id; self.tag = tag; self.left = left; self.top = top; self.width = width; self.height = height
         self.fontSize = fontSize; self.movable = movable; self.editable = editable; self.html = html; self.src = src
+        self.rect = rect; self.text = text
+    }
+}
+
+/// A box in the canvas web view's coordinates (CSS px = points, top-left origin).
+public struct CanvasRect: Codable, Equatable, Sendable {
+    public var x: Double
+    public var y: Double
+    public var w: Double
+    public var h: Double
+    public init(x: Double, y: Double, w: Double, h: Double) { self.x = x; self.y = y; self.w = w; self.h = h }
+}
+
+/// An element's computed text formatting, as the canvas reports it.
+public struct CanvasTextInfo: Codable, Equatable, Sendable {
+    public var bold: Bool
+    public var italic: Bool
+    public var underline: Bool
+    /// "#rrggbb" (or the browser's CSS colour when it has transparency).
+    public var color: String
+    /// left, center, right or justify.
+    public var align: String
+    public var family: String
+    public init(bold: Bool = false, italic: Bool = false, underline: Bool = false, color: String = "#000000", align: String = "left", family: String = "") {
+        self.bold = bold; self.italic = italic; self.underline = underline; self.color = color; self.align = align; self.family = family
+    }
+}
+
+/// The formatting at the text selection while the caret is in an element's text.
+public struct CanvasTextState: Codable, Equatable, Sendable {
+    public var id: String
+    public var bold: Bool
+    public var italic: Bool
+    public var underline: Bool
+    public var color: String
+    /// A range is selected (format commands apply to it inline), not just a caret.
+    public var range: Bool
+    public init(id: String, bold: Bool = false, italic: Bool = false, underline: Bool = false, color: String = "", range: Bool = false) {
+        self.id = id; self.bold = bold; self.italic = italic; self.underline = underline; self.color = color; self.range = range
+    }
+}
+
+/// A format-bar command for SageCanvas.format(cmd, value).
+public enum CanvasFormat: Equatable, Sendable {
+    case bold, italic, underline
+    case color(String)
+    case align(String)
+    case fontSize(Double)
+    case fontFamily(String)
+
+    public var command: String {
+        switch self {
+        case .bold: "bold"
+        case .italic: "italic"
+        case .underline: "underline"
+        case .color: "color"
+        case .align: "align"
+        case .fontSize: "fontSize"
+        case .fontFamily: "fontFamily"
+        }
+    }
+
+    /// The command's value (a CSS string or a px number), or nil for the toggles.
+    public var value: (any Sendable)? {
+        switch self {
+        case .bold, .italic, .underline: nil
+        case .color(let s), .align(let s), .fontFamily(let s): s
+        case .fontSize(let d): d
+        }
     }
 }
 
@@ -105,6 +179,12 @@ public enum CanvasMessage: Equatable, Sendable {
     case move(id: String, left: Double, top: Double)
     case resize(id: String, left: Double, top: Double, width: Double, height: Double)
     case text(id: String, html: String)
+    /// A format command for the whole element (already applied in the page).
+    case style(id: String, style: StyleArgs)
+    /// The caret went into #id's text (nil: left it).
+    case editing(id: String?)
+    case format(CanvasTextState)
+    case rect(id: String, rect: CanvasRect)
     case refused(id: String, reason: String)
 
     /// Parses a `{kind: 'canvas', type, ...}` message body (nil for anything else).
@@ -130,6 +210,18 @@ public enum CanvasMessage: Equatable, Sendable {
         case "text":
             guard let id, let html = body["html"] as? String else { return nil }
             return .text(id: id, html: html)
+        case "style":
+            guard let id, let raw = body["style"] as? [String: Any], !raw.isEmpty,
+                  let style: StyleArgs = decode(raw) else { return nil }
+            return .style(id: id, style: style)
+        case "editing":
+            return .editing(id: id)
+        case "format":
+            guard id != nil, let state: CanvasTextState = decode(body.filter { $0.key != "kind" && $0.key != "type" }) else { return nil }
+            return .format(state)
+        case "rect":
+            guard let id, let raw = body["rect"] as? [String: Any], let rect: CanvasRect = decode(raw) else { return nil }
+            return .rect(id: id, rect: rect)
         case "refused":
             guard let id else { return nil }
             return .refused(id: id, reason: body["reason"] as? String ?? "")
@@ -137,13 +229,19 @@ public enum CanvasMessage: Equatable, Sendable {
         }
     }
 
+    private static func decode<T: Decodable>(_ dict: [String: Any]) -> T? {
+        guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
     /// The source edit a canvas change asks for.
     public var editOp: EditOp? {
         switch self {
-        case .select, .refused: nil
+        case .select, .refused, .editing, .format, .rect: nil
         case .move(let id, let l, let t): .setStyle(id: id, style: .px(left: l, top: t))
         case .resize(let id, let l, let t, let w, let h): .setStyle(id: id, style: .px(left: l, top: t, width: w, height: h))
         case .text(let id, let html): .setText(id: id, html: html)
+        case .style(let id, let style): .setStyle(id: id, style: style)
         }
     }
 }
