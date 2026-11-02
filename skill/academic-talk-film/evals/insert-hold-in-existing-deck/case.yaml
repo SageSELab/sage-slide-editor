@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: insert-hold-in-existing-deck
+expected_outcome: |
+  In the copied deck a new cp() hold sits after the two counters finish counting and before the 67% bar starts
+  growing; the Results overview heading reads "Two numbers"; every later time in the deck (chapter markers,
+  duration, dark-window logic, public build constants) is shifted consistently so later holds still land where
+  their content is complete; the hold list (cplist) shows one extra main hold; the frames at the new hold and at
+  the next hold are screenshot-checked; the original talk folder is unchanged.

@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: storyboard-from-paper
+expected_outcome: |
+  A talk-eval/ folder is scaffolded with the engine files (talk.js, talk.css, edit.js, serve.py, build-public.py)
+  and an index.html built on the Talk engine with absolute times and cp() holds. PLAN.md holds a chapter-by-chapter
+  storyboard with holds, motion time, and bracketed data sources taken from the paper and the package's CSVs
+  (real numbers such as 50 real bugs, 46 synthetic bugs, five tools, 3,049 patches). The title slide uses the real
+  author list in order with Kevin Moran bold, and the first chapter is a continuous animated beat (no bullet lists),
+  with the holds verified by headless screenshots. No venue is named for any follow-up or under-review work.

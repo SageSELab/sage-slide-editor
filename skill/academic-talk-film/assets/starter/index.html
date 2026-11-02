@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="stylesheet" href="talk.css">
+<style>
+  /* Per-talk tweaks on top of talk.css */
+  .logos { display: flex; gap: 46px; align-items: center; filter: grayscale(1); opacity: .8; }
+  .logos img { height: 54px; width: auto; }
+  .authors-line { font-size: 29px; line-height: 1.5; color: var(--ink-2); }
+  .authors-line b { color: var(--ink); font-weight: 600; }
+  #black { z-index: 3; } .rig { z-index: 4; } #c2, #c8 { z-index: 5; }
+</style>
+</head>
+<body>
+<div class="film">
+<div class="stage">
+
+  <div id="slideno"></div>
+
+  <!-- ===================== TITLE ===================== -->
+  <div class="scene" id="title">
+    <div style="position:absolute;left:120px;top:236px">
+      <div class="eyebrow" id="t-eye" data-a>VENUE 2026 · City</div>
+      <h1 class="h-xl" id="t-h" data-a style="margin-top:22px"><span class="w">Paper </span><span class="w">Title </span><span class="w">Goes </span><span class="w">Here</span></h1>
+      <h1 class="h-xl grad" id="t-g" data-a style="margin-top:8px;font-size:104px">The question?</h1>
+      <div class="faces" id="t-fc" style="margin-top:44px"><span class="ph" data-a title="Author One">AO</span><span class="ph" data-a title="Kevin Moran">KM</span></div>
+      <div class="authors-line" id="t-au" data-a style="margin-top:18px">Author One · Author Two · <b>Kevin Moran</b></div>
+      <div class="logos" id="t-lg" data-a style="margin-top:34px"></div>
+    </div>
+  </div>
+
+  <!-- ===================== CHAPTER 2 · (example pane) ===================== -->
+  <div class="scene" id="c2">
+    <div class="eyebrow" id="c2-eye" data-a style="position:absolute;left:120px;top:60px">Chapter name</div>
+    <h2 class="h-l" id="c2-h" data-a style="position:absolute;left:120px;top:118px">A claim, in six words</h2>
+    <p class="sub" id="c2-s" data-a style="position:absolute;left:120px;top:260px;width:1100px">One or two lines that say the fact.</p>
+    <div id="c2-stat" data-a style="position:absolute;left:120px;top:420px"><span class="stat-num" style="font-size:150px" id="c2-n">0</span><span class="stat-num" style="font-size:60px;color:var(--ink-3)"> / 50</span></div>
+  </div>
+
+  <!-- ===================== DARK PASSAGE + CLOSE ===================== -->
+  <div class="scene" id="black" style="background:#000;opacity:0"></div>
+  <div class="scene dk" id="c8">
+    <div class="h-xl" id="omt" data-a style="position:absolute;left:0;right:0;top:440px;text-align:center;font-size:150px;color:#fff">One more thing.</div>
+    <div id="close" style="position:absolute;left:120px;top:230px;width:1680px">
+      <h1 class="h-xl" id="cl-h" data-a style="font-size:140px">Closing question?</h1>
+      <p class="sub" id="cl-s" data-a style="margin-top:34px;max-width:1500px">The two-line verdict.</p>
+      <div id="cl-l" data-a style="margin-top:70px;display:flex;gap:90px"><div><p class="cap">Package</p><p class="mono" style="font-size:30px;margin-top:8px;color:var(--ink)">github.com/org/repo</p></div><div><p class="cap">Contact</p><p class="mono" style="font-size:30px;margin-top:8px;color:var(--ink)">kpmoran@ucf.edu</p><p class="mono cap" style="margin-top:6px">sagelab.io</p></div></div>
+    </div>
+    <!-- private:start -->
+    <div id="backup-title" class="center" data-a style="position:absolute;inset:0"><div class="h-xl" style="color:#fff">Backup</div></div>
+    <!-- private:end -->
+  </div>
+
+  <!-- public:start
+  <div class="scene center" id="end">
+    <div class="eyebrow" id="end-eye" data-a>VENUE 2026 · City</div>
+    <h1 class="h-l" id="end-h" data-a style="margin-top:20px;max-width:1500px;font-size:80px">Paper Title Goes Here: The question?</h1>
+    <p class="authors-line" id="end-au" data-a style="margin-top:30px;text-align:center">Author One · Author Two · <b>Kevin Moran</b></p>
+    <div id="end-links" data-a style="margin-top:46px;display:flex;gap:18px;justify-content:center">
+      <a class="endbtn" href="https://github.com/org/repo" target="_blank" rel="noopener">Code &amp; data</a>
+      <a class="endbtn ghost" href="https://sagelab.io" target="_blank" rel="noopener">SAGE Lab</a>
+    </div>
+  </div>
+  public:end -->
+
+</div>
+</div>
+
+<script type="application/json" id="text-overrides">
+{"text":{},"notes":{}}
+</script>
+<script src="talk.js"></script>
+<script src="edit.js"></script>
+<script>
+(() => {
+  const PUBLIC = false;
+  const CP = [];
+  const cp = (at, label, notes, backup = false) => CP.push({ at, label, notes, backup });
+
+  // Chapter constants: every time in a chapter is an offset of its start, so beats can be moved.
+  const c2 = 6.0;
+  const c8 = c2 + 10.0;
+  const BK = c8 + 12.0;
+  const DURATION = PUBLIC ? c8 + 8.0 : BK + 4.0;
+  const CHAPTERS = [
+    { at: 0, label: 'Title' },
+    { at: c2 + 0.1, label: 'Chapter name' },
+    { at: c8 + 0.1, label: 'One more thing', dark: true, private: true },
+    { at: c8 + 0.1, label: 'Paper', publicOnly: true },
+    { at: BK + 0.1, label: 'Backup', private: true },
+  ].filter((c) => (PUBLIC ? !c.private : !c.publicOnly));
+  const T = new Talk({ duration: DURATION, chapters: CHAPTERS, checkpoints: CP });
+  const ED = new TalkEdit(T, { checkpoints: CP });
+  ED.apply();
+
+  // ---- title ----
+  T.in('#t-eye', 0.3, { dur: 0.8, y: 16 });
+  T.words('#t-h', 0.6, { stagger: 0.09 });
+  T.in('#t-g', 1.9, { dur: 1.1, y: 26, scale: 0.97, blur: 16 });
+  T.in('#t-fc > *', 2.5, { dur: 0.7, y: 14, scale: 0.6, blur: 6, stagger: 0.07 });
+  T.in('#t-au', 3.0, { dur: 0.9, y: 20 });
+  T.in('#t-lg', 3.4, { dur: 0.9, y: 16 });
+  cp(5.0, 'Title', 'Thanks. I am Kevin, this is joint work with ...');
+  T.out('#t-eye, #t-h, #t-g, #t-fc, #t-au, #t-lg', 5.0, { dur: 0.7, y: -40, stagger: 0.05 });
+
+  // ---- chapter 2: an example pane ----
+  T.in('#c2-eye', c2 + 0.4, { dur: 0.8, y: 14 });
+  T.in('#c2-h', c2 + 0.6, { dur: 1 });
+  T.in('#c2-s', c2 + 1.2, { dur: 1, y: 16 });
+  cp(c2 + 3.0, 'The claim', 'What this pane is for.');
+  T.in('#c2-stat', c2 + 3.2, { dur: 0.8, y: 20 });
+  T.count('#c2-n', c2 + 3.3, 1.3, 11);
+  cp(c2 + 6.0, 'The number', 'Eleven of fifty.');
+  T.out('#c2-eye, #c2-h, #c2-s, #c2-stat', c8, { dur: 0.5, stagger: 0.03 });
+
+  // private:start
+  // ---- chapter 8: one more thing (dark), close, backups ----
+  T.anim('#black', c8 + 0.3, 0.9, [{ opacity: 0 }, { opacity: 1 }], { ease: 'inOut' });
+  T.type('#omt', c8 + 1.4, 1.3, { cursor: true });
+  cp(c8 + 4.0, 'One more thing', 'One more thing.');
+  T.out('#omt', c8 + 4.0, { dur: 0.6 });
+  T.in('#cl-h', c8 + 4.6, { dur: 1.1 });
+  T.in('#cl-s', c8 + 5.3, { dur: 1, y: 20 });
+  T.in('#cl-l', c8 + 6.0, { dur: 1, y: 16 });
+  cp(c8 + 8.0, 'Thank you', 'So, how far are we? ...');
+  T.out('#cl-h, #cl-s, #cl-l', BK, { dur: 0.5, stagger: 0.03 });
+  T.in('#backup-title', BK + 0.6, { dur: 0.8 });
+  cp(BK + 2.0, 'Backup', '', true);
+  // private:end
+
+  /* public:start
+  T.in('#end-eye', c8 + 0.6, { dur: 0.8, y: 14 });
+  T.in('#end-h', c8 + 0.8, { dur: 1.1, y: 26 });
+  T.in('#end-au', c8 + 1.4, { dur: 1, y: 18 });
+  T.in('#end-links', c8 + 1.9, { dur: 0.9, y: 16 });
+  cp(c8 + 4.0, 'Paper');
+  public:end */
+
+  // ---- boot ----
+  ED.apply(); ED.applyNotes();
+  T.editor = ED;
+  window.ED = ED;
+  if (new URLSearchParams(location.search).has('edit')) setTimeout(() => ED.enter(), 50);
+  if (new URLSearchParams(location.search).has('cplist')) { const pre = document.createElement('pre'); pre.id = 'cplist'; pre.textContent = CP.map((c, i) => (i + 1) + ' ' + c.at.toFixed(1) + ' ' + c.label).join('\n'); document.body.appendChild(pre); }
+  if (new URLSearchParams(location.search).has('eds')) setTimeout(() => { const pre = document.createElement('pre'); pre.id = 'eds'; pre.textContent = [...document.querySelectorAll('.stage .ed')].map((e) => { const r = e.getBoundingClientRect(); return `${e.tagName}#${e.id} ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`; }).join('\n'); document.body.appendChild(pre); }, 400);
+  if (new URLSearchParams(location.search).has('dbgpath')) { const pre = document.createElement('pre'); pre.id = 'dbgpath'; pre.textContent = new URLSearchParams(location.search).get('dbgpath').split(',').map((s) => s + ' => ' + (document.querySelector(s) ? ED.pathOf(document.querySelector(s)) : 'MISSING')).join('\n'); document.body.appendChild(pre); }
+  const slideno = document.getElementById('slideno');
+  T.onRender = (t) => {
+    const pane = Math.min(CP.length, CP.filter((c) => c.at < t - 0.05).length + 1);
+    const mainN = CP.filter((c) => !c.backup).length;
+    const ch = [...T.chapters].reverse().find((c) => c.at <= t + 0.01) || T.chapters[0];
+    slideno.textContent = CP[pane - 1].backup ? 'Backup ' + (pane - mainN) + ' / ' + (CP.length - mainN) : pane + ' / ' + mainN + '  ·  ' + ch.label;
+    slideno.classList.toggle('dark', !!ch.dark);
+  };
+  T.start();
+  window.T = T;
+  if (new URLSearchParams(location.search).has('hide')) new URLSearchParams(location.search).get('hide').split(',').forEach((s) => document.querySelectorAll(s).forEach((e) => (e.style.display = 'none')));
+  if (new URLSearchParams(location.search).has('at')) {
+    const [x, y] = new URLSearchParams(location.search).get('at').split(',').map(Number);
+    const r = document.querySelector('.stage').getBoundingClientRect(); const sc = r.width / 1920;
+    const px = r.left + x * sc, py = r.top + y * sc;
+    const els = [...document.querySelectorAll('.stage *')].filter((e) => { const b = e.getBoundingClientRect(); return b.left <= px && px <= b.right && b.top <= py && py <= b.bottom; });
+    const pre = document.createElement('pre'); pre.id = 'dbgat';
+    pre.textContent = els.slice(0, 20).map((e) => { const cs = getComputedStyle(e); return `${e.tagName}#${e.id}.${[...e.classList].join('.')} op=${cs.opacity} bg=${cs.backgroundColor}`; }).join('\n');
+    document.body.appendChild(pre);
+  }
+})();
+</script>
+</body>
+</html>

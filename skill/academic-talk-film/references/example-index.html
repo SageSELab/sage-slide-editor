@@ -1,0 +1,1210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APR of UI-centric Android Bugs — ISSTA 2026</title>
+<link rel="stylesheet" href="talk.css">
+<style>
+  /* Per-talk tweaks on top of talk.css */
+  .code { white-space: normal; font-size: 20px; line-height: 30px; }
+  .code .ln { white-space: pre; height: 30px; }
+  .code .ln.new { height: 0; }
+  .logos { display: flex; gap: 46px; align-items: center; filter: grayscale(1); opacity: .8; }
+  .logos img { height: 54px; width: auto; }
+  .logos img.sage { height: 62px; }
+  .authors-line { font-size: 29px; line-height: 1.5; color: var(--ink-2); }
+  .authors-line b { color: var(--ink); font-weight: 600; }
+  #wsvg path { fill: none; stroke: var(--ink); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+  #wsvg { z-index: 1; } #whtml { z-index: 2; }
+  #black { z-index: 3; } .rig { z-index: 4; } #c2, #c3, #c4, #c5, #c6, #c7, #c8 { z-index: 5; }
+  .lane .ln-l { z-index: 3; background: var(--bg); width: 312px; height: 150px; top: 0; padding-top: 30px; }
+  .lane .dq { z-index: 1; } .lane .gate { z-index: 2; }
+  .hmg { grid-template-columns: 170px repeat(50, 26px); } .hmg .cl { width: 26px; height: 26px; }
+  .pcard .code .ln.new { height: 0; }
+  .shot { position: absolute; width: 200px; border-radius: 22px; overflow: hidden; box-shadow: 0 0 0 6px #111, 0 0 0 7px #333, 0 24px 60px rgba(0,0,0,.18); background: #111; }
+  .shot img { display: block; width: 100%; }
+  .shotcap { position: absolute; font-size: 22px; color: var(--ink-3); }
+  .check { position: absolute; width: 96px; height: 96px; border-radius: 50%; background: var(--correct); color: #fff; display: grid; place-items: center; font: 300 60px var(--text); box-shadow: 0 16px 40px rgba(31,138,76,.35); }
+  .xmark { position: absolute; width: 96px; height: 96px; border-radius: 50%; background: var(--crash); color: #fff; display: grid; place-items: center; font: 300 56px var(--text); box-shadow: 0 16px 40px rgba(217,59,43,.35); }
+  .typechip { position: absolute; font: 700 26px var(--display); color: #fff; padding: 12px 24px; border-radius: 999px; }
+</style>
+</head>
+<body>
+<div class="film">
+<div class="stage">
+
+  <!-- ===================== CHAPTER 1 · THE LINE (world layers scrolled by the camera) ===================== -->
+  <svg class="world" id="wsvg" viewBox="0 0 4200 1080" width="4200" height="1080" xmlns="http://www.w3.org/2000/svg">
+    <path id="line" d="M 120 680 L 1420 680 L 3300 680 L 3300 440 A 40 40 0 0 1 3340 400 L 3540 400 A 40 40 0 0 1 3580 440 L 3580 920 A 40 40 0 0 1 3540 960 L 3340 960 A 40 40 0 0 1 3300 920 L 3300 680"/>
+    <path id="qm" d="M 3400 620 A 40 40 0 1 1 3440 660 L 3440 700"/>
+    <circle id="qdot" cx="3440" cy="740" r="8" fill="#1d1d1f" data-a/>
+  </svg>
+  <div class="world" id="whtml"></div>
+
+  <div id="slideno"></div>
+
+  <!-- Title -->
+  <div class="scene" id="title">
+    <div style="position:absolute;left:120px;top:236px">
+      <div class="eyebrow" id="t-eye" data-a>ISSTA 2026 · Oakland, California</div>
+      <h1 class="h-xl" id="t-h" data-a style="margin-top:22px"><span class="w">Automated </span><span class="w">Program </span><span class="w">Repair </span><span class="w">of</span><br><span class="w">UI-centric </span><span class="w">Android </span><span class="w">Bugs</span></h1>
+      <h1 class="h-xl grad" id="t-g" data-a style="margin-top:8px;font-size:104px">How Far are We?</h1>
+      <div class="faces" id="t-fc" style="margin-top:44px"><img src="assets/faces/junayed.jpg" alt="Junayed Mahmud" data-a><img src="assets/faces/sparsh.jpg" alt="Sparsh Pandey" data-a><img src="assets/faces/nadeeshan.jpg" alt="Nadeeshan De Silva" data-a><img src="assets/faces/atish.jpg" alt="Atish Kumar Dipongkor" data-a><span class="ph" data-a title="Jingjing Wu">JW</span><img src="assets/faces/oscar.jpg" alt="Oscar Chaparro" data-a><img src="assets/faces/mattia.jpg" alt="Mattia Fazzini" data-a><img src="assets/faces/kevin.jpg" alt="Kevin Moran" data-a></div>
+      <div class="authors-line" id="t-au" data-a style="margin-top:18px">Junayed Mahmud · <b>Sparsh Pandey</b> · Nadeeshan De Silva · Atish Kumar Dipongkor · Jingjing Wu<br>Oscar Chaparro · Mattia Fazzini · <b>Kevin Moran</b></div>
+      <div class="logos" id="t-lg" data-a style="margin-top:34px"><img class="sage" src="assets/sage.png" alt=""><img src="assets/ucf.png" alt=""><img src="assets/wm.png" alt=""><img src="assets/umn.png" alt="University of Minnesota" style="height:46px"></div>
+    </div>
+  </div>
+
+  <!-- Chapter 1 captions (fixed to the screen, not the world) -->
+  <div class="scene" id="c1cap">
+    <div class="eyebrow" id="c1-eye" data-a style="position:absolute;left:120px;top:110px">Fifteen years of automated program repair</div>
+    <div id="c1-bench" data-a style="position:absolute;left:120px;top:880px;width:1500px">
+      <p class="sub" style="color:var(--ink);font-weight:600;font-size:40px">APR has been evaluated almost entirely on library code.</p><p class="sub" style="margin-top:10px;font-size:34px">Success has been largely dictated by unit tests.</p>
+    </div>
+    <div id="c1-ui" style="position:absolute;left:120px;top:236px;width:960px">
+      <h2 class="h-l" id="c1-ui-h" data-a>Effectiveness on<br>UI-centric programs?</h2>
+      <p class="sub" id="c1-ui-s" data-a style="margin-top:28px;max-width:940px">The UI is nearly half of user-facing software: half the code, half the time, half the maintenance.</p>
+      <p class="cap" id="c1-ui-c" data-a style="margin-top:16px">Myers, CHI 1992</p>
+    </div>
+  </div>
+
+  <!-- ===================== THE DEVICE (persists from chapter 2 on) ===================== -->
+  <div class="rig" id="rig" data-a style="left:1110px;top:310px">
+    <div class="tilt" id="tilt">
+      <div class="device" style="left:0;top:0"><div class="notch"></div><div class="screen">
+        <div class="hn" id="hn">
+          <div class="status"><span>11:49</span><span>▾ ◢ ▮</span></div>
+          <div class="list" style="overflow:hidden"><div id="hnlist">
+            <div class="cm first" style="--c:transparent"><div class="hd"><b>Thorrez</b> · 2 hrs</div><div class="tx" id="cm1tx"><span id="yr">[2024]</span><br>And it looks like this is the draft, and it was published on the author's blog here: <span class="lnk" id="lnk">https://telefoncek.si/2024/05/2024-05-30-grapheneos-and-fore…</span></div></div>
+            <div class="cm" style="--d:1;--c:#e3c344"><div class="hd"><b>azalemeth</b> · 1 hr</div><div class="tx">I really love GrapheneOS but I _wish_ there was a version in which you could get a root shell and extract private data of apps you install when verified as the user. The developers are on record as saying that root blows a hole in their security model (it does!) but if there was _some_ way of doing it safely, so I can modify applications I as the user wish to, it would be my ideal OS.</div></div>
+            <div class="cm" style="--d:2;--c:#4fa3d9"><div class="hd"><b>djrj477dhsnv</b> · 47 mins</div><div class="tx">I wish this as well. I make a userdebug build myself to get adb root, which isn't difficult, but would be a lot nicer if it were officially supported.</div></div>
+            <div class="cm" style="--d:3;--c:#b56fd6"><div class="hd"><b>lmiric</b> · 23 mins</div><div class="tx">That's interesting. Can you share a guide for doing that?</div></div>
+            <div class="cm" style="--d:1;--c:#e3c344"><div class="hd"><b>subscribed</b> · 1 hr</div><div class="tx">You can't have a cake and eat it. A root access is a big hole, there's no way mainline will support it.</div></div>
+          </div>
+          </div>
+          <div class="menu" id="menu">
+            <div><i>●</i>View user (Thorrez)</div><div><i>↗</i>Share comment link</div><div><i>⧉</i>Copy text</div><div><i>⌗</i>Select text</div><div><i>▲</i>Vote up</div><div><i>▽</i>Unvote</div><div><i>▼</i>Vote down (experimental)</div><div><i>↩</i>Reply</div>
+          </div>
+          <div class="browser" id="browser">
+            <div class="bar">WebView Browser Tester 66.0.3359.158</div>
+            <div class="url">https://telefoncek.si/2024/05/2024-05-30-grapheneos…</div>
+            <h1>Telefoncek.si</h1>
+            <div class="nav">• Vizitka • O Pravokator.si • Pravno obvestilo • Predavanja in knjige • Varnost GSM •</div>
+            <h2>GrapheneOS and forensic extraction of data</h2>
+            <div class="date">Objavljeno: 29. 05. 2024</div>
+            <div class="ph"></div>
+          </div>
+          <div class="crash" id="crash"><b>Harmonic has stopped</b><span>java.lang.NullPointerException<br>at CommentsFragment.onItemClick</span><div class="btn">CLOSE APP</div></div>
+          <div class="settings" id="settings"><div class="tb">‹ &nbsp;Settings</div><div class="it">Theme</div><div class="it">Font size</div><div class="it">Open links in</div><div class="it">Account</div></div>
+          <div class="gl" id="gl">
+            <div class="gl-bar">≡ &nbsp;GPSLogger</div>
+            <div class="gl-row"><b>STATUS</b>Logging stopped</div>
+            <div class="gl-row"><b>FORMATS</b>GPX · KML · CSV</div>
+            <div class="gl-row"><b>LAST POINT</b>28.6024, −81.2001</div>
+            <div class="gl-drawer" id="gl-drawer"><div>General options</div><div>Logging details</div><div>Performance</div><div id="gl-item">Auto send, email and upload</div><div>Custom URL</div></div>
+            <div class="gl-crash" id="gl-crash"><b>GPSLogger has stopped</b><span>java.lang.NullPointerException<br>at GpsMainActivity.launchPreferenceScreen</span><div class="btn">CLOSE APP</div></div>
+          </div>
+          <div class="touch" id="fg" style="left:150px;top:120px"><svg viewBox="0 0 80 80" style="position:absolute;inset:-12px;width:82px;height:82px"><circle id="ring" cx="40" cy="40" r="36" fill="none" stroke="#1d1d1f" stroke-width="4" transform="rotate(-90 40 40)"/></svg></div>
+        </div>
+      </div></div>
+      <!-- exploded layers -->
+      <div class="lay wire" data-a><i style="top:48px;height:36px"></i><i style="top:100px;height:140px"></i><i style="top:258px;height:120px"></i><i style="top:392px;height:84px"></i><i style="top:490px;height:60px"></i><i style="top:562px;height:70px"></i></div>
+      <div class="lay listen" data-a><b style="top:118px">onLongClick → onItemClick()</b><b style="top:206px">onClickATag → openLink()</b><b style="top:300px">onLongClick → onItemClick()</b><b style="top:420px">onClick → expand()</b></div>
+      <div class="lay state" data-a><div class="card">comments: <span>List&lt;Comment&gt;</span><br>expanded: <span id="st-exp">true</span><br>scrollY: <span id="st-scr">0</span><br>disableATagClick: <span>false</span></div></div>
+      <div class="lay life" data-a><b style="top:140px" id="lc1">onCreate()</b><b style="top:200px" id="lc2">onResume()</b><b style="top:260px" id="lc3">onPause()</b><b style="top:320px" id="lc4">onStop()</b><b style="top:380px" id="lc5">onDestroy()</b></div>
+    </div>
+  </div>
+
+  <!-- ===================== CHAPTER 2 · INSIDE THE PHONE (captions) ===================== -->
+  <div class="scene" id="c2">
+    <div class="eyebrow" id="c2-eye" data-a style="position:absolute;left:120px;top:60px">Inside a UI-centric app</div>
+    <div class="laylabel" id="ll1" data-a style="left:1200px;top:580px">Layout<small>Views and their hierarchy, declared in XML</small></div>
+    <div class="laylabel" id="ll2" data-a style="left:1200px;top:450px">Event listeners<small>Code the framework calls on a tap or a long press</small></div>
+    <div class="laylabel" id="ll3" data-a style="left:1200px;top:320px">State<small>Values the screen keeps between events</small></div>
+    <div class="laylabel" id="ll4" data-a style="left:1200px;top:190px">Lifecycle<small>Callbacks when the screen is paused, destroyed, re-created</small></div>
+    <!-- the user's side of each paradigm: a second, smaller phone -->
+    <div id="miniwrap" data-a style="position:absolute;left:880px;top:190px;width:223px;height:459px">
+      <div class="device" style="left:0;top:0;transform:scale(.62);transform-origin:0 0"><div class="notch"></div><div class="screen">
+        <div class="hn" id="mhn">
+          <div class="status"><span>11:49</span><span>▾ ◢ ▮</span></div>
+          <div class="list" style="overflow:hidden"><div id="m-list">
+            <div class="cm first mrow" id="m-c1" style="--c:transparent"><div class="hd"><b>Thorrez</b> · 2 hrs</div><div class="tx">[2024]<br>And it looks like this is the draft, and it was published on the author's blog here: <span class="lnk">https://telefoncek.si/2024/05/2024-05-30-grapheneos-and-fore…</span></div></div>
+            <div class="cm mrow" id="m-c2" style="--d:1;--c:#e3c344"><div class="hd"><b>azalemeth</b> · 1 hr</div><div class="tx">I really love GrapheneOS but I _wish_ there was a version in which you could get a root shell and extract private data of apps you install when verified as the user. The developers are on record as saying that root blows a hole in their security model (it does!) but if there was _some_ way of doing it safely, it would be my ideal OS.</div></div>
+            <div class="cm mrow" id="m-c3" style="--d:2;--c:#4fa3d9"><div class="hd"><b>djrj477dhsnv</b> · 47 mins</div><div class="tx">I wish this as well. I make a userdebug build myself to get adb root, which isn't difficult, but would be a lot nicer if it were officially supported.</div></div>
+            <div class="cm mrow" id="m-c4" style="--d:3;--c:#b56fd6"><div class="hd"><b>lmiric</b> · 23 mins</div><div class="tx">That's interesting. Can you share a guide for doing that?</div></div>
+          </div></div>
+          <div class="menu" id="m-menu" style="top:120px"><div><i>●</i>View user (Thorrez)</div><div><i>↗</i>Share comment link</div><div><i>⧉</i>Copy text</div><div><i>↩</i>Reply</div></div>
+          <div class="touch" id="m-fg" style="left:150px;top:120px"></div>
+          <div id="m-flash" style="position:absolute;inset:0;background:#fff;opacity:0;z-index:9"></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="xmlchip" id="xmlchip" data-a style="left:880px;top:670px"><code>&lt;TextView android:id="@+id/comment_body"
+          android:layout_width="match_parent" /&gt;</code></div>
+    <h2 class="h-m" id="pc1" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">The user sees what is declared by developers.</h2>
+    <h2 class="h-m" id="pc2" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">When the user acts, the framework decides which listener runs, and when.</h2>
+    <h2 class="h-m" id="pc3" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">Changes made by user actions need to be tracked in state.</h2>
+    <h2 class="h-m" id="pc4" data-a style="position:absolute;left:880px;top:760px;width:920px;font-size:36px">Apps need to handle users rotating the screen, or leaving the app and coming back.</h2>
+    <div id="c2-types" style="position:absolute;left:760px;top:300px">
+      <h2 class="h-l" id="c2-th" data-a>Four kinds of UI bugs</h2>
+      <p class="cap" id="c2-tc" data-a style="margin-top:16px">Johnson et al., AndroR2+ · 180 real Android bug reports</p>
+    </div>
+    <div class="typechip" id="tc1" data-a style="left:760px;top:520px;background:var(--crash)">Crash</div>
+    <div class="typechip" id="tc2" data-a style="left:900px;top:520px;background:var(--output)">Output</div>
+    <div class="typechip" id="tc3" data-a style="left:1060px;top:520px;background:var(--cosmetic)">Cosmetic</div>
+    <div class="typechip" id="tc4" data-a style="left:1250px;top:520px;background:var(--nav)">Navigation</div>
+  </div>
+
+  <!-- ===================== CHAPTER 3 · ONE BUG, LIVE ===================== -->
+  <div class="scene" id="c3">
+    <div class="eyebrow" id="c3-eye" data-a style="position:absolute;left:120px;top:100px">Harmonic HN · issue #114 · one of the 50 real bugs</div>
+    <div class="report" id="rep" data-a style="left:760px;top:220px;border-top:8px solid var(--crash)">
+      <div class="ih"><span class="ilab red">bug</span><span class="ilab">Harmonic HN · #114</span><span class="ilab green">reproduced · Pixel 2</span></div>
+      <h3>Long-tapping URL (to open comment menu) also opens the URL</h3>
+      <div class="rsteps"><span><i>1</i>Long tap on a URL</span><span><i>2</i>The menu opens, and the link opens too</span></div>
+      <div class="exob"><span class="ex">Expected · only the menu</span><span class="ob">Observed · menu and link together</span></div>
+    </div>
+    <div id="c3-obs" data-a style="position:absolute;left:760px;top:640px;width:1100px"><p class="sub" style="color:var(--correct);font-weight:600">Expected behavior: the long press opens <em>only</em> the menu.</p><p class="sub" style="color:var(--crash);font-weight:600;margin-top:14px">Observed behavior: the menu <em>and</em> the link open simultaneously.</p></div>
+
+    <h2 class="h-m" id="c3-why" data-a style="position:absolute;left:760px;top:92px;width:1100px;font-size:38px;white-space:nowrap">Two listeners on one view that the UI framework controls.</h2>
+    <h2 class="h-m" id="c3-fix" data-a style="position:absolute;left:760px;top:92px;width:1100px;font-size:40px;white-space:nowrap">The fix: implement state that persists.</h2>
+
+    <div class="code" id="pa" data-a style="left:760px;top:170px;width:1040px">
+      <div class="file">CommentsFragment.java · onItemClick(comment, pos, view) · builds the context menu</div><span class="ln">AlertDialog.Builder builder = <span class="k">new</span> AlertDialog.Builder(ctx);</span><span class="ln">builder.setAdapter(adapter, (dialog, which) -&gt; { … });</span><span class="ln"> </span><span class="ln add new">CommentsRecyclerViewAdapter commentAdapter = <span class="k">this</span>.adapter;</span><span class="ln add new">builder.setOnDismissListener(<span class="k">new</span> DialogInterface.OnDismissListener() {</span><span class="ln add new">    @Override</span><span class="ln add new">    <span class="k">public void</span> onDismiss(DialogInterface dialog) {</span><span class="ln add new">        commentAdapter.disableCommentATagClick = <span class="k">false</span>;</span><span class="ln add new">    }</span><span class="ln add new">});</span><span class="ln">AlertDialog dialog = builder.create();</span><span class="ln add new">commentAdapter.disableCommentATagClick = <span class="k">true</span>;</span><span class="ln" id="pa-show">dialog.show();</span>
+    </div>
+    <div class="code" id="pb" data-a style="left:760px;top:690px;width:1040px">
+      <div class="file">CommentsRecyclerViewAdapter.java · ItemViewHolder · one comment row</div><span class="ln add new"><span class="k">public boolean</span> disableCommentATagClick = <span class="k">false</span>;</span><span class="ln" id="pb-long">itemView.setOnLongClickListener(v -&gt; {</span><span class="ln">    commentLongClickListener.onItemClick(comment, pos, v);</span><span class="ln">    <span class="k">return true</span>; });</span><span class="ln" id="pb-click">commentBody.setOnClickATagListener((widget, text, href) -&gt; {</span><span class="ln add new" id="pb-if">    <span class="k">if</span> (disableCommentATagClick) <span class="k">return true</span>;</span><span class="ln" id="pb-open">    Utils.openLinkMaybeHN(widget.getContext(), href);</span><span class="ln">    <span class="k">return true</span>; });</span>
+    </div>
+    <div class="pulse" id="pl1" style="offset-path: path('M 284 304 C 520 304 560 771 760 771')"></div>
+    <div class="pulse" id="pl2" style="offset-path: path('M 284 304 C 520 304 560 861 760 861')"></div>
+    <div class="pulse" id="pl3" style="offset-path: path('M 284 304 C 520 304 560 801 760 801')"></div>
+    <div class="pulse" id="pl4" style="offset-path: path('M 284 304 C 520 304 560 921 760 921')"></div>
+    <div class="check" id="ok1" data-a style="left:380px;top:120px">✓</div>
+
+    <h2 class="h-m" id="c3-none" data-a style="position:absolute;left:760px;top:330px;width:1000px">Five repair tools. Not one produced a patch that passed the tests.</h2>
+    <div id="verd" style="position:absolute;left:760px;top:520px;display:flex;gap:14px;flex-wrap:wrap;width:1120px">
+      <span class="verdict" data-a><i>·</i>RewardRepair</span><span class="verdict" data-a><i>·</i>NTR</span><span class="verdict" data-a><i>·</i>D4C</span><span class="verdict" data-a><i>·</i>ChatRepair</span><span class="verdict" data-a><i>·</i>OpenHands</span>
+    </div>
+  </div>
+
+  <!-- ===================== CHAPTER 4 · BUILDING DROIDFIXBENCH ===================== -->
+  <div class="scene center" id="dfb">
+    <div class="eyebrow" id="dfb-eye" data-a>Part two</div>
+    <h1 class="h-xl grad" id="dfb-h" data-a style="margin-top:18px;font-size:170px">DroidFixBench</h1>
+    <p class="sub" id="dfb-s" data-a style="margin-top:22px;font-size:40px">A benchmark for program repair of UI-centric Android bugs</p>
+  </div>
+  <div class="scene" id="c4">
+    <div class="eyebrow" id="c4-eye" data-a style="position:absolute;left:120px;top:60px">Building DroidFixBench</div>
+    <h2 class="h-l" id="c4-h" data-a style="position:absolute;left:120px;top:118px;font-size:72px">What we need to evaluate UI-centric program repair</h2>
+    <div class="bugchip" id="bugchip" data-a style="left:885px;top:470px;z-index:1">bug</div>
+    <svg id="needlines" viewBox="0 0 1920 1080" style="position:absolute;inset:0;width:1920px;height:1080px;pointer-events:none;z-index:0"><g fill="none" stroke="#c7c7cc" stroke-width="3" stroke-linecap="round"><path id="nl1" d="M 905 500 L 650 420"/><path id="nl2" d="M 1015 500 L 1270 420"/><path id="nl3" d="M 890 560 L 560 640"/><path id="nl4" d="M 1030 560 L 1360 640"/><path id="nl5" d="M 960 625 L 960 760"/></g></svg>
+    <div class="needg" id="need1" data-a style="left:420px;top:300px"><svg viewBox="0 0 160 110"><rect x="34" y="22" width="78" height="64" rx="8" fill="#fff" stroke="#1d1d1f" stroke-width="3"/><rect x="24" y="14" width="78" height="64" rx="8" fill="#fff" stroke="#1d1d1f" stroke-width="3"/><rect x="14" y="6" width="78" height="64" rx="8" fill="#fff" stroke="#1d1d1f" stroke-width="3"/><rect x="26" y="20" width="44" height="6" rx="3" fill="#d2d2d7"/><rect x="26" y="34" width="54" height="6" rx="3" fill="#d2d2d7"/><rect x="26" y="48" width="36" height="6" rx="3" fill="#d2d2d7"/><circle cx="124" cy="80" r="22" fill="#1f8a4c"/><path d="M 113 80 L 121 88 L 136 72" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><b>Compilable snapshot</b></div>
+    <div class="needg" id="need2" data-a style="left:1180px;top:300px"><svg viewBox="0 0 160 110"><rect x="14" y="12" width="90" height="7" rx="3.5" fill="#d2d2d7"/><rect x="14" y="30" width="120" height="7" rx="3.5" fill="#d2d2d7"/><rect x="14" y="48" width="104" height="7" rx="3.5" fill="#ff9f0a"/><rect x="14" y="66" width="70" height="7" rx="3.5" fill="#d2d2d7"/><rect x="14" y="84" width="112" height="7" rx="3.5" fill="#d2d2d7"/><circle cx="118" cy="51" r="24" fill="none" stroke="#1d1d1f" stroke-width="3"/><path d="M 118 20 V 32 M 118 70 V 82 M 87 51 H 99 M 137 51 H 149" stroke="#1d1d1f" stroke-width="3" stroke-linecap="round"/></svg><b>Statement-level localization</b></div>
+    <div class="needg" id="need3" data-a style="left:330px;top:600px"><svg viewBox="0 0 160 110"><rect x="10" y="10" width="140" height="22" rx="6" fill="#fde7e4"/><rect x="24" y="17" width="12" height="8" rx="2" fill="#d93b2b"/><rect x="46" y="17" width="80" height="8" rx="4" fill="#e7a8a2"/><rect x="10" y="44" width="140" height="22" rx="6" fill="#e2f6e8"/><rect x="24" y="51" width="12" height="8" rx="2" fill="#1f8a4c"/><rect x="46" y="51" width="96" height="8" rx="4" fill="#a3d8b5"/><rect x="10" y="78" width="140" height="22" rx="6" fill="#e2f6e8"/><rect x="24" y="85" width="12" height="8" rx="2" fill="#1f8a4c"/><rect x="46" y="85" width="64" height="8" rx="4" fill="#a3d8b5"/></svg><b>Correct patch</b></div>
+    <div class="needg" id="need4" data-a style="left:1290px;top:600px"><svg viewBox="0 0 160 110"><rect x="52" y="4" width="56" height="102" rx="12" fill="#fff" stroke="#1d1d1f" stroke-width="3"/><rect x="62" y="22" width="36" height="6" rx="3" fill="#d2d2d7"/><rect x="62" y="36" width="28" height="6" rx="3" fill="#d2d2d7"/><rect x="62" y="56" width="36" height="18" rx="5" fill="#0a84ff"/><circle cx="28" cy="34" r="20" fill="#d93b2b"/><path d="M 20 26 L 36 42 M 36 26 L 20 42" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/><circle cx="132" cy="76" r="20" fill="#1f8a4c"/><path d="M 122 76 L 129 83 L 143 68" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg><b>GUI tests</b></div>
+    <div class="needg" id="need5" data-a style="left:810px;top:770px"><svg viewBox="0 0 160 110"><path d="M 20 12 H 140 a 10 10 0 0 1 10 10 V 72 a 10 10 0 0 1 -10 10 H 64 L 40 100 V 82 H 20 a 10 10 0 0 1 -10 -10 V 22 a 10 10 0 0 1 10 -10 z" fill="#fff" stroke="#1d1d1f" stroke-width="3" stroke-linejoin="round"/><rect x="28" y="30" width="84" height="7" rx="3.5" fill="#d2d2d7"/><rect x="28" y="46" width="104" height="7" rx="3.5" fill="#d2d2d7"/><rect x="28" y="62" width="60" height="7" rx="3.5" fill="#d2d2d7"/></svg><b>Bug description</b></div>
+
+    <h2 class="h-l" id="c4-fh" data-a style="position:absolute;left:120px;top:118px">How a real bug is built</h2>
+    <h2 class="h-l" id="c4-gh" data-a style="position:absolute;left:120px;top:118px">Gathering real bugs</h2>
+    <div id="stations" style="position:absolute;left:120px;top:250px;width:1680px">
+      <div class="src" id="src1" data-a style="left:0"><span class="dn">AndroR2+</span><b>80</b> reports<small>our bug-localization dataset</small></div>
+      <div class="src" id="src2" data-a style="left:360px"><span class="dn">F-Droid apps</span><b>30</b> issues<small>five recently updated apps</small></div>
+      <div class="src" id="src3" data-a style="left:720px"><span class="dn">FBO4A</span><b>22</b> reports<small>Johnson et al.</small></div>
+      <div class="track" id="strack" data-a></div>
+      <div class="bugcard" id="bugcard" data-a>Harmonic HN · #114</div>
+      <div class="stn" id="stn1" data-a style="left:0"><div class="k">1</div><div class="t">Build the buggy commit</div><div class="micro"><div class="gb"><i style="--c:var(--correct)"></i></div><div class="gb"><i style="--c:var(--correct)"></i></div><div class="gb"><i style="--c:var(--crash);--w:38%"></i></div></div><div class="d">Gradle versions, dead dependencies. Many never build.</div></div>
+      <div class="stn" id="stn2" data-a style="left:345px"><div class="k">2</div><div class="t">Reproduce on the emulator</div><div class="micro"><div class="mphone"><i></i><i></i><i></i></div><div class="mark ok" id="rep-ok">✓</div></div><div class="d">Pixel 2 · Android 9 · follow the report's steps.</div></div>
+      <div class="stn" id="stn3" data-a style="left:690px"><div class="k">3</div><div class="t">Localize the fault</div><div class="micro cl"><i></i><i></i><i class="hit"></i><i></i><i class="hit"></i><i></i></div><div class="d">Diff buggy vs fixed commit. Two authors mark the statements.</div></div>
+      <div class="stn" id="stn4" data-a style="left:1035px"><div class="k">4</div><div class="t">Write two GUI tests</div><div class="micro"><span class="tchip" id="tch1">test 1 · fail → pass</span><span class="tchip" id="tch2">test 2 · fail → pass</span></div><div class="d">Written by one author, reviewed by another.</div></div>
+      <div class="stn" id="stn5" data-a style="left:1380px"><div class="k">5</div><div class="t">Validate</div><div class="micro"><span class="vmark bad" id="vm1">✗ buggy</span><span class="vmark ok" id="vm2">✓ fixed</span></div><div class="d">Both tests fail on the buggy build and pass on the fixed one.</div></div>
+    </div>
+    <div id="fifty" style="position:absolute;left:120px;top:260px;width:1680px">
+      <div id="fifty-n" data-a style="display:flex;align-items:baseline;gap:30px"><span class="stat-num" id="n50" style="font-size:230px">0</span><span class="sub" style="font-size:40px;line-height:1.2">real bugs from 23 apps<br><span class="cap">three sources, several person-months</span></span></div>
+      <div id="fifty-g" data-a style="position:absolute;left:1000px;top:20px"><div class="dots50" id="g50"></div><div class="legend" style="margin-top:26px;width:560px"><span><i style="background:var(--crash)"></i>12 crash</span><span><i style="background:var(--output)"></i>25 output</span><span><i style="background:var(--cosmetic)"></i>9 cosmetic</span><span><i style="background:var(--nav)"></i>4 navigation</span></div>
+        <table class="ytab sm" style="margin-top:34px"><tr><th>Developer fix complexity</th><th>across the 50 bugs</th></tr><tr><td>Fixes in one method</td><td class="y">27 bugs</td></tr><tr><td>Fixes across several methods</td><td class="y">23 bugs</td></tr><tr><td>Lines added · removed</td><td class="y">414 · 290 lines</td></tr><tr><td>Files changed</td><td class="y">63 files</td></tr><tr><td>Largest single fix</td><td class="y">92 lines</td></tr></table></div>
+      <div id="fifty-c" data-a style="position:absolute;left:0;top:360px;width:880px">
+        <table class="ytab"><tr><th></th><th>started</th><th>built</th><th>reproduced</th><th>selected</th></tr>
+        <tr><td>AndroR2+</td><td>80</td><td>42</td><td>35</td><td class="y">35</td></tr>
+        <tr><td>Five F-Droid apps</td><td>30</td><td>23</td><td>21</td><td class="y">13</td></tr>
+        <tr><td>FBO4A</td><td>22</td><td>–</td><td>–</td><td class="y">2</td></tr></table>
+</div>
+    </div>
+
+    <h2 class="h-m" id="c4-th" data-a style="position:absolute;left:760px;top:92px;width:1100px;font-size:34px;white-space:nowrap">Two GUI tests per bug, written by hand and checked by two authors.</h2>
+    <div class="code" id="tp" data-a style="left:760px;top:170px;width:1040px"><div class="file">Script114.java · UiAutomator · the bug-revealing test, as written</div><span class="ln" id="tl1">mDevice.swipe(500, 1600, 500, 800, 20);          <span class="cm">// scroll</span></span><span class="ln" id="tl2">allStories.get(i).click();                         <span class="cm">// open the busiest story</span></span><span class="ln" id="tl3">mDevice.swipe(540, y, 540, y, 100);                <span class="cm">// long press on the link</span></span><span class="ln" id="tl4">UiObject2 select = mDevice.wait(</span><span class="ln" id="tl4b">    Until.findObject(By.text(<span class="s">"Copy text"</span>)), 2000); <span class="cm">// the context menu is up</span></span><span class="ln" id="tl5">assertNotNull(select);</span></div>
+    <div class="xmark" id="tx1" data-a style="left:380px;top:120px">✕</div>
+    <div class="check" id="tok" data-a style="left:380px;top:120px">✓</div>
+    <div class="badge" id="tbad1" data-a style="left:760px;top:470px;background:var(--crash)">buggy build · the browser covers the menu · assertion fails</div>
+    <div class="badge" id="tbad2" data-a style="left:760px;top:470px;background:var(--correct)">fixed build · the menu is found · passes</div>
+    <p class="sub" id="c4-tc" data-a style="position:absolute;left:760px;top:580px;width:1040px">Both tests are fail-to-pass: each fails on the buggy build and passes on the fixed one. Test 1 reproduces the report directly; test 2 exercises the same behavior through the surrounding UI, so a patch has to fix the bug, not just the one path.</p>
+    <table class="ytab sm" id="c4-tc2" data-a style="position:absolute;left:760px;top:790px;width:1040px"><tr><td>Emulator</td><td class="y">Pixel 2 · Android 9</td><td>Time per test</td><td class="y">≈ 2.5 min</td></tr><tr><td>Written by</td><td class="y">one author, reviewed by another</td><td>Agreement</td><td class="y">86% real · 98% synthetic</td></tr></table>
+
+    <h2 class="h-m" id="c4-mh" data-a style="position:absolute;left:760px;top:92px;width:1100px;font-size:38px;white-space:nowrap">Synthetic bugs: Android mutants injected into real code.</h2>
+    <div class="code" id="mp" data-a style="left:760px;top:170px;width:1040px"><div class="file">GPSLogger · GpsMainActivity.launchPreferenceScreen() · MDroid+ operator: NullIntent</div><span class="ln"><span class="k">new</span> Handler().postDelayed(() -&gt; {</span><span class="ln" id="ml-del">    Intent targetActivity = <span class="k">new</span> Intent(getApplicationContext(), MainPreferenceActivity.class);</span><span class="ln add new" id="ml-add">    Intent targetActivity = <span class="k">null</span>;</span><span class="ln">    targetActivity.putExtra(<span class="s">"preference_fragment"</span>, whichFragment);</span><span class="ln">    startActivity(targetActivity);</span><span class="ln">}, 250);</span></div>
+    <div class="report" id="mrep" data-a style="left:760px;top:420px;width:1040px;padding:22px 28px"><div class="rh"><i style="background:var(--crash)"></i>Description written from what we observed on the emulator</div><p style="font-size:23px"><b>"Launch preference screen has stopped."</b> Open the menu, tap Auto send, email and upload. Observed: the app crashes. Expected: the auto-send settings open.</p></div>
+    <div id="mops" data-a style="position:absolute;left:760px;top:620px"><p class="cap" style="margin-bottom:12px">46 bugs · 10 operators · 5 apps · every fix is one statement in one method</p><div class="opchips"><span class="chip">NullIntent <b>5</b></span><span class="chip">DifferentActivityIntentDefinition <b>5</b></span><span class="chip">LengthyGUICreation <b>5</b></span><span class="chip">NullValueIntentPutExtra <b>5</b></span><span class="chip">ViewComponentNotVisible <b>5</b></span><span class="chip">InvalidIDFindView <b>5</b></span><span class="chip">FindViewByIdReturnsNull <b>5</b></span><span class="chip">InvalidKeyIntentPutExtra <b>5</b></span><span class="chip">LengthyGUIListener <b>3</b></span><span class="chip">BuggyGUIListener <b>3</b></span></div></div>
+    <div id="g46wrap" data-a style="position:absolute;left:760px;top:905px;display:flex;gap:30px;align-items:center"><div class="dots50" id="g46" style="grid-template-columns:repeat(23,26px);gap:8px"></div><div class="legend" style="font-size:20px;gap:16px;width:260px"><span><i style="background:var(--crash)"></i>19 crash</span><span><i style="background:var(--output)"></i>8 output</span><span><i style="background:var(--cosmetic)"></i>9 cosmetic</span><span><i style="background:var(--correct)"></i>8 delay</span><span><i style="background:var(--nav)"></i>2 navigation</span></div></div>
+  </div>
+
+  <!-- ===================== CHAPTER 5 · FIVE TOOLS, ONE PIPELINE ===================== -->
+  <div class="scene" id="c5">
+    <div class="eyebrow" id="c5-eye" data-a style="position:absolute;left:120px;top:60px">Five repair techniques</div>
+    <div class="tin" id="tin" data-a>
+      <h4>Each bug, five tools</h4>
+      <div class="issue"><div class="ih"><span class="ilab red">bug</span><span class="ilab">Anglers' Log · #1445</span></div><div class="it">Editing a trip's date fails</div><div class="steps"><span>Create trip</span><span>Edit</span><span>Change date</span><span>Save</span><span class="bad">error</span></div></div>
+      <div class="blk"><span class="k">for</span> (UserDefineObject o : getTrips())
+<span class="loc">  <span class="k">if</span> (trip.overlapsTrip((Trip) o))</span>
+    <span class="k">return true</span>;</div>
+      <div class="have"><span><i style="background:var(--crash)"></i>failing GUI test</span><span><i style="background:var(--alt)"></i>bug report</span><span><i style="background:var(--overfit)"></i>localized line</span></div>
+    </div>
+    <div class="toolcard" id="tc-rr" data-a><h3>RewardRepair</h3><div class="md">Neural machine translation · a pre-trained model, trained with compile and test feedback · ICSE 2022</div>
+      <div class="mech" id="m-rr"><div class="mbox">seq2seq model<small>pre-trained · not tuned on UI code</small></div></div>
+      <div class="desc">Buggy line and method in, patch out. No report, no tests.</div></div>
+    <div class="toolcard" id="tc-ntr" data-a><h3>NTR</h3><div class="md">Fix templates guide an LLM · CodeLlama · 2024</div>
+      <div class="mech"><div class="tpl"><span class="k">if</span> (<span class="hole" id="hole">▢ condition ▢</span><span class="fill" id="fill">!trip.getId().equals(tr.getId())</span>)&nbsp;<span class="k">return true</span>;</div><div class="tpl" style="top:190px;font-size:22px;color:var(--ink-3);font-family:var(--text);font-weight:500">template: <b style="color:var(--ink)">insert a condition</b> → the model fills the hole</div></div>
+      <div class="desc">Pick a repair template, let the model fill the hole.</div></div>
+    <div class="toolcard" id="tc-d4c" data-a><h3>D4C</h3><div class="md">One prompt, the whole function rewritten · GPT-4 · 2024</div>
+      <div class="mech"><div class="tcard" style="left:40px;width:280px"><b>prompt</b>buggy method
+bug report
+failing test
+→ rewrite the function</div><div class="arrow-r" id="d4c-arrow" style="left:370px">→</div><div class="tcard" id="d4c-out" style="left:440px;width:490px"><b>response · the whole method · real patch 62</b><span class="k">for</span> (UserDefineObject object : trips)
+  <span class="k">if</span> (object <span class="k">instanceof</span> Trip &amp;&amp;
+      trip.overlapsTrip((Trip) object))
+    <span class="k">return true</span>;</div></div>
+      <div class="desc">One prompt, the whole function back.</div></div>
+    <div class="toolcard" id="tc-cr" data-a><h3>ChatRepair</h3><div class="md">A conversation with test feedback · GPT-3.5 · ISSTA 2024</div>
+      <div class="mech"><div class="loopring"><svg viewBox="0 0 240 240"><circle cx="120" cy="120" r="96" fill="none" stroke="#e5e5ea" stroke-width="10"/><circle id="loopc" cx="120" cy="120" r="96" fill="none" stroke="#2f6fed" stroke-width="10" stroke-linecap="round" transform="rotate(-90 120 120)"/><text x="120" y="114" text-anchor="middle" font-family="Manrope,sans-serif" font-weight="700" font-size="24" fill="#1d1d1f">patch</text><text x="120" y="142" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="17" fill="#86868b">test · feedback</text></svg></div>
+        <div class="loopnote"><b>1.</b> propose a patch<br><b>2.</b> run the tests<br><b>3.</b> feed the failure back into the prompt<br><b>…</b> up to 100 tries on a real bug</div></div>
+      <div class="desc">Patch, test, feed the failure back. Up to 100 rounds.</div></div>
+    <div class="toolcard" id="tc-oh" data-a><h3>OpenHands</h3><div class="md">A software engineering agent in a sandbox · Qwen2.5-Coder · 2025</div>
+      <div class="mech"><div class="term" id="ohterm" style="left:24px;top:24px;width:920px;height:252px"><div class="hd"><i></i><i></i><i></i><span>sandbox</span></div><span class="l c">cat app/src/main/java/com/cohenadair/anglerslog/model/Logbook.java</span><span class="l o">… public static boolean tripExists(Trip trip) { …</span><span class="l c">edit Logbook.java  tripExists()</span><span class="l c">./gradlew assembleDebug</span><span class="l ok">BUILD SUCCESSFUL in 1m 12s</span></div></div>
+      <div class="desc">Read, edit, run, repeat. One patch per bug.</div></div>
+
+    <h2 class="h-l" id="c5-ph" data-a style="position:absolute;left:120px;top:118px">Patch evaluation methodology</h2>
+    <div id="tminis"></div>
+    <div class="station" id="st1" data-a style="left:270px">Apply<small>splice into the buggy snapshot</small></div>
+    <div class="station" id="st2" data-a style="left:810px">Build<small>Gradle, the whole app</small></div>
+    <div class="station" id="st3" data-a style="left:1350px">Emulator<small>2 GUI tests · Pixel 2 · Android 9</small></div>
+    <div class="lanebox" id="lb1" data-a style="left:120px;--c:var(--correct)">Correct<small>matches the developer's fix</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb2" data-a style="left:440px;--c:var(--alt)">Plausible, not correct<small>passes, does not match</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb3" data-a style="left:760px;--c:var(--overfit)">Overfit<small>passes only by targeting the tests</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb4" data-a style="left:1080px;--c:var(--tfail)">Test failure<small>builds, fails a GUI test</small><div class="n">0</div></div>
+    <div class="lanebox" id="lb5" data-a style="left:1400px;--c:#a1a1a6">Build failure<small>or no usable patch</small><div class="n">0</div></div>
+    <div id="sqs"></div>
+    <div id="c5-total" data-a style="position:absolute;left:120px;top:960px;display:flex;gap:26px;align-items:baseline"><span class="stat-num" id="c5-n" style="font-size:80px">0</span><span class="sub">patches · 1,457 synthetic · 1,592 real · two authors judge every plausible one</span></div>
+  </div>
+
+  <!-- ===================== CHAPTER 6 · RESULTS ===================== -->
+  <div class="scene" id="c6">
+    <div class="eyebrow" id="c6-eye" data-a style="position:absolute;left:120px;top:60px">Results</div>
+    <h2 class="h-m" id="c6-h1" data-a style="position:absolute;left:120px;top:106px;font-size:48px">Effectiveness on <span class="ul">synthetic bugs</span></h2>
+    <div class="rbars" id="rq1"></div>
+    <div id="g46r" data-a style="position:absolute;left:1340px;top:200px"><div class="grid46" id="g46b"></div><div style="margin-top:24px;font:700 70px var(--display);letter-spacing:-.04em"><span id="n41" class="grad">0</span><span style="color:var(--ink-3);font-size:40px"> / 46</span></div><p class="cap" style="width:400px">bugs fixed by at least one tool. 14 were fixed by four of the five.</p></div>
+    <div class="legend" id="lg1" data-a style="position:absolute;left:374px;top:620px;font-size:20px;gap:18px"><span><i style="background:var(--correct)"></i>Correct</span><span><i style="background:var(--alt)"></i>Plausible, not correct</span><span><i style="background:var(--overfit)"></i>Overfit</span><span><i style="background:var(--tfail)"></i>Test failure</span><span><i style="background:var(--bfail)"></i>Build failure or no patch</span></div>
+    <h2 class="h-m" id="c6-h2" data-a style="position:absolute;left:120px;top:106px;font-size:48px">Effectiveness on <span class="ul">real bugs</span></h2>
+    <h2 class="h-m" id="c6-h6" data-a style="position:absolute;left:120px;top:106px;font-size:48px">Results overview</h2>
+    <div class="rbars" id="rq2"></div>
+    <div id="g50r" data-a style="position:absolute;left:1340px;top:200px"><div class="grid46" id="g50b" style="grid-template-columns:repeat(10,40px)"></div><div style="margin-top:24px;font:700 70px var(--display);letter-spacing:-.04em"><span id="n11">0</span><span style="color:var(--ink-3);font-size:40px"> / 50</span></div><p class="cap" style="width:400px">bugs fixed by at least one tool. D4C fixed the most, 8. The fixed bugs average 1.09 methods and 7.9 lines.</p></div>
+    <div class="legend" id="lg2" data-a style="position:absolute;left:374px;top:620px;font-size:20px;gap:18px"><span><i style="background:var(--correct)"></i>Correct</span><span><i style="background:var(--alt)"></i>Plausible, not correct</span><span><i style="background:var(--overfit)"></i>Overfit</span><span><i style="background:var(--tfail)"></i>Test failure</span><span><i style="background:var(--bfail)"></i>Build failure or no patch</span></div>
+
+    <div class="tile-big" id="ct1" data-a style="left:200px;top:200px;width:620px"><div class="big grad">41<small>/46</small></div><div class="lab">synthetic bugs fixed</div></div>
+    <div class="tile-big" id="ct2" data-a style="left:1100px;top:200px;width:620px"><div class="big">11<small>/50</small></div><div class="lab">real bugs fixed</div></div>
+    <div id="ct3" data-a style="position:absolute;left:120px;top:600px;width:1680px"><div style="display:flex;align-items:baseline;gap:34px"><span class="stat-num" id="n67" style="font-size:180px">0%</span><span class="sub" style="font-size:38px;line-height:1.25">of the patches for real bugs <b>did not build</b><br><span class="cap">1,074 of 1,592. The tools reference things that do not exist in the project.</span></span></div><div style="margin-top:24px;height:22px;border-radius:11px;background:#ececf0;overflow:hidden"><div id="bar67" style="height:100%;width:0;background:var(--ink)"></div></div></div>
+
+    <h2 class="h-m" id="c6-h3" data-a style="position:absolute;left:120px;top:106px;font-size:48px">TrainerApp 1641 · the tools guess the app's vocabulary</h2>
+    <div class="issue" id="lim-issue" data-a style="position:absolute;left:120px;top:200px;width:520px;margin:0"><div class="ih"><span class="ilab red">bug</span><span class="ilab">TrainerApp · #1641</span></div><div class="it">The slider's training type is never stored</div><div class="steps"><span>Open the editor</span><span>Set the type</span><span>Save</span><span class="bad">value lost</span></div></div>
+    <div class="pcard" id="lim-real" data-a style="left:120px;top:400px;width:520px"><div class="tag"><i style="background:var(--correct)"></i>What the app actually has · developer fix</div><div class="code"><span class="ln">Spinner s = findViewById(<b>R.id.trainSpinner</b>);</span><span class="ln">schedule.setTrainingsType(</span><span class="ln">    TrainingsTypes.values()[(int) s.getSelectedItemId()]);</span></div><div class="why">The report says "slider". The widget is a Spinner, and the id is nowhere in the method the tools were given.</div></div>
+    <div class="pcard" id="lim1" data-a style="left:680px;top:200px;width:560px"><div class="tag"><i style="background:var(--crash)"></i>D4C · a component ID that does not exist</div><div class="code"><span class="ln">activeSchedule().setTrainingType(</span><span class="ln hl">  ((SeekBar) findViewById(<b>R.id.trainingTypeSeekBar</b>))</span><span class="ln">    .getProgress());</span></div><div class="tests"><b class="fail">cannot find symbol · build fails</b></div><div class="why">Ten patches, five different guessed ids: trainingTypeSlider, training_type_slider, trainingTypeSpinner…</div></div>
+    <div class="pcard" id="lim2" data-a style="left:1280px;top:200px;width:520px"><div class="tag"><i style="background:var(--crash)"></i>OpenHands · methods that do not exist</div><div class="code"><span class="ln hl">String t = <b>getTrainingTypeFromProgress</b>(progress);</span><span class="ln">activeSchedule.setTrainingType(t);</span><span class="ln hl">appManager.getApplicationModel().<b>saveSchedule</b>(…);</span></div><div class="tests"><b class="fail">cannot find symbol · build fails</b></div><div class="why">A plausible-sounding API, invented on the spot.</div></div>
+    <div class="pcard" id="lim3" data-a style="left:680px;top:600px;width:560px"><div class="tag"><i style="background:var(--crash)"></i>D4C · a fix that does nothing</div><div class="code"><span class="ln">fab.setOnClickListener(v -&gt; {</span><span class="ln hl">  <b>saveTrainingScheduleInXml</b>(); <b>updateScheduleView</b>(); });</span><span class="ln">private void saveTrainingScheduleInXml() {</span><span class="ln">  <span class="cm">// Logic to save training schedule state in XML file</span> }</span></div><div class="tests"><b class="fail">test fails</b></div><div class="why">Two new methods, both empty.</div></div>
+    <div class="pcard" id="lim4" data-a style="left:1280px;top:600px;width:520px"><div class="tag"><i style="background:var(--crash)"></i>NTR · FieldBook 1299 · an Activity that does not exist</div><div class="code"><span class="ln">intent.setClassName(ConfigActivity.this,</span><span class="ln hl">    <b>CollectDataActivity</b>.class.getName());</span><span class="ln">startActivity(intent);</span></div><div class="tests"><b class="fail">cannot find symbol · build fails</b></div><div class="why">The real screen is CollectActivity.</div></div>
+    <p class="sub" id="c6-nm" data-a style="position:absolute;left:120px;top:900px;width:1680px;font-weight:600;color:var(--ink)">The tools see one method and a report. They guess the rest: ids, methods, screens.</p>
+
+    <h2 class="h-m" id="c6-h4" data-a style="position:absolute;left:120px;top:106px;font-size:48px">PSLab 2678 · an overfitting patch</h2>
+    <div class="pcard" id="ov-dev" data-a style="left:120px;top:200px;width:800px"><div class="tag"><i style="background:var(--correct)"></i>Developer fix</div><div class="code" style="font-size:22px;line-height:34px"><span class="ln add" style="height:34px">+ degree = Math.round(seekArc.getProgress() * 3.6f);</span></div></div>
+    <div class="pcard" id="ov-d4c" data-a style="left:1000px;top:200px;width:800px"><div class="tag"><i style="background:var(--overfit)"></i>D4C · passes both tests</div><div class="code" style="font-size:22px;line-height:34px"><span class="ln hl" style="height:34px">  degree = 0;</span></div><div class="tests"><b class="pass">test 1 ✓</b><b class="pass">test 2 ✓</b></div></div>
+    <div id="ov19" data-a style="position:absolute;left:120px;top:520px;display:flex;gap:34px;align-items:baseline"><span class="stat-num" id="n19" style="font-size:190px">0</span><span class="sub" style="font-size:38px;line-height:1.25">overfitting patches on the real bugs<br><span class="cap">9 always return the same boolean · 9 hard-code a value · 1 deletes characters from a string</span></span></div>
+
+    <h2 class="h-m" id="c6-h5" data-a style="position:absolute;left:120px;top:106px;font-size:48px">Why 379 sampled patches failed</h2>
+    <p class="cap" id="c6-tcap" data-a style="position:absolute;left:120px;top:176px">A statistically significant sample across all tools and both datasets · three annotators · nine categories · one bar = four patches</p>
+    <div id="piles"></div>
+    <div id="p42" data-a style="position:absolute;left:1180px;top:230px;text-align:right;width:620px"><div class="stat-num" style="font-size:190px"><span id="n42">0</span>%</div><p class="sub" style="font-size:36px"><b>159 of 379</b> failures are specific to UI code</p></div>
+    <div id="tpills" style="position:absolute;left:120px;right:120px;top:900px;display:flex;gap:14px;flex-wrap:wrap">
+      <span class="chip solid" data-a>Non-existent method call <b style="opacity:.7">37</b></span><span class="chip solid" data-a>Non-existent GUI component ID <b style="opacity:.7">35</b></span><span class="chip" data-a>Syntax errors <b>28</b></span><span class="chip" data-a>Non-existent object <b>26</b></span><span class="chip" data-a>Thread.sleep lowered, not removed <b>21</b></span><span class="chip solid" data-a>Non-existent Activity <b style="opacity:.7">18</b></span><span class="chip" data-a>Patch identical to the buggy code <b>18</b></span>
+    </div>
+  </div>
+
+  <!-- ===================== CHAPTER 7 · IMPLICATIONS, SUMMARY ===================== -->
+  <div class="scene" id="c7">
+    <div class="eyebrow" id="c7-eye" data-a style="position:absolute;left:120px;top:60px">Implications</div>
+    <div class="impl" id="im1" data-a style="left:120px;top:150px"><div class="n">1</div><div class="t">Give the tool the GUI vocabulary</div><div class="d">Component IDs, Activities, and Fragments should be inputs, not guesses. 55 of 379 sampled failures hallucinated one of them.</div><div class="mini"><span class="flowchip" style="left:20px;top:14px">R.id.comment_body</span><span class="flowchip" style="left:20px;top:50px">CommentsFragment</span><span class="flowchip" style="left:20px;top:86px">R.id.story_comments</span><div class="promptbox" id="pb1">prompt</div></div></div>
+    <div class="impl" id="im2" data-a style="left:1020px;top:150px"><div class="n">2</div><div class="t">Expose the project's APIs</div><div class="d">52 failures call methods that do not exist or call them with the wrong arguments. The fix often lives one class away from the buggy method.</div><div class="mini"><span class="flowchip" style="left:20px;top:14px">Trip.getId()</span><span class="flowchip" style="left:20px;top:50px">Utils.openLinkMaybeHN(…)</span><span class="flowchip" style="left:20px;top:86px">Trip.overlapsTrip(Trip)</span><div class="promptbox">prompt</div></div></div>
+    <div class="impl" id="im3" data-a style="left:120px;top:590px"><div class="n">3</div><div class="t">Use the UI itself as context</div><div class="d">Screenshots and recordings of the bug and the screens around it carry information that the report and the code do not.</div><div class="mini"><img id="im3-shot" src="assets/phone2.png" alt="" style="position:absolute;left:30px;top:14px;height:92px;border-radius:8px;opacity:0"><img id="im3-shot2" src="assets/phone3.png" alt="" style="position:absolute;left:100px;top:14px;height:92px;border-radius:8px;opacity:0"><div class="promptbox">prompt</div></div></div>
+    <div class="impl" id="im4" data-a style="left:1020px;top:590px"><div class="n">4</div><div class="t">Put the build in the loop</div><div class="d">1,711 of 3,049 patches never compiled. Build before returning a patch, and feed the compiler's errors back.</div><div class="mini"><span class="flowchip" id="im4-p1" style="left:20px;top:40px">patch</span><div class="promptbox" style="right:auto;left:300px;top:24px;width:160px" id="im4-build">build</div><span class="flowchip" id="im4-err" style="left:300px;top:40px;background:#fde7e4;color:#9a1b0f;border-color:#f2b8b1">cannot find symbol R.id.foo</span><span class="flowchip" id="im4-p2" style="left:20px;top:40px;background:#e2f6e8;color:#0f5f31;border-color:#b7e3c6">patch, again</span><span class="flowchip" id="im4-ok" style="left:500px;top:40px;background:#e2f6e8;color:#0f5f31;border-color:#b7e3c6">BUILD SUCCESSFUL</span></div></div>
+
+    <div id="sum" style="position:absolute;left:120px;top:150px;width:1680px">
+      <div class="eyebrow" id="sum-eye" data-a>Summary</div>
+      <div id="sum-rows" style="margin-top:30px;display:flex;flex-direction:column;gap:26px;width:1000px">
+        <div class="sumrow" data-a style="display:flex;gap:30px;align-items:baseline"><span class="stat-num" style="font-size:96px;width:260px;text-align:right">96</span><span class="sub"><b>DroidFixBench</b>: real and synthetic UI-centric bugs with snapshot, localization, patch, GUI tests, and description</span></div>
+        <div class="sumrow" data-a style="display:flex;gap:30px;align-items:baseline"><span class="stat-num" style="font-size:96px;width:260px;text-align:right">5</span><span class="sub">repair techniques, from a pre-trained translation model to an agent, on <b>3,049</b> patches</span></div>
+        <div class="sumrow" data-a style="display:flex;gap:30px;align-items:baseline"><span class="stat-num" style="font-size:96px;width:260px;text-align:right">41<span style="font-size:44px;color:var(--ink-3)">/46</span></span><span class="sub">synthetic bugs fixed, but only <b>11 of 50</b> real bugs</span></div>
+        <div class="sumrow" data-a style="display:flex;gap:30px;align-items:baseline"><span class="stat-num" style="font-size:96px;width:260px;text-align:right">42%</span><span class="sub">of failures are specific to UI code: hallucinated IDs, Activities, and APIs</span></div>
+      </div>
+      <div class="report" id="sum-pkg" data-a style="left:1080px;top:60px;width:600px"><div class="rh"><i></i>Replication package</div><p style="font-size:22px">Benchmark, a Docker harness per tool, every generated patch, the codebooks and the taxonomy.</p><p class="mono" style="font-size:24px;color:var(--ink)">github.com/SageSELab/<br>UI-Program-Repair</p><p class="mono" style="font-size:20px">doi: 10.5281/zenodo.21521939</p></div>
+      <div id="sum-qr" data-a style="position:absolute;left:1080px;top:610px;width:600px;display:flex;gap:30px"><div class="qrtile"><img src="assets/qr-paper.svg" alt=""><span>Paper</span></div><div class="qrtile"><img src="assets/qr-slides.svg" alt=""><span>Slides</span></div><div class="qrtile"><img src="assets/qr-package.svg" alt=""><span>Replication package</span></div></div>
+    </div>
+  </div>
+
+  <!-- ===================== CHAPTER 8 · ONE MORE THING (dark) ===================== -->
+  <div class="scene" id="black" style="background:#000;opacity:0"></div>
+  <div class="scene dk" id="c8">
+    <div class="h-xl" id="omt" data-a style="position:absolute;left:0;right:0;top:440px;text-align:center;font-size:150px;color:#fff">One more thing.</div>
+    <div class="h-xl" id="bkp" data-a style="position:absolute;left:0;right:0;top:460px;text-align:center;font-size:110px;color:var(--ink-3)">Backup</div>
+    <div class="eyebrow" id="c8-eye" data-a style="position:absolute;left:120px;top:60px">Example chapter</div>
+    <h2 class="h-l" id="c8-h" data-a style="position:absolute;left:120px;top:118px">Three tools on 50 example cases</h2>
+    <p class="sub" id="c8-s" data-a style="position:absolute;left:120px;top:232px">A placeholder study that exercises the engine&rsquo;s motion features</p>
+    <div class="agents" id="agents" style="top:340px">
+      <div class="agent" data-a><img src="assets/tool-a.png" alt=""><div class="nm">Tool A</div><div class="md">Model A</div></div>
+      <div class="agent" data-a><img src="assets/tool-b.png" alt=""><div class="nm">Tool B</div><div class="md">Model B</div></div>
+      <div class="agent" data-a><img src="assets/tool-c.png" alt=""><div class="nm">Tool C</div><div class="md">Model C</div></div>
+    </div>
+    <div class="cfg" id="cf1" data-a style="left:1240px;top:340px">Base</div>
+    <div class="cfg" id="cf2" data-a style="left:1590px;top:340px">+ X<small>a first option</small></div>
+    <div class="cfg" id="cf3" data-a style="left:1240px;top:480px">+ Y<small>a second option</small></div>
+    <div class="cfg" id="cf4" data-a style="left:1590px;top:480px">+ X + Y</div>
+    <div id="c8-t5" data-a style="position:absolute;left:120px;top:640px;display:flex;gap:24px;align-items:baseline"><span class="stat-num" id="n5" style="font-size:130px">2</span><span class="sub">example items per case<br><span class="cap">a placeholder caption for the first statistic</span></span></div>
+    <div id="c8-600" data-a style="position:absolute;left:1240px;top:640px;display:flex;gap:24px;align-items:baseline"><span class="stat-num" id="n600" style="font-size:130px">0</span><span class="sub">example runs<br><span class="cap">3 tools × 4 settings × 50 cases · placeholder</span></span></div>
+    <div id="cells600"></div>
+
+    <h2 class="h-m" id="c8-th" data-a style="position:absolute;left:120px;top:92px;font-size:40px;white-space:nowrap">Tool B on an example task. An invented transcript.</h2>
+    <div class="term" id="bigterm" data-a style="left:120px;top:170px;width:1220px;height:760px"><div class="hd"><i></i><i></i><i></i><span id="termclock">00:00</span></div><div id="termlines"></div></div>
+    <div class="xmark" id="ax" data-a style="left:1700px;top:120px">✕</div><div class="check" id="aok" data-a style="left:1700px;top:120px">✓</div>
+    <p class="cap" id="c8-tcap" data-a style="position:absolute;left:120px;top:950px;width:1220px">An invented transcript, condensed to a few turns. The timestamps are made up too.</p>
+
+    <div class="tile-big" id="hl1" data-a style="left:120px;top:300px;width:560px"><div class="big grad"><span id="n74">0</span>%</div><div class="lab">of example runs<br>passed every check</div><div class="cap" style="margin-top:14px">399 of 600 · placeholder numbers</div></div>
+    <div class="tile-big" id="hl2" data-a style="left:680px;top:300px;width:560px"><div class="big"><span id="n50b">0</span><small>/50</small></div><div class="lab">cases passed by<br>at least one setting</div><div class="cap" style="margin-top:14px">placeholder numbers</div></div>
+    <div class="tile-big" id="hl3" data-a style="left:1240px;top:300px;width:560px"><div class="big"><span id="n9">0</span></div><div class="lab">of 600 runs<br>failed a step</div><div class="cap" style="margin-top:14px">placeholder numbers</div></div>
+
+    <h2 class="h-m" id="c8-hh" data-a style="position:absolute;left:120px;top:92px;font-size:40px;white-space:nowrap">Every run · 50 cases across, 12 settings down</h2>
+    <div class="hmg" id="hmg"></div>
+    <div class="legend" id="hmleg" data-a style="position:absolute;left:290px;top:600px;color:var(--ink-2)"><span><i style="background:var(--correct)"></i>Match · 83</span><span><i style="background:var(--alt)"></i>Other pass · 299</span><span><i style="background:var(--overfit)"></i>Partial · 17</span><span><i style="background:#5a5a5e"></i>Fail · 169</span><span><i style="background:#38383c"></i>Error · 32</span></div>
+    <div id="pct14" data-a style="position:absolute;left:120px;top:690px;display:flex;gap:90px;align-items:flex-start">
+      <div style="display:flex;gap:24px;align-items:baseline"><span class="stat-num" style="font-size:150px;color:var(--alt)"><span id="n74b">0</span>%</span><span class="sub" style="font-size:34px;line-height:1.25">passing<br><span class="cap">399 of 600 placeholder runs pass every check</span></span></div>
+      <div style="display:flex;gap:24px;align-items:baseline"><span class="stat-num" style="font-size:150px;color:var(--correct)"><span id="n14">0</span>%</span><span class="sub" style="font-size:34px;line-height:1.25">matching<br><span class="cap">83 of 600 match the reference</span></span></div>
+      <p class="cap" style="width:420px;align-self:center">Placeholder text for the third column. Every number in this chapter is invented for the test fixture and describes no real study.</p>
+    </div>
+
+    <h2 class="h-m" id="c8-fh" data-a style="position:absolute;left:120px;top:92px;font-size:40px;white-space:nowrap">An example task · twelve variants, one reference</h2>
+    <div class="ftree" id="ftree">
+      <div>app/</div>
+      <div>├─ build.gradle<span class="cnt">1</span></div>
+      <div>└─ src/main/java/</div>
+      <div>   ├─ com/example/notes/</div>
+      <div>   │   ├─ <b>NoteListFragment.java</b><span class="cnt dev">reference</span></div>
+      <div>   │   ├─ <b>NoteListAdapter.java</b><span class="cnt dev">reference</span><span class="cnt">2 · Tool B with + X</span></div>
+      <div>   │   └─ SettingsDialog.java<span class="cnt">1</span></div>
+      <div>   └─ org/example/textview/   <span style="color:var(--ink-3)">← a library bundled with the app</span></div>
+      <div>       └─ <b>LinkHandler.java</b><span class="cnt">10 · Tool A ×4, Tool C ×4, Tool B ×2</span></div>
+    </div>
+    <div class="pcard dark" id="fp1" data-a style="left:1000px;top:190px;width:800px"><div class="tag"><i style="background:var(--alt)"></i>Tool A · + X + Y · LinkHandler.java</div><div class="code"><span class="ln"><span class="k">if</span> (event == Event.UP) {</span><span class="ln add">  <span class="k">long</span> held = now() - pressedAt;</span><span class="ln add">  <span class="k">if</span> (held &lt; LONG_PRESS_MS)</span><span class="ln">    handler.run();</span></div><div class="why">A placeholder explanation for the first example variant, long enough to wrap.</div></div>
+    <div class="pcard dark" id="fp2" data-a style="left:1000px;top:520px;width:800px"><div class="tag"><i style="background:var(--alt)"></i>Tool B · + X + Y · NoteListAdapter.java</div><div class="code"><span class="ln add">ignoreUntil = clock() + 750;</span><span class="ln">…</span><span class="ln add"><span class="k">if</span> (clock() &lt; ignoreUntil)</span><span class="ln add">  <span class="k">return true</span>;</span></div><div class="why">A placeholder explanation for the second example variant.</div></div>
+    <p class="sub" id="c8-fcap" data-a style="position:absolute;left:120px;top:800px;width:840px;font-weight:600;color:var(--ink)">12 of 12 pass the checks. 0 of 12 match the reference.<br><span class="cap">A placeholder caption. The numbers are invented.</span></p>
+
+    <h2 class="h-m" id="c8-vh" data-a style="position:absolute;left:120px;top:92px;font-size:40px;white-space:nowrap">Setting Y changes the outcome</h2>
+    <div id="vbars"></div>
+    <div id="c8-vcap" data-a style="position:absolute;left:120px;top:780px;display:flex;gap:80px;align-items:baseline"><div style="display:flex;gap:24px;align-items:baseline"><span class="stat-num" style="font-size:120px">+31</span><span class="sub">points from setting Y, for Tool B<br><span class="cap">a placeholder caption · the numbers are invented</span></span></div><div style="display:flex;gap:24px;align-items:baseline"><span class="stat-num" style="font-size:120px;white-space:nowrap">2–3×</span><span class="sub">the runtime<br><span class="cap">a placeholder caption · the numbers are invented</span></span></div></div>
+
+    <h2 class="h-m" id="c8-xh" data-a style="position:absolute;left:120px;top:92px;font-size:40px;white-space:nowrap">Why example runs fail · six placeholder categories</h2>
+    <div class="rbars" id="fam" style="top:180px;width:1000px"></div>
+    <div class="pcard dark" id="gps" data-a style="left:1180px;top:180px;width:620px"><div class="tag"><i style="background:var(--android)"></i>Example case · state · 7 of 8 failed runs</div><div class="code"><span class="ln"><span class="cm">// Example.updateList()</span></span><span class="ln del">- <span class="k">if</span> (items.isEmpty()) {</span><span class="ln add">+ <span class="k">if</span> (!App.get().started</span><span class="ln add">+     || items.isEmpty()) {</span><span class="ln">    group.setVisibility(View.GONE);</span></div><div class="why">A placeholder explanation for a failed run. It is long enough to wrap onto a few lines, so the card keeps a similar shape.</div></div>
+    <h2 class="h-m" id="c8-line" data-a style="position:absolute;left:120px;top:860px;width:1680px;font-size:52px"><span class="w">Each </span><span class="w">word </span><span class="w">of </span><span class="w">this </span><span class="w">line </span><span class="w grad">animates </span><span class="w grad">in </span><span class="w grad">its </span><span class="w grad">turn.</span></h2>
+
+    <div id="sparsh" style="position:absolute;left:120px;top:200px;width:1680px;display:flex;gap:90px;align-items:center">
+      <img id="sp-img" data-a src="assets/sparsh.jpeg" alt="Sparsh Pandey" style="width:420px;height:420px;border-radius:50%;object-fit:cover;box-shadow:0 30px 90px rgba(0,0,0,.5)">
+      <div>
+        <div class="eyebrow" id="sp-eye" data-a>One more one more thing</div>
+        <h1 class="h-xl" id="sp-h" data-a style="font-size:110px;margin-top:14px">Sparsh Pandey</h1>
+        <p class="sub" id="sp-s" data-a style="margin-top:18px;font-size:36px">Undergraduate researcher, SAGE Lab, University of Central Florida.<br>Co-author of this paper.</p>
+        <p class="sub" id="sp-a" data-a style="margin-top:34px;font-size:40px;color:var(--ink);font-weight:700">Applying to PhD programs in CS and SE this cycle.</p>
+        <p class="cap" id="sp-c" data-a style="margin-top:22px;font-size:28px">If you are recruiting, come talk to him. He is standing right here.<br><span class="mono">sparsh.pandey@ucf.edu</span></p>
+      </div>
+    </div>
+    <div id="close" style="position:absolute;left:120px;top:230px;width:1680px">
+      <h1 class="h-xl" id="cl-h" data-a style="font-size:140px">How far are we?</h1>
+      <div id="cl-qr" data-a style="position:absolute;right:0;top:-6px;display:flex;gap:22px"><div class="qrtile dk"><img src="assets/qr-paper.svg" alt=""><span>Paper</span></div><div class="qrtile dk"><img src="assets/qr-slides.svg" alt=""><span>Slides</span></div><div class="qrtile dk"><img src="assets/qr-package.svg" alt=""><span>Replication package</span></div></div>
+      <p class="sub" id="cl-s" data-a style="margin-top:34px;max-width:1500px">Traditional repair fixes small UI bugs and fails on real ones, mostly on syntax it cannot see. What remains is scope, lifecycle, state, and deciding what correct means.</p>
+      <div id="cl-l" data-a style="margin-top:70px;display:flex;gap:90px"><div><p class="cap">Benchmark &amp; package</p><p class="mono" style="font-size:30px;margin-top:8px;color:var(--ink)">github.com/SageSELab/UI-Program-Repair</p><p class="mono cap" style="margin-top:6px">doi: 10.5281/zenodo.21521939</p></div><div><p class="cap">Contact</p><p class="mono" style="font-size:30px;margin-top:8px;color:var(--ink)">kpmoran@ucf.edu</p><p class="mono" style="font-size:30px;margin-top:6px;color:var(--ink)">sparsh.pandey@ucf.edu</p><p class="mono cap" style="margin-top:6px">sagelab.io</p></div></div>
+      <div class="logos" id="cl-g" data-a style="margin-top:80px;filter:none;opacity:.9;gap:40px"><img class="sage" src="assets/sage-white.png" alt=""><img src="assets/ucf.png" alt="" style="border-radius:12px"><img src="assets/wm-white.png" alt=""><img src="assets/umn.png" alt="University of Minnesota" style="height:46px;filter:brightness(0) invert(1)"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script type="application/json" id="text-overrides">
+{"text":{},"notes":{}}
+</script>
+<script src="talk.js"></script>
+<script src="edit.js"></script>
+<script>
+(() => {
+  // ---------- build the world (timeline nodes + benchmark tiles) ----------
+  const MS = [
+    [200, '2009', 'GenProg', 'search-based repair'],
+    [350, '2013', 'PAR', 'templates from human fixes'],
+    [500, '2014', 'Defects4J', 'the shared benchmark'],
+    [650, '2016', 'Prophet · Angelix', 'learned priors, constraints'],
+    [800, '2019', 'TBar', 'template-based repair'],
+    [950, '2020', 'CoCoNuT · CURE', 'neural machine translation'],
+    [1100, '2022', 'RewardRepair', 'execution feedback in training'],
+    [1250, '2023', 'ChatRepair', 'conversational LLM repair'],
+    [1400, '2024', 'SWE-agent · OpenHands', 'LLM agents'],
+  ];
+  const TILES = [
+    ['ManyBugs', 'php · python · gzip · libtiff · lighttpd · wireshark'],
+    ['IntroClass', 'six small C programs: checksum · digits · grade · median · smallest · syllables'],
+    ['Defects4J', 'JFreeChart · Closure Compiler · Commons Lang · Commons Math · Joda-Time · Mockito'],
+    ['QuixBugs', '40 textbook algorithms: quicksort · knapsack · shortest path · bitcount'],
+    ['Bugs.jar', 'Accumulo · Camel · Commons Math · Flink · Jackrabbit Oak · Log4j 2 · Maven · Wicket'],
+    ['BugsInPy', 'pandas · keras · matplotlib · scrapy · black · youtube-dl · tornado · luigi'],
+    ['SWE-bench', 'django · sympy · scikit-learn · matplotlib · astropy · flask · requests · pytest'],
+  ];
+  const W = document.getElementById('whtml');
+  MS.forEach(([x, yr, nm, ds], i) => {
+    const up = i % 2 === 0;
+    const el = document.createElement('div');
+    el.className = 'ms'; el.id = 'ms' + i;
+    el.style.left = x + 'px';
+    if (up) el.style.bottom = '389px'; else el.style.top = '669px';
+    el.innerHTML = up
+      ? `<div class="ds" data-a>${ds}</div><div class="nm" data-a>${nm}</div><div class="yr" data-a style="margin-bottom:14px">${yr}</div><div class="dot" data-a></div>`
+      : `<div class="dot" data-a></div><div class="yr" data-a style="margin-top:14px">${yr}</div><div class="nm" data-a>${nm}</div><div class="ds" data-a>${ds}</div>`;
+    W.appendChild(el);
+  });
+  TILES.forEach(([n, projects], i) => {
+    const el = document.createElement('div');
+    el.className = 'tile'; el.id = 'tile' + i;
+    el.style.left = (1800 + i * 230) + 'px'; el.style.top = '560px';
+    el.setAttribute('data-a', '');
+    el.innerHTML = `<div class="f">${n}</div><div class="b"><b>library code</b><small>unit tests</small><em>${projects}</em></div><div class="nm" data-a>${n}</div>`;
+    W.appendChild(el);
+  });
+
+  // ---------- the talk ----------
+  const CP = [];
+  const cp = (at, label, notes, backup = false) => CP.push({ at, label, notes, backup });
+  const T = new Talk({ duration: 343.0, chapters: [{ at: 0, label: 'The line' }, { at: 27.6, label: 'Inside the phone' }, { at: 66.6, label: 'One bug' }, { at: 96.6, label: 'DroidFixBench' }, { at: 137.4, label: 'Five tools' }, { at: 173.4, label: 'Results' }, { at: 218.4, label: 'Implications' }, { at: 240.9, label: 'One more thing' }, { at: 271.9, label: 'Backup' }], checkpoints: CP });
+  const ED = new TalkEdit(T, { checkpoints: CP });
+  ED.apply();
+  const line = document.getElementById('line');
+  const L = line.getTotalLength();
+  const px = (a, b, t, dur, ease) => T.draw('#line', t, dur, a / L, b / L, ease ?? 'linear');
+
+  // ===== 1 · Title (0–5) =====
+  T.in('#t-eye', 0.3, { dur: 0.8, y: 16 });
+  T.words('#t-h', 0.6, { stagger: 0.09 });
+  T.in('#t-g', 1.9, { dur: 1.1, y: 26, scale: 0.97, blur: 16 });
+  px(0, 160, 2.3, 1.0, 'inOut');
+  T.in('#t-fc > *', 2.5, { dur: 0.7, y: 14, scale: 0.6, blur: 6, stagger: 0.07 });
+  T.in('#t-au', 3.0, { dur: 0.9, y: 20 });
+  T.in('#t-lg', 3.4, { dur: 0.9, y: 16 });
+  cp(5.0, 'Title', 'Thank you. I am Kevin Moran from UCF. Joint work with colleagues at UCF, William & Mary, and Minnesota; Junayed Mahmud led it. The question in the title is literal.');
+
+  // ===== 2 · Fifteen years (5–13.5) =====
+  T.out('#t-eye, #t-h, #t-g, #t-fc, #t-au, #t-lg', 5.0, { dur: 0.7, y: -40, stagger: 0.05 });
+  T.in('#c1-eye', 5.4, { dur: 0.8, y: 14 });
+  // One eased stroke from the title stub to the last node; each node appears as the pen reaches it.
+  px(160, 1280, 5.6, 7.0, 'inOut');
+  const invInOut = (p) => (p < 0.5 ? Math.cbrt(p / 4) : 1 - Math.cbrt((1 - p) / 4));
+  const nodeT = (x) => { const s = x - 120; if (s <= 160) return 5.45; return 5.6 + 7.0 * invInOut((s - 160) / 1120) - 0.08; };
+  MS.forEach(([x], i) => {
+    const t = nodeT(x);
+    T.in(`#ms${i} .dot`, t, { dur: 0.5, y: 0, scale: 0.3, blur: 0 });
+    T.in(`#ms${i} .yr`, t + 0.1, { dur: 0.6, y: 10, blur: 4 });
+    T.in(`#ms${i} .nm`, t + 0.18, { dur: 0.7, y: 14, blur: 6 });
+    T.in(`#ms${i} .ds`, t + 0.28, { dur: 0.7, y: 10, blur: 4 });
+  });
+  cp(13.5, 'Fifteen years', 'One line. GenProg searched over edits. PAR brought templates from human fixes. Defects4J gave everyone a shared benchmark in 2014. Prophet and Angelix, TBar, then translation models, then execution feedback, then a conversation with an LLM, and by 2024 agents.');
+
+  // ===== 3 · Where it was measured (13.5–20.5) =====
+  T.anim('.world', 13.5, 1.6, [{ transform: 'translateX(0px)' }, { transform: 'translateX(-1480px)' }], { ease: 'inOut' });
+  T.anim('.ms', 13.6, 0.8, [{ opacity: 1 }, { opacity: 0 }], { ease: 'inOut' });
+  px(1280, 3060, 13.5, 6.36);
+  TILES.forEach((n, i) => {
+    const x = 1800 + i * 230;
+    const t = 13.5 + (x - 1400) / 280;
+    T.in(`#tile${i}`, 13.9 + i * 0.1, { dur: 0.8, y: 24, blur: 6 });
+    T.anim(`#tile${i} .f`, t, 0.7, [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(-180deg)' }], { ease: 'inOut' });
+    T.anim(`#tile${i} .b`, t, 0.7, [{ transform: 'rotateX(180deg)' }, { transform: 'rotateX(0deg)' }], { ease: 'inOut' });
+    T.in(`#tile${i} .nm`, t + 0.3, { dur: 0.5, y: 8, blur: 2 });
+  });
+  T.in('#c1-bench', 17.6, { dur: 1, y: 20 });
+  cp(20.5, 'Where it was measured', 'Every one of these was evaluated on benchmarks like these. They share one property: library and framework code checked by unit tests.');
+
+  // ===== 4 · Where it never went (20.5–27.5) =====
+  T.out('#c1-bench', 20.5, { dur: 0.5 });
+  T.out('.tile', 20.6, { dur: 0.6, y: 0, blur: 8, stagger: 0.04 });
+  T.anim('.world', 20.5, 1.4, [{ transform: 'translateX(-2150px)' }], { ease: 'inOut' });
+  px(3060, 3180, 20.8, 0.5);
+  px(3180, L, 21.6, 3.2, 'inOut');
+  T.draw('#qm', 25.0, 0.9, 0, 1);
+  T.in('#qdot', 25.9, { dur: 0.4, y: 0, scale: 0.2, blur: 0 });
+  T.in('#c1-ui-h', 23.4, { dur: 1.1 });
+  T.in('#c1-ui-s', 25.6, { dur: 1, y: 24 });
+  T.in('#c1-ui-c', 26.3, { dur: 1, y: 16 });
+  cp(27.5, 'Where it never went', 'The line never reached this. UI-centric programs. Mobile apps. The UI is nearly half of user-facing software, bugs are everywhere in it, and it is hard to test, which is exactly why repair research skipped it.');
+
+  // ===== 5 · The phone becomes a device; exploded view (27.5–36) =====
+  T.out('#c1-ui-h, #c1-ui-s, #c1-ui-c, #c1-eye', 27.5, { dur: 0.6, stagger: 0.04 });
+  T.out('#qm, #qdot', 27.5, { dur: 0.5, y: 0, blur: 6 });
+  T.anim('#rig', 27.7, 0.9, [{ opacity: 0, transform: 'translate(0,0) scale(.778)' }, { opacity: 1, transform: 'translate(0,0) scale(.778)' }]);
+  T.anim('#wsvg', 28.1, 0.8, [{ opacity: 1 }, { opacity: 0 }]);
+  T.anim('#rig', 28.7, 1.4, [{ transform: 'translate(0,0) scale(.778)' }, { transform: 'translate(-990px,-140px) scale(1)' }], { ease: 'inOut' });
+  T.in('#c2-eye', 29.3, { dur: 0.8, y: 14 });
+  // explode
+  T.anim('#tilt', 30.4, 2.0, [{ transform: 'translate(0px,0px) rotateX(0deg) rotateZ(0deg) scale(1)' }, { transform: 'translate(170px,150px) rotateX(58deg) rotateZ(-24deg) scale(.78)' }], { ease: 'inOut' });
+  const LAYS = ['.lay.wire', '.lay.listen', '.lay.state', '.lay.life'];
+  T.tween(0, 343.0, (p) => { const t = p * 343.0; const vis = t >= 30.5 && t <= 58.0 ? 'visible' : 'hidden'; T.els('.lay').forEach((l) => { l.style.visibility = vis; }); }, 'linear');
+  LAYS.forEach((s, i) => {
+    T.anim(s, 30.6 + i * 0.25, 1.6, [{ opacity: 0, transform: 'translateZ(0px)' }, { opacity: 1, transform: `translateZ(${120 * (i + 1)}px)` }], { ease: 'inOut' });
+    T.in(`#ll${i + 1}`, 31.4 + i * 0.3, { dur: 0.9, x: 30, y: 0 });
+  });
+  cp(36.0, 'Exploded view', 'Four reasons UI code is different, all visible in Android. The layout lives in XML, not in code. The code that reacts to a tap is a listener, and the framework decides when it runs. The screen has state. And the framework pauses, destroys, and re-creates it. Myers called this inside-out programming.');
+
+  // ===== 6 · One paradigm at a time (36–56.5) =====
+  const focus = (i, t) => {
+    LAYS.forEach((s, j) => T.anim(s, t, 0.6, [{ opacity: j === i ? 1 : 0.07 }], { ease: 'inOut' }));
+    [1, 2, 3, 4].forEach((k) => T.anim(`#ll${k}`, t, 0.6, [{ opacity: k === i + 1 ? 1 : 0.22 }], { ease: 'inOut' }));
+  };
+  const setState = (t, exp, scr) => T.tween(t, 0.01, (p) => { if (p >= 1) { document.getElementById('st-exp').textContent = exp; document.getElementById('st-scr').textContent = scr; } }, 'linear');
+  const cardFlash = (t) => T.anim('.lay.state .card', t, 0.6, [{ boxShadow: '0 0 0 0 rgba(255,159,10,0)' }, { boxShadow: '0 0 0 10px rgba(255,159,10,.35)' }, { boxShadow: '0 10px 30px rgba(0,0,0,.12)' }]);
+  // Layout: the mini screen builds up, row by row, from the XML.
+  focus(0, 36.0);
+  T.in('#miniwrap', 36.2, { dur: 1, y: 30 });
+  T.in('#pc1', 36.6, { dur: 0.9, y: 16 });
+  ['#m-c1', '#m-c2', '#m-c3', '#m-c4'].forEach((s, i) => {
+    T.anim(s, 37.4 + i * 0.5, 0.5, [{ opacity: 0, boxShadow: 'inset 0 0 0 2px rgba(10,132,255,0)' }, { opacity: 1, boxShadow: 'inset 0 0 0 2px rgba(10,132,255,.95)' }]);
+    T.anim(s, 38.1 + i * 0.5, 0.6, [{ boxShadow: 'inset 0 0 0 2px rgba(10,132,255,0)' }]);
+  });
+  T.in('#xmlchip', 37.3, { dur: 0.6, y: 10 });
+  T.type('#xmlchip code', 37.5, 1.8);
+  cp(41.0, 'Layout', 'The layout is declared in XML, not drawn in code. Each view in that file becomes a view on screen, and the framework lays them out.');
+  // Listeners: a long press on the mini screen; the framework calls the listener.
+  T.out('#pc1, #xmlchip', 41.0, { dur: 0.4 });
+  focus(1, 41.1);
+  T.in('#pc2', 41.5, { dur: 0.9, y: 16 });
+  T.anim('#m-fg', 42.2, 0.25, [{ opacity: 0, transform: 'translate(0,0) scale(1.6)' }, { opacity: 1, transform: 'translate(0,0) scale(1)' }]);
+  T.anim('.lay.listen b:nth-child(1)', 43.1, 0.5, [{ transform: 'scale(1)', background: '#bf5af2' }, { transform: 'scale(1.15)', background: '#ff375f' }, { transform: 'scale(1)', background: '#bf5af2' }]);
+  T.anim('#m-menu', 43.2, 0.5, [{ opacity: 0, transform: 'translateY(40px) scale(.96)' }, { opacity: 1, transform: 'translateY(0) scale(1)' }]);
+  T.anim('#m-fg', 43.4, 0.3, [{ opacity: 0, transform: 'translate(0,0) scale(.8)' }]);
+  cp(46.0, 'Event listeners', 'The code that reacts to a tap is a listener. The user acts, and the framework decides which listener runs and in what order. Control is inverted. Myers called this inside-out programming.');
+  // State: scroll, then collapse a comment; the state card tracks it.
+  T.out('#pc2', 46.0, { dur: 0.4 });
+  T.anim('#m-menu', 46.0, 0.3, [{ opacity: 0, transform: 'translateY(20px) scale(.98)' }]);
+  focus(2, 46.1);
+  T.in('#pc3', 46.5, { dur: 0.9, y: 16 });
+  T.anim('#m-fg', 47.0, 0.25, [{ opacity: 0, transform: 'translate(0,230px) scale(1.4)' }, { opacity: 1, transform: 'translate(0,230px) scale(1)' }]);
+  T.anim('#m-fg', 47.3, 0.7, [{ transform: 'translate(0,230px) scale(1)' }, { transform: 'translate(0,120px) scale(1)' }], { ease: 'inOut' });
+  T.anim('#m-list', 47.3, 0.7, [{ transform: 'translateY(0px)' }, { transform: 'translateY(-110px)' }], { ease: 'inOut' });
+  T.anim('#m-fg', 48.0, 0.3, [{ opacity: 0 }]);
+  setState(47.9, 'true', '620'); cardFlash(47.9);
+  T.anim('#m-fg', 48.7, 0.2, [{ opacity: 0, transform: 'translate(0,-10px) scale(1.4)' }, { opacity: 1, transform: 'translate(0,-10px) scale(1)' }]);
+  T.anim('#m-fg', 49.0, 0.3, [{ opacity: 0 }]);
+  T.anim('#m-c2 .tx', 49.0, 0.5, [{ maxHeight: '400px' }, { maxHeight: '0px' }], { ease: 'inOut' });
+  setState(49.1, 'false', '620'); cardFlash(49.1);
+  cp(51.0, 'State', 'The screen has state. Where the user scrolled to, which comment they collapsed. That state is held by the screen, and it has to be kept.');
+  // Lifecycle: rotate; the screen is destroyed and re-created; unsaved state reverts.
+  T.out('#pc3', 51.0, { dur: 0.4 });
+  focus(3, 51.1);
+  T.in('#pc4', 51.5, { dur: 0.9, y: 16 });
+  T.anim('#miniwrap', 52.0, 1.0, [{ transform: 'translate(0,0) rotate(0deg)' }, { transform: 'translate(-90px,110px) rotate(-90deg)' }], { ease: 'inOut' });
+  ['#lc3', '#lc4', '#lc5', '#lc1'].forEach((s, i) => T.anim(s, 52.3 + i * 0.35, 0.45, [{ background: '#fff', color: '#0b6b3a' }, { background: '#3ddc84', color: '#fff' }, { background: '#fff', color: '#0b6b3a' }]));
+  T.anim('#m-flash', 53.4, 0.5, [{ opacity: 0 }, { opacity: 0.85, offset: 0.3 }, { opacity: 0 }]);
+  T.anim('#m-list', 53.5, 0.01, [{ transform: 'translateY(0px)' }]);
+  T.tween(53.45, 0.01, (p) => { document.getElementById('mhn').classList.toggle('land', p >= 1); }, 'linear');
+  T.anim('#m-c2 .tx', 53.5, 0.01, [{ maxHeight: '400px' }]);
+  setState(53.5, 'true', '0'); cardFlash(53.6);
+  cp(56.5, 'Lifecycle', 'And the framework pauses, destroys, and re-creates that screen whenever it likes. Rotate the phone, switch apps and come back. Anything the code did not save is gone. The output is a rendered screen, and that is what a repair tool has to reason about.');
+
+  // ===== 7 · Four kinds of UI bugs (56.5–66.5), one hold per type =====
+  T.out('#pc4, #ll1, #ll2, #ll3, #ll4, #miniwrap', 56.5, { dur: 0.5, stagger: 0.03 });
+  LAYS.forEach((s, i) => T.anim(s, 56.6 + i * 0.1, 1.2, [{ opacity: 0, transform: 'translateZ(0px)' }], { ease: 'inOut' }));
+  T.anim('#tilt', 56.7, 1.5, [{ transform: 'translate(0px,0px) rotateX(0deg) rotateZ(0deg) scale(1)' }], { ease: 'inOut' });
+  T.in('#c2-th', 57.9, { dur: 1 });
+  T.in('#c2-tc', 58.2, { dur: 1, y: 16 });
+  T.anim('#crash', 58.9, 0.3, [{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'scale(1)' }]);
+  T.in('#tc1', 59.0, { dur: 0.6, y: 14 });
+  cp(60.5, 'Crash', 'Prior work on 180 real Android bug reports groups them into four types. Crashes.');
+  T.anim('#crash', 60.5, 0.3, [{ opacity: 0 }]);
+  T.tween(60.7, 1.9, (p) => { const y = document.getElementById('yr'); const bad = p > 0 && p < 1; y.textContent = bad ? '[NaN]' : '[2024]'; y.style.color = bad ? '#ff6b61' : ''; }, 'linear');
+  T.in('#tc2', 60.8, { dur: 0.6, y: 14 });
+  cp(62.5, 'Output', 'Output errors: the app computes or shows the wrong thing. These are the most common type in our real bugs.');
+  T.anim('#cm1tx', 62.7, 0.4, [{ transform: 'translateX(0)' }, { transform: 'translateX(70px)' }]);
+  T.in('#tc3', 62.8, { dur: 0.6, y: 14 });
+  cp(64.5, 'Cosmetic', 'Cosmetic issues: clipped, misplaced, or mis-styled components. The function is there, the rendering is wrong.');
+  T.anim('#cm1tx', 64.5, 0.4, [{ transform: 'translateX(0)' }]);
+  T.anim('#settings', 64.8, 0.45, [{ transform: 'translateX(100%)' }, { transform: 'translateX(0%)' }]);
+  T.in('#tc4', 64.9, { dur: 0.6, y: 14 });
+  cp(66.5, 'Navigation', 'And navigation issues: the user ends up on the wrong screen, or cannot get to the right one. We use these four types throughout.');
+
+  // ===== 8 · Harmonic #114, live (66.5–74.5) =====
+  const c3 = 66.5;
+  T.anim('#settings', c3, 0.4, [{ transform: 'translateX(100%)' }]);
+  T.out('#c2-th, #c2-tc, #tc1, #tc2, #tc3, #tc4, #c2-eye', c3, { dur: 0.5, stagger: 0.03 });
+  T.in('#c3-eye', c3 + 0.4, { dur: 0.8, y: 14 });
+  T.in('#rep', c3 + 0.6, { dur: 1, y: 30 });
+  const press = (t) => {
+    T.anim('#fg', t, 0.25, [{ opacity: 0, transform: 'scale(1.6)' }, { opacity: 1, transform: 'scale(1)' }]);
+    T.draw('#ring', t + 0.15, 0.75, 0, 1, 'linear');
+  };
+  const release = (t) => T.anim('#fg', t, 0.3, [{ opacity: 0, transform: 'scale(.8)' }]);
+  const menuIn = (t) => T.anim('#menu', t, 0.5, [{ opacity: 0, transform: 'translateY(40px) scale(.96)' }, { opacity: 1, transform: 'translateY(0) scale(1)' }]);
+  const menuOut = (t) => T.anim('#menu', t, 0.35, [{ opacity: 0, transform: 'translateY(20px) scale(.98)' }]);
+  const browserIn = (t) => T.anim('#browser', t, 0.6, [{ transform: 'translateY(100%)' }, { transform: 'translateY(0%)' }], { ease: 'inOut' });
+  const browserOut = (t) => T.anim('#browser', t, 0.5, [{ transform: 'translateY(100%)' }], { ease: 'inOut' });
+  press(c3 + 1.8); menuIn(c3 + 2.8); release(c3 + 3.0); browserIn(c3 + 3.9);
+  T.in('#c3-obs', c3 + 4.8, { dur: 0.9, y: 16 });
+  cp(c3 + 7.0, 'The bug', 'Harmonic is a Hacker News reader. Issue 114, as filed. You long-press a link in a comment. The context menu opens, which is right. And the link opens in the browser, which is wrong.');
+
+  // ===== 9 · Why it happens (74.5–81.5) =====
+  T.out('#rep, #c3-obs, #c3-eye', c3 + 8.0, { dur: 0.5, stagger: 0.03 });
+  browserOut(c3 + 8.1); menuOut(c3 + 8.3);
+  T.in('#pa', c3 + 8.9, { dur: 1, y: 30 });
+  T.in('#pb', c3 + 9.1, { dur: 1, y: 30 });
+  T.in('#c3-why', c3 + 9.4, { dur: 1, y: 16 });
+  const pulse = (id, t, dur) => T.anim(id, t, dur, [{ opacity: 0, offsetDistance: '0%' }, { opacity: 1, offsetDistance: '8%', offset: 0.1 }, { opacity: 1, offsetDistance: '92%', offset: 0.9 }, { opacity: 0, offsetDistance: '100%' }], { ease: 'inOut' });
+  const flash = (sel, t, c) => T.anim(sel, t, 0.5, [{ background: 'rgba(255,255,255,0)' }, { background: c }], { ease: 'out' });
+  press(c3 + 10.2);
+  pulse('#pl1', c3 + 10.9, 0.7); flash('#pb-long', c3 + 11.5, '#fff4d6'); menuIn(c3 + 11.6); release(c3 + 11.7);
+  pulse('#pl2', c3 + 12.4, 0.7); flash('#pb-click', c3 + 13.0, '#fde7e4'); flash('#pb-open', c3 + 13.0, '#fde7e4'); browserIn(c3 + 13.2);
+  cp(c3 + 15.0, 'Why it happens', 'Two listeners on one view. The long press reaches onItemClick and opens the menu. The ordinary click listener on the link fires as well and opens the browser. The framework orders them, and nothing in the code arbitrates.');
+
+  // ===== 10 · The developer's fix, displayed (81.5–86.5) =====
+  browserOut(c3 + 15.0); menuOut(c3 + 15.2);
+  T.out('#c3-why', c3 + 15.0, { dur: 0.5 });
+  T.anim('#pb-click, #pb-open', c3 + 15.2, 0.4, [{ background: 'rgba(255,255,255,0)' }]);
+  const grow = (sel, t, stagger = 0.16) => {
+    T.els(sel).forEach((el, i) => {
+      T.anim(el, t + i * stagger, 0.25, [{ height: '0px', opacity: 0 }, { height: '30px', opacity: 1 }], { ease: 'inOut' });
+      T.anim(el, t + i * stagger + 0.2, 0.35, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)' }], { ease: 'steps(16)' });
+    });
+  };
+  grow('#pa .ln.new', c3 + 15.8);
+  grow('#pb .ln.new', c3 + 17.6, 0.3);
+  T.in('#c3-fix', c3 + 18.4, { dur: 1, y: 16 });
+  cp(c3 + 20.0, 'The fix', 'The developer added a flag on the adapter. It is set while the menu is showing, consulted by the link listener, and cleared when the menu is dismissed. Nine lines across two methods. The difficulty is not the size. It is knowing that two listeners share a view and that the only way to arbitrate is state that outlives a single event.');
+
+  // ===== 11 · The fixed app (86.5–91.5) =====
+  press(c3 + 20.2);
+  pulse('#pl3', c3 + 20.9, 0.7); flash('#pb-long', c3 + 21.5, '#fff4d6'); menuIn(c3 + 21.6); release(c3 + 21.7);
+  pulse('#pl4', c3 + 22.4, 0.7); flash('#pb-if', c3 + 23.0, '#c8efd6');
+  T.in('#ok1', c3 + 23.6, { dur: 0.6, y: 0, scale: 0.4, blur: 0, ease: 'spring' });
+  cp(c3 + 25.0, 'Fixed', 'Same gesture on the fixed build. The long press opens the menu, the click reaches the flag and stops. No browser.');
+
+  // ===== 12 · No tool fixed it (91.5–96.5) =====
+  T.out('#pa, #pb, #c3-fix, #ok1', c3 + 25.0, { dur: 0.5, stagger: 0.04 });
+  menuOut(c3 + 25.0);
+  T.in('#c3-none', c3 + 25.6, { dur: 1 });
+  T.in('#verd .verdict', c3 + 26.3, { dur: 0.7, y: 20, stagger: 0.12 });
+  T.els('#verd .verdict i').forEach((el, i) => {
+    T.tween(c3 + 27.4 + i * 0.2, 0.01, (p) => { el.textContent = p >= 1 ? '✕' : '·'; }, 'linear');
+    T.anim(el, c3 + 27.4 + i * 0.2, 0.4, [{ background: '#86868b', transform: 'scale(1)' }, { background: '#d93b2b', transform: 'scale(1.25)' }, { background: '#d93b2b', transform: 'scale(1)' }]);
+  });
+  cp(c3 + 29.5, 'No tool fixed it', 'None of the five tools in our study produced a plausible patch for this bug. Hold that thought. We come back to it at the end.');
+
+  // ======================================================================
+  // CHAPTER 4 · BUILDING DROIDFIXBENCH (96.5–146.5)
+  // ======================================================================
+  // ---- title card: DroidFixBench (96.5–101.5) ----
+  const rigShow = (t, on) => T.anim('#rig', t, 0.6, [{ opacity: on ? 1 : 0 }], { ease: 'inOut' });
+  T.out('#c3-none, #verd .verdict', 96.5, { dur: 0.5, stagger: 0.03 });
+  rigShow(96.5, false);
+  T.in('#dfb-eye', 97.2, { dur: 0.8, y: 14 });
+  T.in('#dfb-h', 97.4, { dur: 1.2, y: 0, scale: 0.94, blur: 22 });
+  T.in('#dfb-s', 98.2, { dur: 1, y: 18 });
+  cp(100.5, 'DroidFixBench', 'So we built DroidFixBench, the first Android bug benchmark made for program repair.');
+  const c4 = 101.5;
+  T.out('#dfb-eye, #dfb-h, #dfb-s', c4, { dur: 0.6, y: -24, stagger: 0.05 });
+  const tline = (id, t, dur = 0.5) => { T.anim(id, t, 0.01, [{ opacity: 0 }, { opacity: 1 }]); T.anim(id, t, dur, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)' }], { ease: 'steps(24)' }); };
+  T.out('#c3-none, #verd .verdict', c4, { dur: 0.5, stagger: 0.03 });
+  rigShow(c4, false);
+  T.in('#c4-eye', c4 + 0.4, { dur: 0.8, y: 14 });
+  T.in('#c4-h', c4 + 0.6, { dur: 1 });
+  T.in('#bugchip', c4 + 1.2, { dur: 0.7, y: 0, scale: 0.4, blur: 0, ease: 'spring' });
+  [['#need1', -60, -40], ['#need2', 60, -40], ['#need3', -80, 0], ['#need4', 80, 0], ['#need5', 0, 60]].forEach(([s, x, y], i) => { T.in(s, c4 + 1.9 + i * 0.45, { dur: 0.9, x, y, blur: 6 }); T.draw('#nl' + (i + 1), c4 + 1.7 + i * 0.45, 0.5, 0, 1); });
+  cp(c4 + 7.0, 'What a repair tool needs', 'To run any of these tools on a UI bug you need five things, and every one of them was missing from the Android bug datasets that existed. A buggy snapshot that compiles. The fault localized to the statement. The developer\'s fix. GUI tests that fail on the bug and pass on the fix. And a description. So we built DroidFixBench.');
+
+  // --- how a real bug is built: five stations ---
+  T.out('#c4-h, #bugchip, #need1, #need2, #need3, #need4, #need5, #needlines', c4 + 7.0, { dur: 0.5, stagger: 0.03 });
+  T.in('#c4-fh', c4 + 7.4, { dur: 1 });
+  T.in('#src1, #src2, #src3', c4 + 7.8, { dur: 0.8, y: 18, stagger: 0.15 });
+  T.in('#strack', c4 + 8.4, { dur: 0.6, y: 0, blur: 0 });
+  T.in('#bugcard', c4 + 8.6, { dur: 0.6, y: 10 });
+  cp(c4 + 9.3, 'Three sources', 'Three sources of candidate bugs: our AndroR2+ dataset, the issue trackers of five recently updated F-Droid apps, and the FBO4A reports from Johnson et al. Every candidate then goes through five steps.');
+  const SX = [0, 345, 690, 1035, 1380];
+  // One click per station: the card appears, the bug moves onto it, its animation plays, then hold.
+  const sAt = (k) => c4 + 10.0 + k * 2.0;
+  const SNOTES = ['Build the buggy commit. Gradle versions, dead dependencies. Many historical snapshots never build at all.', 'Reproduce it on a Pixel 2 emulator with Android 9, following the steps in the report.', 'Localize the fault. Diff the buggy and fixed commits; two authors mark the statements that matter.', 'Write two GUI tests, both fail-to-pass: one reproduces the report directly, one reaches the same bug through the surrounding UI.', 'Validate. Both tests flip from fail to pass between the buggy and fixed builds.'];
+  SX.forEach((x, k) => {
+    T.in(`#stn${k + 1}`, sAt(k) - 0.5, { dur: 0.7, y: 24 });
+    if (k < 4) cp(sAt(k) + 1.4, ['Build', 'Reproduce', 'Localize', 'Write tests'][k], SNOTES[k]);
+    if (k) T.anim('#bugcard', sAt(k) - 0.45, 0.6, [{ transform: `translateX(${SX[k - 1]}px)` }, { transform: `translateX(${x}px)` }], { ease: 'inOut' });
+    T.anim(`#stn${k + 1}`, sAt(k), 0.5, [{ boxShadow: '0 20px 50px rgba(0,0,0,.06)', borderColor: 'rgba(0,0,0,.12)' }, { boxShadow: '0 24px 60px rgba(10,132,255,.18)', borderColor: '#0a84ff' }]);
+    if (k < 4) T.anim(`#stn${k + 1}`, sAt(k + 1) - 0.3, 0.5, [{ boxShadow: '0 20px 50px rgba(0,0,0,.06)', borderColor: 'rgba(0,0,0,.12)' }]);
+  });
+  // station micro-animations
+  T.els('#stn1 .gb i').forEach((b, i) => T.anim(b, sAt(0) + 0.1 + i * 0.3, 0.6, [{ width: '0%' }, { width: b.style.getPropertyValue('--w') || '100%' }]));
+  T.anim('#rep-ok', sAt(1) + 0.6, 0.4, [{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'scale(1)' }], { ease: 'spring' });
+  T.els('#stn3 .cl i.hit').forEach((l, i) => T.anim(l, sAt(2) + 0.4 + i * 0.3, 0.4, [{ background: '#e5e5ea', transform: 'scaleX(1)' }, { background: '#ff9f0a', transform: 'scaleX(1)' }]));
+  T.anim('#tch1', sAt(3) + 0.3, 0.4, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }]);
+  T.anim('#tch2', sAt(3) + 0.7, 0.4, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }]);
+  T.anim('#vm1', sAt(4) + 0.3, 0.4, [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { ease: 'spring' });
+  T.anim('#vm2', sAt(4) + 0.9, 0.4, [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { ease: 'spring' });
+  cp(sAt(4) + 1.4, 'Validate', SNOTES[4] + ' Five steps per bug, and this is where the months went.');
+  T.out('#src1, #src2, #src3, #strack, #bugcard, #stn1, #stn2, #stn3, #stn4, #stn5', c4 + 19.4, { dur: 0.5, stagger: 0.03 });
+  T.out('#c4-fh', c4 + 19.4, { dur: 0.5 });
+  T.in('#c4-gh', c4 + 19.9, { dur: 1 });
+  T.in('#fifty-n', c4 + 20.1, { dur: 1 });
+  T.count('#n50', c4 + 20.2, 1.3, 50);
+  T.in('#fifty-g', c4 + 20.7, { dur: 0.8 });
+  const mkDots = (id, spec) => { const el = document.getElementById(id); const out = []; spec.forEach(([cls, n]) => { for (let i = 0; i < n; i++) { const d = document.createElement('i'); d.className = cls; el.appendChild(d); out.push(d); } }); return out; };
+  mkDots('g50', [['crash', 12], ['output', 25], ['cosmetic', 9], ['navigation', 4]]).forEach((d, i) => T.anim(d, c4 + 20.9 + i * 0.04, 0.4, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1)' }]));
+  T.in('#fifty-c', c4 + 22.7, { dur: 1, y: 16 });
+  cp(c4 + 24.9, 'Fifty real bugs', 'Fifty real bugs from twenty-three apps. Twelve crashes, twenty-five output errors, nine cosmetic, four navigation. Twenty-seven are fixed in one method and twenty-three across several. The largest fix changes ninety-two lines. These are not toy bugs, and this took several person-months.');
+
+  // --- to the synthetic half (the test replay, 'Two tests per bug', lives in the backup slides) ---
+  T.out('#fifty-n, #fifty-g, #fifty-c, #c4-gh', c4 + 24.9, { dur: 0.5, stagger: 0.04 });
+  ['#tl1', '#tl2', '#tl3', '#tl4', '#tl4b', '#tl5'].forEach((s) => T.hide(s, 0));
+  rigShow(c4 + 25.3, true);
+
+  // --- synthetic bugs ---
+  T.anim('#gl', c4 + 25, 0.3, [{ opacity: 0 }, { opacity: 1 }]);  // GPSLogger is on screen before the device fades in
+  T.in('#c4-mh', c4 + 25.6, { dur: 0.9, y: 14 });
+  T.in('#mp', c4 + 25.8, { dur: 0.9, y: 24 });
+  cp(c4 + 26.9, 'The mutant, before', 'This is launchPreferenceScreen in GPSLogger as the developers wrote it. MDroid+ has ten Android-specific mutation operators. On the next click it applies NullIntent here, and we build the mutant, run it, and describe what we see.');
+  T.anim('#ml-del', c4 + 27.2, 0.5, [{ background: 'rgba(0,0,0,0)', color: '#1d1d1f' }, { background: '#fde7e4', color: '#9a1b0f', textDecoration: 'line-through' }]);
+  grow('#ml-add', c4 + 27.7);
+  T.anim('#gl-drawer', c4 + 28.6, 0.5, [{ transform: 'translateX(-100%)' }, { transform: 'translateX(0%)' }]);
+  T.anim('#gl-item', c4 + 29.3, 0.3, [{ background: '#fff' }, { background: '#e8f3ec' }]);
+  T.anim('#gl-crash', c4 + 29.9, 0.3, [{ opacity: 0, transform: 'scale(.92)' }, { opacity: 1, transform: 'scale(1)' }]);
+  T.in('#mrep', c4 + 30.2, { dur: 0.9, y: 20 });
+  cp(c4 + 32.3, 'A mutant', 'The synthetic half. We ran MDroid+, our Android-specific mutation tool, on the same five apps, keeping only mutants in Activities and Fragments so the bug shows on screen. This one replaces an Intent with null in GPSLogger. We built it, reproduced it on the emulator, and wrote the description from what we saw.');
+  T.in('#mops', c4 + 32.6, { dur: 0.9, y: 16 });
+  T.in('#g46wrap', c4 + 33, { dur: 0.8 });
+  mkDots('g46', [['crash', 19], ['output', 8], ['cosmetic', 9], ['delay', 8], ['navigation', 2]]).forEach((d, i) => T.anim(d, c4 + 33.2 + i * 0.03, 0.4, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1)' }]));
+  cp(c4 + 35.8, 'Forty-six synthetic bugs', 'Forty-six bugs across ten operators. Single-statement, single-method, with a known fix. They give us the easy end of the difficulty range. The real bugs give us the hard end.');
+
+  // ======================================================================
+  // CHAPTER 5 · FIVE TOOLS, ONE PIPELINE (146.5–182.5)
+  // ======================================================================
+  const c5 = c4 + 35.8;
+  T.out('#c4-mh, #mp, #mrep, #mops, #g46wrap, #c4-eye', c5, { dur: 0.5, stagger: 0.03 });
+  T.anim('#gl', c5 + 0.2, 0.4, [{ opacity: 0 }]);
+  T.anim('#gl-drawer', c5 + 0.7, 0.01, [{ transform: 'translateX(-100%)' }]);
+  T.anim('#gl-crash', c5 + 0.7, 0.01, [{ opacity: 0 }]);
+  rigShow(c5 + 0.1, false);
+  T.in('#c5-eye', c5 + 0.4, { dur: 0.8, y: 14 });
+  T.in('#tin', c5 + 0.6, { dur: 1, x: -30, y: 0 });
+  const TOOLS = ['#tc-rr', '#tc-ntr', '#tc-d4c', '#tc-cr', '#tc-oh'];
+  const TNOTES = [
+    ['RewardRepair', 'RewardRepair is a neural machine translation model, trained with compilation and test feedback. We used the authors\' pre-trained model. It sees the buggy line and its method, nothing else. No report, no tests.'],
+    ['NTR', 'NTR predicts which fix template applies and then has CodeLlama fill the template in. The templates come from traditional Java repair. None of them was designed for UI code.'],
+    ['D4C', 'D4C prompts GPT-4 once with the method, the report, and the failing test, and asks for the whole function back. The response on screen is real patch 62 for this bug. It builds, it passes the tests, and it is not a fix.'],
+    ['ChatRepair', 'ChatRepair holds a conversation with GPT-3.5. It proposes a patch, runs the tests, and feeds the failure back into the next prompt, up to a hundred times on a real bug. It is the first tool here that sees its own test results.'],
+    ['OpenHands', 'OpenHands is a software engineering agent. It reads, edits, and runs commands in a sandbox until it decides it is done. We ran it with Qwen2.5-Coder, one patch per bug. Released code and default settings for all five.'],
+  ];
+  const TT = TOOLS.map((s, k) => c5 + 1.2 + k * 5.0);
+  TOOLS.forEach((s, k) => {
+    if (k) T.out(TOOLS[k - 1], TT[k] - 0.2, { dur: 0.45, y: -24 });
+    T.in(s, TT[k] + 0.2, { dur: 0.9, y: 30 });
+    cp(TT[k] + 4.6, TNOTES[k][0], TNOTES[k][1]);
+  });
+  // RewardRepair: tokens in, tokens out
+  const mrr = document.getElementById('m-rr');
+  const TOK_IN = ['if (', 'trip', '.overlapsTrip', '(object)', ')'], TOK_OUT = ['if (', 'trip.equals', '(object)', ')'];
+  TOK_IN.forEach((w, i) => { const e = document.createElement('div'); e.className = 'tok'; e.textContent = w; e.style.left = (20 + i * 76) + 'px'; e.style.width = '70px'; mrr.appendChild(e);
+    T.anim(e, TT[0] + 0.8 + i * 0.1, 1.3, [{ opacity: 0, transform: 'translateX(-20px)' }, { opacity: 1, transform: 'translateX(0)', offset: 0.25 }, { opacity: 1, transform: 'translateX(0)', offset: 0.55 }, { opacity: 0, transform: `translateX(${380 - (20 + i * 76)}px)` }], { ease: 'inOut' }); });
+  TOK_OUT.forEach((w, i) => { const e = document.createElement('div'); e.className = 'tok o'; e.textContent = w; e.style.left = (640 + i * 76) + 'px'; e.style.width = '70px'; mrr.appendChild(e);
+    T.anim(e, TT[0] + 2.4 + i * 0.12, 0.7, [{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'translateX(0)' }]); });
+  T.anim('.mbox', TT[0] + 2.0, 0.5, [{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }]);
+  // NTR: fill the hole
+  T.anim('#hole', TT[1] + 1.2, 0.5, [{ width: '230px', opacity: 1, paddingLeft: '10px', paddingRight: '10px', borderWidth: '2px' }, { width: '0px', opacity: 0, paddingLeft: '0px', paddingRight: '0px', borderWidth: '0px' }], { ease: 'inOut' });
+  T.anim('#fill', TT[1] + 1.6, 1.2, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)' }], { ease: 'steps(32)' });
+  // D4C: the response appears
+  document.getElementById('d4c-arrow').setAttribute('data-a', ''); document.getElementById('d4c-out').setAttribute('data-a', '');
+  T.in('#d4c-arrow', TT[2] + 1.2, { dur: 0.5, x: -14, y: 0 });
+  T.in('#d4c-out', TT[2] + 1.5, { dur: 0.8, y: 14 });
+  // ChatRepair: the loop turns three times
+  [0, 1, 2].forEach((i) => T.draw('#loopc', TT[3] + 0.9 + i * 1.15, 1.0, 0, 1));
+  // OpenHands: terminal lines
+  T.els('#ohterm .l').forEach((el, i) => tline(el, TT[4] + 0.9 + i * 0.5, 0.45));
+
+  // --- pipeline ---
+  const c5p = c5 + 26.0;
+  T.out('#tc-oh, #tin', c5p, { dur: 0.5, stagger: 0.03 });
+  T.in('#c5-ph', c5p + 0.4, { dur: 1 });
+  const tmEl = document.getElementById('tminis');
+  ['RewardRepair', 'NTR', 'D4C', 'ChatRepair', 'OpenHands'].forEach((n, k) => { const d = document.createElement('div'); d.className = 'toolmini'; d.setAttribute('data-a', ''); d.style.left = (120 + k * 330) + 'px'; d.textContent = n; tmEl.appendChild(d); T.in(d, c5p + 0.8 + k * 0.1, { dur: 0.7, y: 16 }); });
+  T.in('#st1, #st2, #st3', c5p + 1.3, { dur: 0.8, y: 20, stagger: 0.15 });
+  T.in('#lb1, #lb2, #lb3, #lb4, #lb5', c5p + 1.9, { dur: 0.8, y: 20, stagger: 0.1 });
+  const LANE_X = [265, 585, 905, 1225, 1545], LANE_C = ['#1f8a4c', '#2f6fed', '#c47a00', '#8e8e93', '#a1a1a6'], CUM = [442, 591, 626, 1246, 3049];
+  const sqEl = document.getElementById('sqs');
+  for (let i = 0; i < 70; i++) {
+    const k = i % 5, pick = (i * 7919) % 3049; let j = 0; while (pick >= CUM[j]) j++;
+    const cx = 230 + k * 330, lx = LANE_X[j];
+    const s = document.createElement('div'); s.className = 'sq'; s.style.background = LANE_C[j];
+    s.style.offsetPath = `path('M ${cx} 300 C ${cx} 430, 960 380, 960 495 C 960 620, ${lx} 650, ${lx} 790')`;
+    sqEl.appendChild(s);
+    T.anim(s, c5p + 2.6 + i * 0.075, 1.7, [{ opacity: 0, offsetDistance: '0%' }, { opacity: 1, offsetDistance: '6%', offset: 0.06 }, { opacity: 1, offsetDistance: '94%', offset: 0.94 }, { opacity: 0, offsetDistance: '100%' }], { ease: 'inOut' });
+  }
+  [442, 149, 35, 620, 1803].forEach((n, j) => T.count(`#lb${j + 1} .n`, c5p + 3.4, 5.6, n));
+  T.in('#c5-total', c5p + 3.0, { dur: 0.8, y: 12 });
+  T.count('#c5-n', c5p + 3.4, 5.6, 3049);
+  cp(c5p + 10.0, 'Patch evaluation methodology', 'Every patch goes through the same pipeline. Splice it into the buggy snapshot, build the whole app, install it, run the two GUI tests on the emulator. A patch that builds and passes is plausible. Two authors then judge every plausible patch: correct if it is semantically the developer\'s fix, overfit if it passes only by targeting what the tests check. Three thousand and forty-nine patches.');
+
+  // ======================================================================
+  // CHAPTER 6 · RESULTS (182.5–227.5)
+  // ======================================================================
+  const c6 = c5 + 36;
+  T.out('#c5-ph, .toolmini, .station, .lanebox, #c5-total, #c5-eye', c6, { dur: 0.5, stagger: 0.02 });
+  T.in('#c6-eye', c6 + 0.4, { dur: 0.8, y: 14 });
+  T.in('#c6-h1', c6 + 0.6, { dur: 1 });
+  const SYN = [['OpenHands', '46 patches', [84.8, 2.2, 0, 6.5, 6.5]], ['ChatRepair', '46 patches', [67.4, 13.0, 2.2, 4.3, 13.0]], ['D4C', '460 patches', [50.9, 5.2, 0, 13.3, 30.7]], ['NTR', '445 patches', [17.3, 3.8, 2.0, 45.2, 31.7]], ['RewardRepair', '460 patches', [1.7, 0.9, 1.3, 20.2, 75.9]]];
+  const REAL = [['OpenHands', '50 patches', [12, 8, 0, 20, 60]], ['ChatRepair', '50 patches', [8, 26, 0, 10, 56]], ['D4C', '500 patches', [8, 8.6, 3.4, 13, 67]], ['NTR', '492 patches', [0.6, 4.7, 0.2, 25, 69.5]], ['RewardRepair', '500 patches', [0, 2.8, 0.2, 11.4, 85.6]]];
+  const buildBars = (id, rows, t) => {
+    const el = document.getElementById(id);
+    rows.forEach((r, ri) => {
+      const row = document.createElement('div'); row.className = 'brow'; row.setAttribute('data-a', '');
+      row.innerHTML = `<div class="lbl">${r[0]}<small>${r[1]}</small></div><div class="track">${['c', 'a', 'o', 't', 'b'].map((c, s) => `<div class="seg ${c}">${r[2][s] >= 9 ? Math.round(r[2][s]) + '%' : ''}</div>`).join('')}</div>`;
+      el.appendChild(row);
+      T.in(row, t + ri * 0.12, { dur: 0.8, x: -24, y: 0, blur: 4 });
+      row.querySelectorAll('.seg').forEach((seg, s) => T.anim(seg, t + 0.5 + ri * 0.12 + s * 0.06, 1.1, [{ width: '0%' }, { width: r[2][s] + '%' }]));
+    });
+  };
+  buildBars('rq1', SYN, c6 + 1.0);
+  T.in('#lg1', c6 + 2.2, { dur: 0.8, y: 10 });
+  T.in('#g46r', c6 + 2.6, { dur: 0.8, y: 16 });
+  const mkCells = (id, n) => Array.from({ length: n }, () => document.getElementById(id).appendChild(document.createElement('i')));
+  mkCells('g46b', 46).slice(0, 41).forEach((d, i) => T.anim(d, c6 + 3.0 + i * 0.05, 0.3, [{ background: '#e5e5ea' }, { background: '#1f8a4c' }]));
+  T.count('#n41', c6 + 3.0, 2.1, 41);
+  cp(c6 + 7.0, 'Effectiveness on synthetic bugs', 'RQ1, the synthetic bugs. Each bar is all of a tool\'s patches. Green is correct. The three tools built on large LLMs do well: OpenHands is correct on thirty-nine of forty-six, ChatRepair on sixty-seven percent of its patches, D4C on half. NTR, with templates written for traditional code, drops to seventeen percent. RewardRepair, with no report and no tests, almost never. Forty-one of forty-six bugs were fixed by at least one tool.');
+  T.out('#c6-h1, #rq1 .brow, #lg1, #g46r', c6 + 7.0, { dur: 0.5, stagger: 0.03 });
+  T.in('#c6-h2', c6 + 7.4, { dur: 1 });
+  buildBars('rq2', REAL, c6 + 7.8);
+  T.in('#lg2', c6 + 9.0, { dur: 0.8, y: 10 });
+  T.in('#g50r', c6 + 9.4, { dur: 0.8, y: 16 });
+  mkCells('g50b', 50).slice(0, 11).forEach((d, i) => T.anim(d, c6 + 9.8 + i * 0.09, 0.3, [{ background: '#e5e5ea' }, { background: '#2f6fed' }]));
+  T.count('#n11', c6 + 9.8, 1.1, 11);
+  cp(c6 + 13.5, 'Effectiveness on real bugs', 'RQ2, the real bugs. Same chart, same tools. The green nearly disappears. The best correct rate is OpenHands at twelve percent. ChatRepair reaches thirty-four percent plausible, but most of those do not match the developer. And look at the light gray. For three of the five tools, most patches do not even build. Eleven of fifty bugs were fixed by at least one tool, and they are the simple ones.');
+  T.out('#c6-h2, #rq2 .brow, #lg2, #g50r', c6 + 13.5, { dur: 0.5, stagger: 0.03 });
+  T.in('#c6-h6', c6 + 14.0, { dur: 1 });
+  T.in('#ct1', c6 + 14.0, { dur: 1, y: 0, scale: 0.9, blur: 16 });
+  T.in('#ct2', c6 + 14.4, { dur: 1, y: 0, scale: 0.9, blur: 16 });
+  T.in('#ct3', c6 + 15.4, { dur: 1, y: 20 });
+  T.anim('#bar67', c6 + 15.8, 1.3, [{ width: '0%' }, { width: '67%' }]);
+  T.count('#n67', c6 + 15.8, 1.3, 67, { format: (v) => Math.round(v) + '%' });
+  cp(c6 + 18.5, 'Results overview', 'Forty-one of forty-six, eleven of fifty. And the single biggest reason is the most basic one. Sixty-seven percent of the patches for real bugs did not compile. The tools reference things that do not exist in the project.');
+  T.out('#c6-h6, #ct1, #ct2, #ct3', c6 + 18.5, { dur: 0.5, stagger: 0.04 });
+  T.in('#c6-h3', c6 + 19.0, { dur: 1 });
+  T.in('#lim-issue', c6 + 19.4, { dur: 0.9, y: 24 });
+  T.in('#lim-real', c6 + 20.0, { dur: 0.9, y: 24 });
+  [['#lim1', 21.0], ['#lim2', 22.4], ['#lim3', 23.8], ['#lim4', 25.2]].forEach(([s, t]) => { T.in(s, c6 + t, { dur: 0.9, y: 24 }); T.anim(s + ' .tests b', c6 + t + 1.0, 0.3, [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }]); });
+  T.in('#c6-nm', c6 + 26.6, { dur: 1, y: 16 });
+  cp(c6 + 28.0, 'A preview of the limitations', 'A preview of what we will see in the taxonomy. TrainerApp, bug 1641: the report says the slider\'s training type is never stored. The real widget is a Spinner with an id the tools never saw. So they guess. D4C invents a component id and the build fails; ten patches, five different guessed ids. OpenHands invents methods that sound right and do not exist. Another D4C patch adds two methods and leaves them empty. And on FieldBook, NTR navigates to an Activity that does not exist. The tools see one method and a report, and they guess the rest.');
+  T.out('#c6-h3, #lim-issue, #lim-real, #lim1, #lim2, #lim3, #lim4, #c6-nm', c6 + 28.0, { dur: 0.5, stagger: 0.03 });
+  T.in('#c6-h4', c6 + 28.4, { dur: 1 });
+  T.in('#ov-dev', c6 + 28.8, { dur: 0.9, y: 24 });
+  T.in('#ov-d4c', c6 + 29.6, { dur: 0.9, y: 24 });
+  T.anim('#ov-d4c .tests b', c6 + 30.5, 0.3, [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { stagger: 0.3 });
+  T.in('#ov19', c6 + 31.3, { dur: 1, y: 20 });
+  T.count('#n19', c6 + 31.4, 1.0, 19);
+  cp(c6 + 33.5, 'Overfitting', 'And overfitting is real. PSLab, bug 2678. The fix rounds a seek arc\'s progress into degrees. One plausible patch assigns zero. Both tests pass. Nineteen patches on the real bugs overfit this way. GUI tests are expensive to write, so each bug has two, and two leave room for this.');
+  T.out('#c6-h4, #ov-dev, #ov-d4c, #ov19', c6 + 33.5, { dur: 0.5, stagger: 0.03 });
+  T.in('#c6-h5', c6 + 34.0, { dur: 1 });
+  T.in('#c6-tcap', c6 + 34.3, { dur: 0.9, y: 10 });
+  const PILES = [['Java-specific', 79, 0], ['GUI constructs', 63, 1], ['APIs & libraries', 61, 1], ['Patch-specific', 56, 0], ['Coding logic', 46, 0], ['OOP', 37, 0], ['Activities & Intents', 23, 1], ['Threading', 12, 1], ['Other', 2, 0]];
+  const pilesEl = document.getElementById('piles');
+  PILES.forEach(([n, v, ui], i) => {
+    const p = document.createElement('div'); p.className = 'pile' + (ui ? ' ui' : ''); p.style.left = (120 + i * 186) + 'px';
+    p.innerHTML = `<div class="pv" data-a>${v}</div><div class="pn" data-a>${n}${ui ? ' <span style="color:#1f8a4c">●</span>' : ''}</div>`;
+    const bars = Math.ceil(v / 4);
+    for (let j = 0; j < bars; j++) { const b = document.createElement('i'); p.appendChild(b); T.anim(b, c6 + 34.6 + i * 0.3 + j * 0.06, 0.3, [{ opacity: 0, transform: 'translateY(-40px)' }, { opacity: 1, transform: 'translateY(0)' }], { ease: 'in' }); }
+    pilesEl.appendChild(p);
+    T.in(p.querySelector('.pn'), c6 + 34.7 + i * 0.3, { dur: 0.6, y: 10 });
+    T.in(p.querySelector('.pv'), c6 + 35.0 + i * 0.3 + bars * 0.06, { dur: 0.5, y: 10 });
+  });
+  cp(c6 + 40.0, 'Nine categories', 'RQ3. We open-coded a statistically significant sample of 379 failed patches across all tools and both datasets. Three annotators, a gold set, two labels per patch. Nine categories. The piles with the green dot are specific to Android UI code.');
+  T.anim('.pile:not(.ui)', c6 + 40.0, 0.6, [{ opacity: 1 }, { opacity: 0.28 }]);
+  T.in('#p42', c6 + 40.4, { dur: 1, y: 0, scale: 0.9, blur: 14 });
+  T.count('#n42', c6 + 40.5, 1.4, 42);
+  T.in('#tpills .chip', c6 + 41.8, { dur: 0.7, y: 20, stagger: 0.11 });
+  cp(c6 + 45.0, 'UI-specific failures', 'Four of the nine categories are specific to UI code: GUI constructs, Android APIs, Activities and Intents, and threading on the UI thread. Together, 159 of 379. Forty-two percent of failures are about the UI, not about Java. And the individual causes are telling. Thirty-seven patches call a method that does not exist. Thirty-five reference a component ID that does not exist. Eighteen reference an Activity that does not exist. The tools are hallucinating the vocabulary of the app.');
+
+  // ======================================================================
+  // CHAPTER 7 · IMPLICATIONS, SUMMARY (227.5–250)
+  // ======================================================================
+  const c7 = c6 + 45;
+  T.out('#c6-h5, #c6-tcap, .pile, #p42, #tpills .chip, #c6-eye', c7, { dur: 0.5, stagger: 0.02 });
+  T.in('#c7-eye', c7 + 0.4, { dur: 0.8, y: 14 });
+  const flowIn = (sel, t, dx) => T.els(sel).forEach((e, i) => T.anim(e, t + i * 0.3, 1.6, [{ opacity: 0, transform: 'translate(0,0)' }, { opacity: 1, transform: 'translate(0,0)', offset: 0.25 }, { opacity: 1, transform: 'translate(0,0)', offset: 0.55 }, { opacity: 0, transform: `translate(${dx}px,0)` }], { ease: 'inOut' }));
+  const boxPulse = (sel, t, label) => { T.anim(sel, t, 0.6, [{ borderColor: '#86868b', color: '#86868b' }, { borderColor: '#1d1d1f', color: '#1d1d1f' }]); if (label) T.els(sel).forEach((e) => T.tween(t, 0.01, (p) => { e.textContent = p >= 1 ? label : 'prompt'; }, 'linear')); };
+  T.in('#im1', c7 + 0.8, { dur: 1, y: 30 }); flowIn('#im1 .flowchip', c7 + 1.4, 470); boxPulse('#im1 .promptbox', c7 + 3.2, 'prompt + real IDs');
+  cp(c7 + 4.5, 'Implication 1', 'Four implications for anyone building repair tools for this domain. One. Do not make the tool guess the GUI vocabulary. Component IDs, Activities, Fragments. Fifty-five of the sampled failures hallucinated one of these. Hand them over.');
+  T.in('#im2', c7 + 4.6, { dur: 1, y: 30 }); flowIn('#im2 .flowchip', c7 + 5.2, 470); boxPulse('#im2 .promptbox', c7 + 7.0, 'prompt + project APIs');
+  cp(c7 + 9.0, 'Implication 2', 'Two. Expose the project\'s APIs. Fifty-two failures called methods that do not exist or called them wrong. The fix is often one class away from the buggy method, and the tool cannot see it.');
+  T.in('#im3', c7 + 9.1, { dur: 1, y: 30 });
+  T.anim('#im3-shot', c7 + 9.8, 1.6, [{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, transform: 'translateX(0)', offset: 0.3 }, { opacity: 1, transform: 'translateX(0)', offset: 0.55 }, { opacity: 0, transform: 'translateX(470px)' }], { ease: 'inOut' });
+  T.anim('#im3-shot2', c7 + 10.2, 1.6, [{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, transform: 'translateX(0)', offset: 0.3 }, { opacity: 1, transform: 'translateX(0)', offset: 0.55 }, { opacity: 0, transform: 'translateX(400px)' }], { ease: 'inOut' });
+  boxPulse('#im3 .promptbox', c7 + 11.6, 'prompt + screens');
+  cp(c7 + 13.5, 'Implication 3', 'Three. The UI itself is context. Screenshots and recordings of the bug and the surrounding screens carry information the text does not.');
+  T.in('#im4', c7 + 13.6, { dur: 1, y: 30 });
+  ['#im4-p1', '#im4-err', '#im4-p2', '#im4-ok'].forEach((s) => T.hide(s, 0));
+  T.anim('#im4-p1', c7 + 14.2, 1.0, [{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, transform: 'translateX(0)', offset: 0.3 }, { opacity: 1, transform: 'translateX(220px)', offset: 0.9 }, { opacity: 0, transform: 'translateX(240px)' }], { ease: 'inOut' });
+  T.anim('#im4-err', c7 + 15.2, 1.2, [{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, transform: 'translateX(0)', offset: 0.2 }, { opacity: 1, transform: 'translateX(-250px)', offset: 0.85 }, { opacity: 0, transform: 'translateX(-250px)' }], { ease: 'inOut' });
+  T.anim('#im4-p2', c7 + 16.4, 1.0, [{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, transform: 'translateX(0)', offset: 0.3 }, { opacity: 1, transform: 'translateX(220px)', offset: 0.9 }, { opacity: 0, transform: 'translateX(240px)' }], { ease: 'inOut' });
+  T.anim('#im4-ok', c7 + 17.3, 0.5, [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'scale(1)' }]);
+  cp(c7 + 18.5, 'Implication 4', 'Four. Put the build in the loop. Seventeen hundred of the three thousand patches never compiled. A tool that compiles before it answers, and reads the compiler\'s errors, removes that class of failure entirely. Keep that one in mind.');
+  T.out('#im1, #im2, #im3, #im4, #c7-eye', c7 + 18.5, { dur: 0.5, stagger: 0.03 });
+  T.in('#sum-eye', c7 + 18.9, { dur: 0.8, y: 14 });
+  T.in('#sum-rows .sumrow', c7 + 19.1, { dur: 0.9, y: 24, stagger: 0.18 });
+  T.in('#sum-pkg', c7 + 20.0, { dur: 1, y: 24 });
+  T.in('#sum-qr', c7 + 20.6, { dur: 1, y: 24 });
+  cp(c7 + 22.5, 'Summary', 'To sum up. DroidFixBench is the first Android bug benchmark built for program repair. Five techniques, three thousand patches. Modern tools handle small UI bugs; on real ones the best tool fixes six of fifty, and forty-two percent of failures are specifically about UI code. The benchmark, the Docker harness for each tool, every patch, and the codebooks are on GitHub and archived on Zenodo.');
+
+  // ======================================================================
+  // CHAPTER 8 · ONE MORE THING (250–336)
+  // ======================================================================
+  const c8 = c7 + 22.5;
+  T.out('#sum-eye, #sum-rows .sumrow, #sum-pkg, #sum-qr', c8, { dur: 0.5, stagger: 0.03 });
+  T.anim('#black', c8 + 0.3, 0.9, [{ opacity: 0 }, { opacity: 1 }], { ease: 'inOut' });
+  T.show('#omt', c8 + 1.4);
+  T.type('#omt', c8 + 1.4, 1.3, { cursor: true });
+  cp(c8 + 4.0, 'One more thing', 'One more thing.');
+  T.out('#omt', c8 + 4.0, { dur: 0.6, y: -20 });
+  T.in('#c8-eye', c8 + 4.4, { dur: 0.8, y: 14 });
+  T.in('#c8-h', c8 + 4.6, { dur: 1 });
+  T.in('#c8-s', c8 + 5.0, { dur: 1, y: 16 });
+  T.in('#agents .agent', c8 + 5.6, { dur: 0.9, y: 24, stagger: 0.25 });
+  T.in('#cf1, #cf2, #cf3, #cf4', c8 + 7.0, { dur: 0.8, y: 20, stagger: 0.2 });
+  T.in('#c8-t5', c8 + 8.2, { dur: 0.9, y: 16 });
+  T.count('#n5', c8 + 8.8, 0.8, 5, { from: 2 });
+  T.in('#c8-600', c8 + 9.0, { dur: 0.9, y: 16 });
+  T.count('#n600', c8 + 9.3, 2.4, 600);
+  const cellsEl = document.getElementById('cells600');
+  for (let i = 0; i < 600; i++) { const c = document.createElement('div'); c.className = 'cell600'; c.style.left = (120 + (i % 50) * 17) + 'px'; c.style.top = (836 + Math.floor(i / 50) * 17) + 'px'; c.style.width = c.style.height = '13px'; cellsEl.appendChild(c); T.anim(c, c8 + 9.3 + i * 0.004, 0.3, [{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'scale(1)' }]); }
+  cp(c8 + 13.0, 'The setup', 'Placeholder notes for the example study: three tools, fifty example cases, four settings, six hundred runs. Every number in this chapter is invented for the test fixture.');
+
+  // ---- main flow: setup → every run → close ----
+  T.out('#c8-h, #c8-s, #agents .agent, #cf1, #cf2, #cf3, #cf4, #c8-t5, #c8-600', c8 + 13.0, { dur: 0.5, stagger: 0.02 });
+  T.anim('.cell600', c8 + 13.0, 0.4, [{ opacity: 0 }]);
+  const HM = c8 + 13.5;
+  T.in('#c8-hh', HM, { dur: 0.9, y: 14 });
+  const FSE = [[8,"TrickyTripper","C","TAAAACTATTCA"],[18,"calendula","C","CBBAATTTCAAC"],[44,"Omni-Notes","O","TAAAAAABAAAA"],[53,"Markor","C","ACTATATAAATT"],[54,"Markor","O","BTCTAATTACAA"],[71,"KISS","O","ATTACBATCCTA"],[84,"ultrasonic","O","ABAAAATTOCAA"],[92,"WiFiAnalyzer","O","TATAAATTTAAO"],[114,"Harmonic HN","O","AATTAAOCABAA"],[129,"andOTP","C","CTTAABCAAAAT"],[130,"andOTP","C","ATATTATCAAAT"],[136,"Harmonic HN","C","AABCATTACAAA"],[159,"Anki-Android","C","ATCAABACOAAA"],[160,"Anki-Android","C","CAATOATATCAA"],[171,"Harmonic HN","C","TATCATCBTCTA"],[181,"Harmonic HN","O","ATCAAACAACAA"],[191,"android-anuto","O","ATTCAAATTBAT"],[192,"markor","O","TATBATCCBATA"],[271,"Aegis","C","CAAATCTCTAAT"],[273,"Anki-Android","O","TAATABATCAAT"],[275,"Aegis","O","TAAAOATTAATO"],[358,"URLCheck","O","TAAATAATTTAO"],[365,"URLCheck","C","CCACATTCBTAB"],[382,"URLCheck","O","ABTBATACAATT"],[447,"URLCheck","O","TATAAACTAAAA"],[1130,"AntennaPod","O","ABATAAOAAAAA"],[1138,"gpslogger","O","ABAATACAACCC"],[1146,"gpstest","O","ACAAAAACAAAA"],[1151,"gpstest","N","BAOAATACATTT"],[1198,"Images-to-PDF","O","CTTAACOTTCAA"],[1202,"Images-to-PDF","O","TTTTAAACAACT"],[1205,"Images-to-PDF","N","TAATCAAOAACT"],[1207,"andOTP","C","TTAOATATCATB"],[1213,"andOTP","O","AAATTTAAAAAA"],[1214,"andOTP","O","ACATAACAAACC"],[1215,"andOTP","C","CTATAAAAATCT"],[1255,"SkyTube","O","CTAAATCCACTA"],[1299,"FieldBook","C","CAAATAAAACCA"],[1441,"anglers-log","O","AAATCCTCTTTC"],[1445,"Anglerslog","O","ATAATTABBTAA"],[1446,"anglers-log","C","ATTAATATTTTT"],[1563,"lrkFM","C","AATAABAAAAAT"],[1568,"lrkFM","C","ATAATTBAATAA"],[1640,"TrainerApp","C","AATTCACTTAAT"],[1641,"TrainerApp","O","CAAABATTTAAO"],[1645,"TrainerApp","C","ATAABATAATAA"],[2587,"PSLab","C","ATTTATACAAAA"],[2677,"PSLab","O","AATTATAAACTT"],[2678,"PSLab","O","TCCBAAACABAC"],[123451,"Anki-Android","O","OTTAOCTOTBAA"]];
+  const score = (s) => [...s].filter((c) => 'CAO'.includes(c)).length * 100 + [...s].filter((c) => c === 'C').length;
+  const BUGS = [...FSE].sort((a, b) => score(b[3]) - score(a[3]) || a[0] - b[0]);
+  const ROWS = [['Tool A', 'Base'], ['Tool A', '+ X'], ['Tool A', '+ Y'], ['Tool A', '+ X + Y'], ['Tool B', 'Base'], ['Tool B', '+ X'], ['Tool B', '+ Y'], ['Tool B', '+ X + Y'], ['Tool C', 'Base'], ['Tool C', '+ X'], ['Tool C', '+ Y'], ['Tool C', '+ X + Y']];
+  const hmg = document.getElementById('hmg');
+  let hk = 0;
+  ROWS.forEach((r, ri) => {
+    const l = document.createElement('div'); l.className = 'rl'; l.innerHTML = (ri % 4 === 0 ? `<b>${r[0]}</b> · ` : '') + r[1]; l.setAttribute('data-a', ''); hmg.appendChild(l);
+    T.in(l, HM + 0.4 + ri * 0.05, { dur: 0.6, x: -10, y: 0, blur: 2 });
+    BUGS.forEach((b) => { const c = document.createElement('div'); c.className = 'cl ' + b[3][ri] + (b[0] === 114 ? ' k' : ''); hmg.appendChild(c); T.anim(c, HM + 0.8 + hk * 0.004, 0.35, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1)' }]); hk++; });
+  });
+  T.in('#hmleg', HM + 3.6, { dur: 0.8, y: 10 });
+  T.in('#pct14', HM + 4.2, { dur: 1, y: 20 });
+  T.count('#n74b', HM + 4.4, 1.2, 67);
+  T.count('#n14', HM + 4.6, 1.2, 14);
+  cp(HM + 7.5, 'But', 'Every run of the example study. Fifty cases across, twelve setting rows down. The colours show invented outcomes for the test fixture.');
+
+  const CL = HM + 7.5;
+  T.out('#pct14, #hmleg, #c8-hh, #c8-eye', CL, { dur: 0.5, stagger: 0.03 });
+  T.anim('#hmg', CL, 0.5, [{ opacity: 1 }, { opacity: 0 }], { ease: 'inOut' });
+  T.in('#cl-h', CL + 0.6, { dur: 1.1 });
+  T.in('#cl-s', CL + 1.3, { dur: 1, y: 20 });
+  T.in('#cl-l', CL + 2.0, { dur: 1, y: 16 });
+  T.in('#cl-qr', CL + 2.3, { dur: 1, y: 16 });
+  T.in('#cl-g', CL + 2.6, { dur: 1, y: 12 });
+  cp(CL + 5.0, 'Thank you', 'So, how far are we? What remains is the hard part of UI programming, the part that is hard for people too: scope, lifecycle, state, and what a correct fix even is when there are many. The benchmark and the package are public. Thank you. Happy to take questions.');
+
+  // ---- Sparsh ----
+  const SP = CL + 5.0;
+  T.out('#cl-h, #cl-s, #cl-l, #cl-g, #cl-qr', SP, { dur: 0.5, stagger: 0.03 });
+  T.in('#sp-img', SP + 0.5, { dur: 1.1, y: 0, scale: 0.85, blur: 18 });
+  T.in('#sp-eye', SP + 0.8, { dur: 0.8, y: 14 });
+  T.in('#sp-h', SP + 1.0, { dur: 1 });
+  T.in('#sp-s', SP + 1.5, { dur: 1, y: 18 });
+  T.in('#sp-a', SP + 2.3, { dur: 1, y: 18 });
+  T.in('#sp-c', SP + 2.9, { dur: 1, y: 14 });
+  cp(SP + 4.5, 'Sparsh', 'And one more thing. Sparsh Pandey is an undergraduate in my lab and a co-author on this paper, and he is applying to PhD programs in CS and software engineering this cycle. If you are recruiting, talk to him.');
+
+  // ---- backup slides ----
+  const BK = SP + 4.5;
+  T.out('#sp-img, #sp-eye, #sp-h, #sp-s, #sp-a, #sp-c', BK, { dur: 0.5, stagger: 0.03 });
+  T.in('#bkp', BK + 0.5, { dur: 0.9, y: 20 });
+  cp(BK + 2.0, 'Backup', 'Backup slides.', true);
+
+  // --- backup: a tool at work ---
+  const AG = BK + 2.0;
+  T.out('#bkp', AG, { dur: 0.5 });
+  T.anim('#rig', AG + 0.4, 0.9, [{ opacity: 0, transform: 'translate(330px,-140px) scale(1)' }, { opacity: 1, transform: 'translate(330px,-140px) scale(1)' }]);
+  T.in('#c8-th', AG + 0.6, { dur: 0.9, y: 14 });
+  T.in('#bigterm', AG + 0.8, { dur: 0.9, y: 24 });
+  const TLINES = [
+    [3, 'a', 'I will run the example check first, then read the two files it names.'],
+    [3, 'c', 'ls -la'],
+    [3, 'c', 'rg --files example/checks/'],
+    [7, 'c', "sed -n '1,120p' src/example/ListFragment.java"],
+    [11, 'c', "sed -n '1,200p' src/example/ListAdapter.java"],
+    [43, 'c', "sed -n '1,80p' example/checks/Check7.java"],
+    [60, 'a', 'The example check fails because a long press also counts as a tap. Adding a short guard window after the press.'],
+    [60, 'c', 'apply_patch   → M ListAdapter.java  (+7 lines)'],
+    [174, 'c', './gradlew assembleDebug'],
+    [174, 'ok', 'BUILD SUCCESSFUL'],
+    [291, 'c', './run_checks.sh Check7'],
+    [565, 'bad', '>>> Check7: FAILED'],
+    [851, 'a', 'The guard is not enough: the tap still fires on release. Consuming the release event after a long press instead.'],
+    [858, 'c', 'apply_patch   → M ListAdapter.java  (+20 lines)'],
+    [865, 'c', './run_checks.sh Check7'],
+    [1197, 'ok', '>>> Check7: PASSED'],
+    [1198, 'c', './run_checks.sh all'],
+    [1621, 'ok', '>>> all checks: PASSED'],
+    [1633, 'a', 'Done. The change is in ListAdapter.java.'],
+  ];
+  const mmss = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  const termEl = document.getElementById('termlines'), clockEl = document.getElementById('termclock');
+  const tBase = AG + 1.6;
+  const tAt = (i) => tBase + i * 1.25 + (i >= 11 ? 1.4 : 0) + (i >= 15 ? 1.4 : 0);
+  TLINES.forEach(([sec, cls, txt], i) => {
+    const l = document.createElement('span'); l.className = 'l ' + cls; l.innerHTML = `<span class="ts">${mmss(sec)}</span>${txt}`; termEl.appendChild(l);
+    tline(l, tAt(i), cls === 'a' ? 0.9 : 0.45);
+    T.tween(tAt(i), 0.01, (p) => { if (p >= 1) clockEl.textContent = mmss(sec); }, 'linear');
+  });
+  press(tAt(10) + 0.1); menuIn(tAt(10) + 1.0); release(tAt(10) + 1.1); browserIn(tAt(10) + 1.6);
+  T.in('#ax', tAt(11) + 0.3, { dur: 0.5, y: 0, scale: 0.4, blur: 0, ease: 'spring' });
+  browserOut(tAt(14) - 0.2); menuOut(tAt(14) - 0.1); T.out('#ax', tAt(14) - 0.2, { dur: 0.4 });
+  press(tAt(14) + 0.2); menuIn(tAt(14) + 1.1); release(tAt(14) + 1.2);
+  T.in('#aok', tAt(15) + 0.3, { dur: 0.5, y: 0, scale: 0.4, blur: 0, ease: 'spring' });
+  T.in('#c8-tcap', tAt(18) + 1.0, { dur: 0.9, y: 10 });
+  cp(AG + 30.5, 'A tool at work', 'An invented transcript of an example tool run. It reads two files and patches one; the check fails; it strengthens the patch and the check passes.', true);
+
+  // --- backup: headline ---
+  const HL = AG + 30.5;
+  T.out('#c8-th, #bigterm, #c8-tcap, #aok', HL, { dur: 0.5, stagger: 0.03 });
+  menuOut(HL); rigShow(HL, false);
+  T.in('#hl1', HL + 0.5, { dur: 1, y: 0, scale: 0.9, blur: 16 }); T.count('#n74', HL + 0.7, 1.4, 67);
+  T.in('#hl2', HL + 1.0, { dur: 1, y: 0, scale: 0.9, blur: 16 }); T.count('#n50b', HL + 1.2, 1.4, 44);
+  T.in('#hl3', HL + 1.5, { dur: 1, y: 0, scale: 0.9, blur: 16 }); T.count('#n9', HL + 1.7, 1.4, 32);
+  cp(HL + 5.0, 'The headline', 'Placeholder headline numbers for the example study. They are invented for the test fixture.', true);
+
+  // --- backup: twelve variants of one task ---
+  const TP = HL + 5.0;
+  T.out('#hl1, #hl2, #hl3', TP, { dur: 0.5, stagger: 0.04 });
+  T.in('#c8-fh', TP + 0.5, { dur: 0.9, y: 14 });
+  T.els('#ftree div').forEach((d, i) => T.anim(d, TP + 1.0 + i * 0.22, 0.6, [{ opacity: 0, transform: 'translateX(-14px)' }, { opacity: 1, transform: 'translateX(0)' }]));
+  T.in('#fp1', TP + 3.4, { dur: 0.9, y: 24 });
+  T.in('#fp2', TP + 4.4, { dur: 0.9, y: 24 });
+  T.in('#c8-fcap', TP + 5.4, { dur: 1, y: 16 });
+  cp(TP + 8.5, 'Twelve variants, one task', 'Placeholder notes for the twelve variants of one example task.', true);
+
+  // --- backup: setting Y ---
+  const VL = TP + 8.5;
+  T.out('#c8-fh, #ftree div, #fp1, #fp2, #c8-fcap', VL, { dur: 0.5, stagger: 0.02 });
+  T.in('#c8-vh', VL + 0.5, { dur: 0.9, y: 14 });
+  const VB = [['Tool A', [61, 70, 79, 75]], ['Tool B', [52, 63, 88, 84]], ['Tool C', [57, 62, 69, 73]]];
+  const vbEl = document.getElementById('vbars');
+  VB.forEach(([n, vals], g) => {
+    const grp = document.createElement('div'); grp.setAttribute('data-a', ''); grp.style.cssText = `position:absolute;left:${120 + g * 580}px;top:200px;width:520px;height:400px`;
+    grp.innerHTML = `<div class="cap" style="position:absolute;left:0;top:-50px;font-weight:600;color:var(--ink)">${n} · pass rate</div>`;
+    vals.forEach((v, b) => {
+      const h = v * 3.6;
+      grp.insertAdjacentHTML('beforeend', `<div class="vb ${b >= 2 ? 'hi' : ''}" style="left:${40 + b * 120}px" data-h="${h}"></div><div class="vbv" style="left:${40 + b * 120}px;top:${400 - h - 36}px" data-a>${v}%</div><div class="vbl" style="left:${40 + b * 120}px;top:412px">${['Base', '+ X', '+ Y', '+ X<br>+ Y'][b]}</div>`);
+    });
+    vbEl.appendChild(grp);
+    T.in(grp, VL + 0.8 + g * 0.2, { dur: 0.8, y: 20 });
+    grp.querySelectorAll('.vb').forEach((bar, b) => T.anim(bar, VL + 1.4 + g * 0.25 + b * 0.12, 1.0, [{ height: '0px' }, { height: bar.dataset.h + 'px' }]));
+    grp.querySelectorAll('.vbv').forEach((vv, b) => T.in(vv, VL + 2.2 + g * 0.25 + b * 0.12, { dur: 0.5, y: 8 }));
+  });
+  T.in('#c8-vcap', VL + 3.8, { dur: 1, y: 16 });
+  cp(VL + 6.5, 'Setting Y', 'Placeholder notes: setting Y changes the outcome more than setting X.', true);
+
+  // --- backup: why runs fail ---
+  const WH = VL + 6.5;
+  T.out('#c8-vh, #vbars > div, #c8-vcap', WH, { dur: 0.5, stagger: 0.03 });
+  T.in('#c8-xh', WH + 0.5, { dur: 0.9, y: 14 });
+  const FAM = [['Category one', 26.0, '#2f6fed'], ['Category two', 23.0, '#d2d2d7'], ['Category three', 19.5, '#d2d2d7'], ['Category four', 16.5, '#3ddc84'], ['Category five', 8.5, '#5a5a5e'], ['Category six', 6.5, '#5a5a5e']];
+  const famEl = document.getElementById('fam');
+  FAM.forEach(([n, v, col], i) => {
+    const row = document.createElement('div'); row.className = 'brow'; row.setAttribute('data-a', '');
+    row.innerHTML = `<div class="lbl" style="width:440px;font-size:26px">${n}</div><div class="track" style="background:transparent;height:44px"><div class="seg" style="background:${col};color:${col === '#d2d2d7' || col === '#3ddc84' ? '#000' : '#fff'}">${v}%</div></div>`;
+    famEl.appendChild(row);
+    T.in(row, WH + 0.9 + i * 0.12, { dur: 0.8, x: -20, y: 0, blur: 3 });
+    T.anim(row.querySelector('.seg'), WH + 1.4 + i * 0.12, 1.0, [{ width: '0%' }, { width: (v * 3.3) + '%' }]);
+  });
+  T.in('#gps', WH + 3.3, { dur: 1, y: 24 });
+  cp(WH + 6.5, 'Why runs fail', 'Placeholder notes for the six failure categories of the example study.', true);
+  T.words('#c8-line', WH + 6.7, { stagger: 0.1 });
+  cp(WH + 9.5, 'One word at a time', 'Each word of the line animates in its turn.', true);
+
+  // --- backup: two tests per bug (the fixed-build replay) ---
+  const TB = WH + 9.5;
+  T.out('#c8-xh, #fam .brow, #gps, #c8-line, #c8-eye', TB, { dur: 0.5, stagger: 0.02 });
+  T.anim('#black', TB + 0.3, 0.8, [{ opacity: 0 }], { ease: 'inOut' });
+  T.anim('#rig', TB + 0.5, 0.01, [{ transform: 'translate(-990px,-140px) scale(1)' }]);
+  rigShow(TB + 0.6, true);
+  T.in('#c4-eye', TB + 0.8, { dur: 0.8, y: 14 });
+  T.in('#c4-th', TB + 1.0, { dur: 0.9, y: 14 });
+  T.in('#tp', TB + 1.2, { dur: 0.9, y: 24 });
+  ['#tl1', '#tl2', '#tl3', '#tl4', '#tl4b', '#tl5'].forEach((l, i) => tline(l, TB + 1.6 + i * 0.22));
+  T.in('#tbad2', TB + 3.2, { dur: 0.6, y: 12 });
+  press(TB + 3.6); menuIn(TB + 4.6); release(TB + 4.7);
+  flash('#tl4b', TB + 5.0, '#c8efd6');
+  T.in('#tok', TB + 5.4, { dur: 0.5, y: 0, scale: 0.4, blur: 0, ease: 'spring' });
+  T.in('#c4-tc', TB + 6.0, { dur: 1, y: 16 });
+  T.in('#c4-tc2', TB + 6.8, { dur: 1, y: 12 });
+  cp(TB + 9.2, 'Two tests per bug', 'On the fixed build the same test finds the menu and passes. Both tests are fail-to-pass: test 1 reproduces the report directly, test 2 reaches the same bug through the surrounding UI with several assertions. Each test takes about two and a half minutes on the emulator.', true);
+
+  ED.apply(); ED.applyNotes();
+  T.editor = ED;
+  window.ED = ED;
+  if (new URLSearchParams(location.search).has('edit')) setTimeout(() => ED.enter(), 50);
+  if (new URLSearchParams(location.search).has('cplist')) { const pre=document.createElement('pre'); pre.id='cplist'; pre.textContent=CP.map((c,i)=>(i+1)+' '+c.at.toFixed(1)+' '+c.label).join('\n'); document.body.appendChild(pre); }
+  if (new URLSearchParams(location.search).has('eds')) setTimeout(() => { const pre = document.createElement('pre'); pre.id = 'eds'; pre.textContent = [...document.querySelectorAll('.stage .ed')].map((e) => { const r = e.getBoundingClientRect(); return `${e.tagName}#${e.id}.${[...e.classList].join('.')} ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)} op=${getComputedStyle(e).opacity} :: ${e.textContent.trim().slice(0, 40)}`; }).join('\n'); document.body.appendChild(pre); }, 400);
+  if (new URLSearchParams(location.search).has('dbgpath')) { const pre = document.createElement('pre'); pre.id = 'dbgpath'; pre.textContent = new URLSearchParams(location.search).get('dbgpath').split(',').map((s) => s + ' => ' + (document.querySelector(s) ? ED.pathOf(document.querySelector(s)) : 'MISSING')).join('\n'); document.body.appendChild(pre); }
+  const CHAP = T.chapters;
+  const slideno = document.getElementById('slideno');
+  T.onRender = (t) => {
+    const pane = Math.min(CP.length, CP.filter((c) => c.at < t - 0.05).length + 1);
+    const mainN = CP.filter((c) => !c.backup).length;
+    const ch = [...CHAP].reverse().find((c) => c.at <= t + 0.01) || CHAP[0];
+    slideno.textContent = CP[pane - 1].backup ? 'Backup ' + (pane - mainN) + ' / ' + (CP.length - mainN) : pane + ' / ' + mainN + '  ·  ' + ch.label;
+    slideno.classList.toggle('dark', t >= 241.1 && t < 333.6);
+  };
+  T.start();
+  window.T = T;
+  // ?debug: dump the state of the pulse dots for headless checks.
+  if (new URLSearchParams(location.search).has('debug')) {
+    const pre = document.createElement('pre'); pre.id = 'dbg';
+    pre.textContent = ['#pl1', '#pl2', '#pl3', '#pl4'].map((s) => {
+      const el = document.querySelector(s); const cs = getComputedStyle(el);
+      const an = el.getAnimations().map((a) => `${a.playState}@${a.currentTime}/${a.effect.getTiming().delay}+${a.effect.getTiming().duration} fill=${a.effect.getTiming().fill}`).join(' | ');
+      return `${s} op=${cs.opacity} dist=${cs.offsetDistance} anims=[${an}]`;
+    }).join('\n');
+    document.body.appendChild(pre);
+  }
+  if (new URLSearchParams(location.search).has('hide')) new URLSearchParams(location.search).get('hide').split(',').forEach((s) => document.querySelectorAll(s).forEach((e) => (e.style.display = 'none')));
+  if (new URLSearchParams(location.search).has('at')) {
+    const [x, y] = new URLSearchParams(location.search).get('at').split(',').map(Number);
+    const r = document.querySelector('.stage').getBoundingClientRect();
+    const sc = r.width / 1920;
+    const px = r.left + x * sc, py = r.top + y * sc;
+    const effOp = (e) => { let o = 1; for (let n = e; n && n.nodeType === 1; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity); return o; };
+    const els = [...document.querySelectorAll('.stage *')].filter((e) => { const b = e.getBoundingClientRect(); if (!(b.left <= px && px <= b.right && b.top <= py && py <= b.bottom)) return false; const cs = getComputedStyle(e); return cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && effOp(e) > 0.01 && cs.visibility !== 'hidden'; });
+    const pre = document.createElement('pre'); pre.id = 'dbgat';
+    pre.textContent = els.slice(0, 20).map((e) => { const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); return `${e.tagName}#${e.id}.${[...e.classList].join('.')} op=${cs.opacity} bg=${cs.backgroundColor} box=${Math.round(b.left)},${Math.round(b.top)} ${Math.round(b.width)}x${Math.round(b.height)}`; }).join('\n');
+    document.body.appendChild(pre);
+  }
+})();
+</script>
+</body>
+</html>
