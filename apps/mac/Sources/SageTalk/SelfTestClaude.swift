@@ -10,9 +10,13 @@ import SwiftUI
 ///   claude.txt          the transcript as the model holds it
 extension SelfTest {
     static func claudePane(model: TalkWindowModel, out: URL) async {
+        // SAGE_SELFTEST_CLAUDE_TRACE names the recording directly (the packaging smoke test runs
+        // the app with no repository to find it in).
         let env = ProcessInfo.processInfo.environment
-        guard let repo = SidecarLocator.repoRoot(environment: env, resources: Bundle.main.resourceURL, executable: Bundle.main.executableURL),
-              let text = try? String(contentsOf: repo.appendingPathComponent("tests/claude/caption-frame.ndjson"), encoding: .utf8) else {
+        let trace = env["SAGE_SELFTEST_CLAUDE_TRACE"].map { URL(fileURLWithPath: $0) }
+            ?? SidecarLocator.repoRoot(environment: env, resources: Bundle.main.resourceURL, executable: Bundle.main.executableURL)?
+                .appendingPathComponent("tests/claude/caption-frame.ndjson")
+        guard let trace, let text = try? String(contentsOf: trace, encoding: .utf8) else {
             check(false, "claude: the recorded session was found"); return
         }
         let chat = model.chat

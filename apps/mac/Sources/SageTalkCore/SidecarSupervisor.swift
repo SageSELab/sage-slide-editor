@@ -94,9 +94,10 @@ public actor SidecarSupervisor {
     }
 }
 
-/// Finds the repository whose `packages/sidecar` the development app runs.
+/// Finds the sidecar: the one bundled in a packaged app, else the repository whose
+/// `packages/sidecar` the development app runs.
 ///
-/// In order: `SAGE_REPO` in the environment; `Contents/Resources/sage-repo-path`, written by
+/// Repository, in order: `SAGE_REPO` in the environment; `Contents/Resources/sage-repo-path`, written by
 /// `apps/mac/scripts/bundle.sh`; then the folders above the executable (for `swift run`).
 /// `node` comes from `SAGE_NODE`, `Contents/Resources/sage-node-path` (also baked in by
 /// bundle.sh, since an app launched from Finder has a minimal PATH), then PATH and the usual
@@ -129,10 +130,23 @@ public enum SidecarLocator {
         return SidecarConfiguration.findNode(environment: environment)
     }
 
-    /// The development configuration, or a message saying what is missing.
+    /// True when the app should run its own bundled sidecar: it has one, and `SAGE_REPO` does
+    /// not name a repository (an explicit SAGE_REPO lets a developer run a packaged app against
+    /// a checkout).
+    public static func usesBundle(environment: [String: String] = ProcessInfo.processInfo.environment,
+                                  resources: URL? = Bundle.main.resourceURL) -> Bool {
+        if let env = environment["SAGE_REPO"], !env.isEmpty, isRepo(URL(fileURLWithPath: env)) { return false }
+        return SidecarConfiguration.Bundled.present(in: resources)
+    }
+
+    /// The sidecar configuration: bundled in a packaged app (see `usesBundle`), else development,
+    /// or a message saying what is missing.
     public static func configuration(environment: [String: String] = ProcessInfo.processInfo.environment,
                                      resources: URL? = Bundle.main.resourceURL,
                                      executable: URL? = Bundle.main.executableURL) -> Result<SidecarConfiguration, LocatorError> {
+        if usesBundle(environment: environment, resources: resources), let resources {
+            return .success(.bundled(resources: resources))
+        }
         guard let repo = repoRoot(environment: environment, resources: resources, executable: executable) else {
             return .failure(.noRepo)
         }

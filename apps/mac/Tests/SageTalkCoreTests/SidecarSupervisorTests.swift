@@ -123,4 +123,42 @@ actor SupervisorLog {
         let n = SidecarLocator.node(environment: ["SAGE_NODE": "/bin/sh"], resources: nil)
         #expect(n?.path == "/bin/sh")
     }
+
+    /// A packaged app runs its own sidecar (node + dist/main.mjs inside Resources), with no
+    /// repository anywhere; SAGE_REPO naming a real checkout still wins (development).
+    @Test func locatorPrefersTheBundledSidecar() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("sage-bundled-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let resources = base.appendingPathComponent("SAGE Talk.app/Contents/Resources")
+        let side = resources.appendingPathComponent("sidecar")
+        try fm.createDirectory(at: side.appendingPathComponent("dist"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: resources.appendingPathComponent("node/bin"), withIntermediateDirectories: true)
+        try Data().write(to: side.appendingPathComponent("dist/main.mjs"))
+        let node = resources.appendingPathComponent("node/bin/node")
+        try Data("#!/bin/sh\n".utf8).write(to: node)
+
+        // Not executable, no manifest: not a bundle.
+        #expect(!SidecarConfiguration.Bundled.present(in: resources))
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: node.path)
+        #expect(!SidecarConfiguration.Bundled.present(in: resources))
+        try Data("{}".utf8).write(to: side.appendingPathComponent("manifest.json"))
+        #expect(SidecarConfiguration.Bundled.present(in: resources))
+
+        let config = try SidecarLocator.configuration(environment: ["PATH": ""], resources: resources, executable: nil).get()
+        #expect(config.mode == .bundled)
+        #expect(config.executable.path == node.path)
+        #expect(config.arguments == [side.appendingPathComponent("dist/main.mjs").path])
+        #expect(config.currentDirectory?.path == side.path)
+        #expect(config.environment == nil)
+
+        // A stale SAGE_REPO does not pull a packaged app out of its bundle.
+        #expect(SidecarLocator.usesBundle(environment: ["SAGE_REPO": "/nope"], resources: resources))
+        let repo = base.appendingPathComponent("checkout")
+        try fm.createDirectory(at: repo.appendingPathComponent("packages/sidecar/src"), withIntermediateDirectories: true)
+        try Data().write(to: repo.appendingPathComponent("packages/sidecar/src/main.ts"))
+        let dev = try SidecarLocator.configuration(environment: ["SAGE_REPO": repo.path, "SAGE_NODE": "/bin/sh"], resources: resources, executable: nil).get()
+        #expect(dev.mode == .development)
+        #expect(dev.currentDirectory?.path == repo.appendingPathComponent("packages/sidecar").standardizedFileURL.path)
+    }
 }

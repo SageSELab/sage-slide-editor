@@ -135,6 +135,15 @@ extension JSONValue {
 
 // MARK: - Configuration and errors
 
+public enum SidecarMode: String, Sendable {
+    /// `node --import tsx` in a repository checkout.
+    case development
+    /// The esbuild bundle and Node runtime inside a packaged app.
+    case bundled
+    /// Built by hand (tests).
+    case custom
+}
+
 public struct SidecarConfiguration: Sendable {
     public var executable: URL
     public var arguments: [String]
@@ -144,6 +153,8 @@ public struct SidecarConfiguration: Sendable {
     public var requestTimeout: Duration
     /// Receives the sidecar's stderr (log text). nil passes it through to the app's stderr.
     public var stderrHandler: (@Sendable (String) -> Void)?
+    /// How the sidecar was located (shown by the onboarding sheet).
+    public var mode: SidecarMode = .custom
 
     public init(executable: URL, arguments: [String] = [], currentDirectory: URL? = nil,
                 environment: [String: String]? = nil, requestTimeout: Duration = .seconds(30),
@@ -157,11 +168,44 @@ public struct SidecarConfiguration: Sendable {
     }
 
     /// Development launch: `node --import tsx src/main.ts` in `<repo>/packages/sidecar`
-    /// (tsx resolves from that package's node_modules). The bundled app will point at a vendored
-    /// Node and a compiled entry point instead (Phase 6).
+    /// (tsx resolves from that package's node_modules).
     public static func development(repoRoot: URL, node: URL) -> SidecarConfiguration {
-        SidecarConfiguration(executable: node, arguments: ["--import", "tsx", "src/main.ts"],
-                             currentDirectory: repoRoot.appendingPathComponent("packages/sidecar"))
+        var c = SidecarConfiguration(executable: node, arguments: ["--import", "tsx", "src/main.ts"],
+                                     currentDirectory: repoRoot.appendingPathComponent("packages/sidecar"))
+        c.mode = .development
+        return c
+    }
+
+    /// Packaged app (docs/packaging.md): the vendored `Resources/node/bin/node` running the
+    /// esbuild bundle `Resources/sidecar/dist/main.mjs`, with cwd `Resources/sidecar`. The
+    /// sidecar finds its engine, plugin, talkc and browser from its own location (runtime.ts),
+    /// so nothing outside the app is needed.
+    public static func bundled(resources: URL) -> SidecarConfiguration {
+        let side = resources.appendingPathComponent(Bundled.sidecarDir, isDirectory: true)
+        var c = SidecarConfiguration(executable: resources.appendingPathComponent(Bundled.node),
+                                     arguments: [side.appendingPathComponent(Bundled.entry).path],
+                                     currentDirectory: side)
+        c.mode = .bundled
+        return c
+    }
+
+    /// Paths inside `Contents/Resources` of a packaged app (apps/mac/scripts/package.sh).
+    public enum Bundled {
+        public static let node = "node/bin/node"
+        public static let sidecarDir = "sidecar"
+        /// Relative to `sidecarDir`.
+        public static let entry = "dist/main.mjs"
+        public static let manifest = "manifest.json"
+
+        /// `resources` when it holds a complete bundled sidecar (node, entry, manifest).
+        public static func present(in resources: URL?) -> Bool {
+            guard let r = resources else { return false }
+            let fm = FileManager.default
+            let side = r.appendingPathComponent(sidecarDir)
+            return fm.isExecutableFile(atPath: r.appendingPathComponent(node).path)
+                && fm.fileExists(atPath: side.appendingPathComponent(entry).path)
+                && fm.fileExists(atPath: side.appendingPathComponent(manifest).path)
+        }
     }
 
     /// Finds a `node` executable on PATH or in the usual install locations.

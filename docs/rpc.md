@@ -30,7 +30,11 @@ has a fixture in `tests/rpc/`, and both test suites decode the same files (PLAN 
 
 ## Lifecycle
 
-The app starts one sidecar per open talk. In development this is
+The app starts one sidecar per open talk. A packaged app (`apps/mac/scripts/package.sh`,
+docs/packaging.md) runs its own: `Contents/Resources/node/bin/node
+Contents/Resources/sidecar/dist/main.mjs` with cwd `Contents/Resources/sidecar`
+(`SidecarConfiguration.bundled`), needing nothing outside the app; only a `SAGE_REPO` that
+names a real checkout overrides that. In development it is
 `node --import tsx src/main.ts`, run with cwd `packages/sidecar`
 (`SidecarConfiguration.development`). The app finds the repository through `SAGE_REPO`, else
 the path `apps/mac/scripts/bundle.sh` bakes into `Contents/Resources/sage-repo-path`, else the

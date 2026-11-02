@@ -8,10 +8,12 @@ enum CanvasScript {
     static let relativePath = "packages/engine/src/canvas.js"
 
     /// Read from the repository the app runs its sidecar from (fresh each time, so a change to
-    /// canvas.js needs no app rebuild), else from the app's resources.
+    /// canvas.js needs no app rebuild), else from the app's resources. A packaged app running
+    /// its bundled sidecar uses its own copy (Resources/canvas.js, from package.sh).
     static func source() -> String? {
         let env = ProcessInfo.processInfo.environment
-        if let repo = SidecarLocator.repoRoot(environment: env, resources: Bundle.main.resourceURL, executable: Bundle.main.executableURL),
+        if !SidecarLocator.usesBundle(environment: env),
+           let repo = SidecarLocator.repoRoot(environment: env, resources: Bundle.main.resourceURL, executable: Bundle.main.executableURL),
            let s = try? String(contentsOf: repo.appendingPathComponent(relativePath), encoding: .utf8) { return s }
         if let url = Bundle.main.url(forResource: "canvas", withExtension: "js") { return try? String(contentsOf: url, encoding: .utf8) }
         return nil
