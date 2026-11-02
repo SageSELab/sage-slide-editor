@@ -96,6 +96,9 @@ describe('css', () => {
     expect(twice).not.toContain('--bg: #fbf7f0;');
     expect(twice.endsWith(STARTER_CSS)).toBe(true);
     expect(withThemeBlocks('', null, paper)).toBe(themeBlock(paper) + '\n');
+    // No faces removes the fonts block; null leaves it.
+    expect(withThemeBlocks(once, [], null)).toBe(withThemeBlocks(STARTER_CSS, null, paper));
+    expect(withThemeBlocks(once, null, null)).toBe(once);
   });
 });
 

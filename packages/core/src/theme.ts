@@ -250,7 +250,8 @@ export function themePackageCss(theme: Theme): string {
 }
 
 /**
- * The new text of a talk's theme.css with `faces` as its fonts block and `theme` (null: leave
+ * The new text of a talk's theme.css with `faces` as its fonts block (null: leave it; empty:
+ * remove it) and `theme` (null: leave
  * it) as its theme block. Existing blocks are replaced in place; missing ones are added at the
  * top (fonts first), so the talk's own rules keep their precedence.
  */
@@ -263,6 +264,11 @@ export function withThemeBlocks(css: string, faces: readonly FontFace[] | null, 
   };
   let out = css;
   if (faces && faces.length) out = upsert(out, FONTS_BEGIN, FONTS_END, fontsBlock(faces), 0);
+  else if (faces) {
+    // No faces: the fonts block goes (with the line break after it).
+    const at = findBlock(out, FONTS_BEGIN, FONTS_END);
+    if (at) out = out.slice(0, at[0]) + out.slice(at[1] + (out[at[1]] === '\n' ? 1 : 0));
+  }
   if (theme) out = upsert(out, THEME_BEGIN, THEME_END, themeBlock(theme), findBlock(out, FONTS_BEGIN, FONTS_END)?.[1] ?? 0);
   return out;
 }
