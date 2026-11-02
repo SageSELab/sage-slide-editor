@@ -145,7 +145,13 @@ extension SelfTest {
         // What a drop of main.tex on the Claude pane does (the drop handler calls attach).
         if let tex = paper?.items.first(where: { $0.name == "main.tex" }) {
             model.chat.attach(tex.url)
-            check(model.chat.attachments == [tex.url.path], "materials: a dropped file is attached by path (\(model.chat.attachments))")
+            // Absolute, or relative to the open talk when that is shorter (a talk opened from a
+            // temp folder, as package-smoke.sh does, sits next to these temp materials).
+            let base = model.chat.attachmentBase
+            let resolved = model.chat.attachments.map { p in
+                p.hasPrefix("/") ? p : (base?.appendingPathComponent(p).standardizedFileURL.path ?? p)
+            }
+            check(resolved == [tex.url.standardizedFileURL.path], "materials: a dropped file is attached by path (\(model.chat.attachments))")
             model.chat.detach(tex.url.path)
         }
         model.materials = saved
