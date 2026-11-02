@@ -553,7 +553,17 @@ Sidecar supervisor and RPC in place.
 
 Exit: Kevin can give the ISSTA talk from the app with no browser and no `serve.py`.
 
-### Phase 3 — Editing
+### Phase 3 — Editing (in progress)
+
+Status (2026-11-02): `talk.edit`/`talk.revert` in the sidecar (every core op plus
+`setBeatProps`/`setChapterProps`; atomic staged writes labelled `app`; inverses carry file
+digests and a stale one is refused with EditConflict); `canvas.js` (hit test, move, resize,
+snapping with guides, nudges, in-place text, keyboard-only) with 15 Playwright WebKit tests;
+in the app: edit mode (⌘E), Object/Beat/Chapter inspector, navigator beat menu, undo/redo of
+the app's own edits, external changes clearing the history and badging beats. The self-test's
+edit round trip (move, retype, set hold, undo all three) ends byte-identical. Not yet: image
+replace/insert by drop, the Insert menu, drag reorder in the navigator, Option-drag
+duplicate, the timeline strip's draggable hold.
 
 Selection, move, resize, snapping, in-place text, image replace and insert, Insert menu,
 inspector tabs, beat operations, hold and stretch controls, undo/redo, autosave, external
