@@ -57,6 +57,36 @@ else
   pass "no file in the app mentions the repository's path"
 fi
 check "no node on the clean PATH" "${CLEAN[@]}" /bin/sh -c '! command -v node >/dev/null'
+# The .talk document package type (packaging/document-types.plist.xml).
+PL="$APP/Contents/Info.plist"
+plx() { plutil -extract "$1" raw -o - "$PL" 2>/dev/null; }
+talk_type_ok() {
+  local i=0 id
+  while id="$(plx "UTExportedTypeDeclarations.$i.UTTypeIdentifier")"; do
+    if [ "$id" = io.sagelab.talk ]; then
+      plutil -extract "UTExportedTypeDeclarations.$i.UTTypeConformsTo" json -o - "$PL" | grep -q '"com.apple.package"' &&
+      [ "$(plx "UTExportedTypeDeclarations.$i.UTTypeTagSpecification.public\.filename-extension.0")" = talk ] &&
+      [ -f "$APP/Contents/Resources/$(plx "UTExportedTypeDeclarations.$i.UTTypeIconFile").icns" ]
+      return
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+talk_doc_ok() {
+  local i=0 ct
+  while ct="$(plx "CFBundleDocumentTypes.$i.LSItemContentTypes.0")"; do
+    if [ "$ct" = io.sagelab.talk ]; then
+      [ "$(plx "CFBundleDocumentTypes.$i.LSTypeIsPackage")" = true ] && [ "$(plx "CFBundleDocumentTypes.$i.LSHandlerRank")" = Owner ]
+      return
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+check "Info.plist exports io.sagelab.talk as a package with the talk extension and a document icon" talk_type_ok
+check "Info.plist claims io.sagelab.talk (Owner, LSTypeIsPackage)" talk_doc_ok
+check "Info.plist exports io.sagelab.talktheme" sh -c "plutil -extract UTExportedTypeDeclarations json -o - '$PL' | grep -q '\"io.sagelab.talktheme\"'"
 
 # ---- 2. the app, self-test mode -----------------------------------------------------------
 "${CLEAN[@]}" SAGE_OPEN="$WORK/issta26" SAGE_SELFTEST="$OUT/selftest" SAGE_SELFTEST_EXPECT_MODE=bundled \
