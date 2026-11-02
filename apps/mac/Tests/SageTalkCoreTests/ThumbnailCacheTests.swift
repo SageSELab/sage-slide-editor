@@ -27,6 +27,13 @@ import Testing
         #expect(ThumbnailCache.key(film: a, at: 36) != ThumbnailCache.key(film: a, at: 36.5))
     }
 
+    @Test func engineFilesBesideTheFilmAreHashedToo() throws {
+        let f = try film("<p>same</p>")
+        let before = try ThumbnailCache.filmHash(of: f)
+        try Data("/* engine v2 */".utf8).write(to: root.appendingPathComponent("talk.css"))
+        #expect(try ThumbnailCache.filmHash(of: f) != before)
+    }
+
     @Test func livesInTheTalksSageFolder() {
         let c = ThumbnailCache(talkRoot: URL(fileURLWithPath: "/talk"))
         #expect(c.directory.path == "/talk/.sage/thumbs")

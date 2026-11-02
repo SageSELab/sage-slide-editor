@@ -9,6 +9,10 @@ final class TalkWindowModel {
     var talk: TalkFolder?
     /// The compiled film the canvas shows (from talk.open for beat-format talks).
     private(set) var filmURL: URL?
+    /// The folder web views may read: the sidecar's resolved root, so it is a prefix of filmURL
+    /// even when the talk was opened through a symlink (/var -> /private/var). WebKit refuses
+    /// subresources outside the granted path, and the load never finishes.
+    private(set) var filmRoot: URL?
     private(set) var holds: [Hold] = []
     private(set) var chapters: [ChapterInfo] = []
     private(set) var duration: Double = 0
@@ -23,7 +27,11 @@ final class TalkWindowModel {
     /// Reloads of the canvas after an external edit (self-test).
     private(set) var reloads = 0
 
+    /// Navigator sections the user folded.
+    var collapsed: Set<String> = []
+
     let canvas = FilmView()
+    let thumbnails = ThumbnailStore()
     @ObservationIgnored private(set) var supervisor: SidecarSupervisor?
     @ObservationIgnored private var openGeneration = 0
 
@@ -40,6 +48,8 @@ final class TalkWindowModel {
             }
         }
     }
+
+    var sections: [NavigatorSection] { NavigatorGrouping.sections(holds: holds, chapters: chapters) }
 
     var transport: TransportModel { TransportModel(holds: holds, chapters: chapters, duration: duration) }
 
@@ -65,10 +75,13 @@ final class TalkWindowModel {
         holds = []; chapters = []; duration = 0; t = 0; playing = false
         selectedHold = nil; error = nil; status = nil; diagnostics = []
         filmURL = nil
+        filmRoot = nil
+        thumbnails.close()
         switch folder.kind {
         case .legacy:
             Task { try? await supervisor?.client.close() }
             filmURL = folder.filmURL
+            filmRoot = folder.root
             status = "Legacy deck, read-only"
             canvas.load(film: folder.filmURL, readAccess: folder.root)
         case .beatFormat:
@@ -88,7 +101,9 @@ final class TalkWindowModel {
                 if !b.ok { error = Self.describe(b.diagnostics) }
             }
             filmURL = r.filmURL
-            canvas.load(film: r.filmURL, readAccess: URL(fileURLWithPath: r.root, isDirectory: true))
+            let root = URL(fileURLWithPath: r.root, isDirectory: true)
+            filmRoot = root
+            canvas.load(film: r.filmURL, readAccess: root)
         } catch {
             guard gen == openGeneration else { return }
             self.error = error.localizedDescription
@@ -144,9 +159,9 @@ final class TalkWindowModel {
 
     /// Reloads the film after a rebuild and returns to the same time.
     func reloadCanvas() {
-        guard let filmURL, let talk else { return }
+        guard let filmURL, let filmRoot else { return }
         reloads += 1
-        canvas.load(film: filmURL, readAccess: talk.root, at: t)
+        canvas.load(film: filmURL, readAccess: filmRoot, at: t)
     }
 
     private static func describe(_ d: [SidecarProtocol.Diagnostic]) -> String {
@@ -170,6 +185,7 @@ final class TalkWindowModel {
         duration = info.duration
         t = canvas.t
         selectedHold = HoldTimeline(holds: holds, duration: duration).current(at: t)?.id
+        if let filmURL, let filmRoot { thumbnails.setFilm(filmURL, talkRoot: filmRoot, holds: holds) }
     }
 
     private func filmMoved(_ t: Double, _ playing: Bool) {

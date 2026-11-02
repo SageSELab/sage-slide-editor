@@ -4,8 +4,9 @@ import Foundation
 /// The navigator's thumbnail cache in `<talk>/.sage/thumbs` (PLAN 5.2).
 ///
 /// A thumbnail's file name is its key: a hash of the compiled film (`build/index.html`, or a
-/// legacy deck's `index.html`) plus the hold time, `"<film>-<t>.png"`. Every compiled input is
-/// inlined in that file, so a key can only be stale when the film changed or the hold moved.
+/// legacy deck's `index.html`, plus the engine files beside it) and the hold time,
+/// `"<film>-<t>.png"`. Every compiled input is inlined in that file, so a key can only be stale
+/// when the film changed or the hold moved.
 ///
 /// A rebuild changes the film hash for every hold, but most frames do not change. So the cache
 /// also records, per hold time, a fingerprint of the rendered frame (computed by the renderer
@@ -46,9 +47,20 @@ public struct ThumbnailCache: Sendable {
 
     // MARK: Keys
 
-    /// First 16 hex digits of the SHA-256 of the film file.
+    /// Engine files the compiled film loads from beside itself; they change every frame too.
+    public static let engineFiles = ["talk.js", "talk.css", "talk-layout.js", "edit.js"]
+
+    /// First 16 hex digits of the SHA-256 of the film file, plus the engine files next to it.
     public static func filmHash(of film: URL) throws -> String {
-        filmHash(of: try Data(contentsOf: film))
+        var data = try Data(contentsOf: film)
+        let dir = film.deletingLastPathComponent()
+        for name in engineFiles {
+            if let d = try? Data(contentsOf: dir.appendingPathComponent(name)) {
+                data.append(Data("\u{0}\(name)\u{0}".utf8))
+                data.append(d)
+            }
+        }
+        return filmHash(of: data)
     }
 
     public static func filmHash(of data: Data) -> String {

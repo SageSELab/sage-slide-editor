@@ -2,41 +2,177 @@ import AppKit
 import SageTalkCore
 import WebKit
 
-/// SAGE_SELFTEST=<dir> runs the app without taking focus, opens SAGE_OPEN, waits for the
-/// engine to report its holds, seeks to a few of them, and writes:
-///   holds.txt            the hold list the app received ("n time label")
-///   canvas-<n>.png       the WKWebView snapshot at hold n
-///   window.png           the whole window (navigator, canvas, inspector)
-/// then quits. Used by scripts/selftest.sh and CI; never captures anything but its own window.
+/// SAGE_SELFTEST=<dir> runs the app without taking focus, opens SAGE_OPEN, and writes:
+///   holds.txt          the hold list ("n time chapter | label | notes?"), then the navigator sections
+///   thumbs.txt         thumbnail counts and timing (rendered, adopted, loaded from disk)
+///   canvas-<n>.png     the canvas web view's own snapshot at hold n
+///   window.png         the talk window: its view hierarchy, with each web view's own snapshot
+///                      drawn into its frame (cacheDisplay cannot draw web content)
+///   roundtrip.txt      beat-format talks: an external edit to a temp copy's scene text, then
+///                      checks that the canvas reloaded at the same time and showed the edit,
+///                      and how many thumbnails were re-rendered vs adopted
+///   result.txt         PASS or FAIL lines for every check
+/// then quits. Used by scripts/selftest.sh. It only ever draws the app's own windows and web
+/// views: no screen capture of any kind.
 @MainActor
 enum SelfTest {
     static var outDir: URL? {
         ProcessInfo.processInfo.environment["SAGE_SELFTEST"].map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
 
+    private static var results: [String] = []
+
+    static func check(_ ok: Bool, _ what: String) {
+        results.append((ok ? "PASS " : "FAIL ") + what)
+        print("selftest: \(ok ? "PASS" : "FAIL") \(what)")
+    }
+
     static func run(model: TalkWindowModel, out: URL) {
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         Task { @MainActor in
-            for _ in 0..<200 where model.holds.isEmpty { try? await Task.sleep(for: .milliseconds(50)) }
-            let lines = model.holds.map { "\($0.index) \(String(format: "%.1f", $0.at)) \($0.label)" }
-            try? (lines.joined(separator: "\n") + "\n").write(to: out.appendingPathComponent("holds.txt"), atomically: true, encoding: .utf8)
-            let picks = [1, 4, 8].filter { $0 <= model.holds.count }
-            for n in picks {
-                model.select(n)
-                try? await Task.sleep(for: .milliseconds(400))
-                if let img = try? await model.canvas.webView.takeSnapshot(configuration: nil) {
-                    write(img, to: out.appendingPathComponent("canvas-\(n).png"))
-                }
-            }
-            if let win = NSApp.windows.first(where: { $0.isVisible }), let view = win.contentView {
-                if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
-                    view.cacheDisplay(in: view.bounds, to: rep)
-                    try? rep.representation(using: .png, properties: [:])?.write(to: out.appendingPathComponent("window.png"))
-                }
-            }
-            print("selftest: \(model.holds.count) holds, error=\(model.error ?? "none")")
+            await runSteps(model: model, out: out)
+            try? (results.joined(separator: "\n") + "\n").write(to: out.appendingPathComponent("result.txt"), atomically: true, encoding: .utf8)
+            print("selftest: done, \(results.filter { $0.hasPrefix("FAIL") }.count) failures")
             quit()
         }
+    }
+
+    private static func runSteps(model: TalkWindowModel, out: URL) async {
+        let booted = await waitFor(seconds: 60) { model.canvas.info != nil && !model.holds.isEmpty }
+        check(booted, "talk opened and the engine booted (error: \(model.error ?? "none"))")
+        guard booted, let talk = model.talk else { return }
+        check(talk.kind == .legacy || model.supervisor != nil, "beat-format talks open through the sidecar")
+        writeHolds(model, to: out.appendingPathComponent("holds.txt"))
+        check(model.holds.allSatisfy { $0.notes?.isEmpty == false } || talk.kind == .legacy, "every hold has notes")
+
+        // Thumbnails for every hold.
+        let clock = ContinuousClock(), t0 = clock.now
+        model.thumbnails.requestAll()
+        let thumbsDone = await waitFor(seconds: 120) { model.thumbnails.pendingCount == 0 && !model.thumbnails.busy }
+        let th = model.thumbnails
+        let line = "holds \(model.holds.count) rendered \(th.rendered) adopted \(th.adopted) fromDisk \(th.loadedFromDisk) in \(clock.now - t0)"
+        try? (line + "\n").write(to: out.appendingPathComponent("thumbs.txt"), atomically: true, encoding: .utf8)
+        check(thumbsDone, "all thumbnails generated (\(line))")
+
+        for n in [1, 4, 8] where n <= model.holds.count {
+            model.select(n)
+            try? await Task.sleep(for: .milliseconds(300))
+            if let img = try? await model.canvas.snapshot(width: 960) { write(img, to: out.appendingPathComponent("canvas-\(n).png")) }
+        }
+        model.select(min(5, model.holds.count))
+        try? await Task.sleep(for: .milliseconds(500))
+        if let win = model.canvas.webView.window {
+            await writeWindow(win, films: [model.canvas], to: out.appendingPathComponent("window.png"))
+        }
+
+        if talk.kind == .beatFormat { await roundTrip(model: model, out: out) }
+    }
+
+    // MARK: External edit round trip
+
+    private static func roundTrip(model: TalkWindowModel, out: URL) async {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("sage-selftest-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let copy = base.appendingPathComponent("talk")
+        guard let src = model.talk?.root, (try? fm.createDirectory(at: base, withIntermediateDirectories: true)) != nil,
+              (try? fm.copyItem(at: src, to: copy)) != nil else { check(false, "copy the talk for the round trip"); return }
+        try? fm.removeItem(at: copy.appendingPathComponent(".sage"))
+        try? fm.removeItem(at: copy.appendingPathComponent("build"))
+
+        var log: [String] = []
+        model.open(copy)
+        let opened = await waitFor(seconds: 60) { model.canvas.info != nil && !model.holds.isEmpty && model.talk?.root == copy.standardizedFileURL }
+        check(opened, "round trip: temp copy opened")
+        guard opened, model.holds.count >= 2 else { return }
+        model.thumbnails.requestAll()
+        _ = await waitFor(seconds: 120) { model.thumbnails.pendingCount == 0 && !model.thumbnails.busy }
+        let before = (rendered: model.thumbnails.rendered, adopted: model.thumbnails.adopted)
+
+        let target = model.holds[1].at
+        model.scrub(to: target)
+        _ = await waitFor(seconds: 5) { abs(model.t - target) < 1e-6 }
+        let reloadsBefore = model.reloads, readyBefore = model.canvas.readyCount
+        log.append("seeked to \(target), t=\(model.t)")
+
+        // The edit: the chapter-1 eyebrow, visible from hold 2 on.
+        let scene = copy.appendingPathComponent("scenes/line.html")
+        let marker = "Selftest edit \(Int.random(in: 1000...9999))"
+        guard let text = try? String(contentsOf: scene, encoding: .utf8),
+              text.contains("Fifteen years of automated program repair") else { check(false, "round trip: scene text found"); return }
+        try? text.replacingOccurrences(of: "Fifteen years of automated program repair", with: marker)
+            .write(to: scene, atomically: true, encoding: .utf8)
+        let clock = ContinuousClock(), t0 = clock.now
+
+        let reloaded = await waitFor(seconds: 30) { model.reloads > reloadsBefore && model.canvas.readyCount > readyBefore }
+        log.append("reload after \(clock.now - t0), status: \(model.status ?? "-")")
+        check(reloaded, "round trip: canvas reloaded after the external edit")
+        try? await Task.sleep(for: .milliseconds(300))
+        let shows = (try? await model.canvas.call("return document.querySelector('.stage').textContent.includes(m)", ["m": marker]) as? Bool) ?? false
+        log.append("t after reload \(model.canvas.t), shows edit \(shows)")
+        let built = (try? String(contentsOf: copy.appendingPathComponent("build/index.html"), encoding: .utf8))?.contains(marker) ?? false
+        log.append("build/index.html has the edit: \(built)")
+        check(abs(model.canvas.t - target) < 1e-6, "round trip: canvas came back at t=\(target) (got \(model.canvas.t))")
+        check(shows, "round trip: canvas shows the edited text")
+        if let img = try? await model.canvas.snapshot(width: 960) { write(img, to: out.appendingPathComponent("canvas-after-edit.png")) }
+
+        model.thumbnails.requestAll()
+        let thumbs = await waitFor(seconds: 120) { model.thumbnails.pendingCount == 0 && !model.thumbnails.busy }
+        let rendered = model.thumbnails.rendered - before.rendered, adopted = model.thumbnails.adopted - before.adopted
+        log.append("after the rebuild: \(rendered) thumbnails re-rendered, \(adopted) adopted unchanged")
+        check(thumbs && rendered > 0 && rendered < model.holds.count / 2 && rendered + adopted == model.holds.count,
+              "round trip: only changed thumbnails re-rendered (\(rendered) of \(model.holds.count))")
+        try? (log.joined(separator: "\n") + "\n").write(to: out.appendingPathComponent("roundtrip.txt"), atomically: true, encoding: .utf8)
+    }
+
+    // MARK: Helpers
+
+    static func waitFor(seconds: Double, _ cond: () -> Bool) async -> Bool {
+        let clock = ContinuousClock(), end = clock.now + .milliseconds(Int(seconds * 1000))
+        while clock.now < end {
+            if cond() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return cond()
+    }
+
+    private static func writeHolds(_ model: TalkWindowModel, to url: URL) {
+        var lines = model.holds.map {
+            "\($0.index) \(String(format: "%.1f", $0.at)) \($0.chapter ?? "-") | \($0.label)\($0.backup ? " [backup]" : "") | notes \($0.notes?.count ?? 0) chars"
+        }
+        lines.append("")
+        lines.append("sections:")
+        lines += model.sections.map { "\($0.title)\($0.dark ? " (dark)" : "")\($0.isBackup ? " (backups)" : ""): \($0.holds.map { String($0.index) }.joined(separator: " "))" }
+        try? (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    /// Draws a window's views, then each film's own snapshot into its frame. Only this app's
+    /// views are drawn; nothing is read back from the screen.
+    static func writeWindow(_ window: NSWindow, films: [FilmView], to url: URL) async {
+        guard let view = window.contentView else { return }
+        var shots: [(NSRect, NSImage)] = []
+        for f in films where f.webView.window === window {
+            let frame = f.webView.convert(f.webView.bounds, to: view)
+            if let img = try? await f.snapshot(width: frame.width) { shots.append((frame, img)) }
+        }
+        let size = view.bounds.size
+        let scale = window.backingScaleFactor
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds),
+              let out = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        out.size = size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
+        rep.draw(in: NSRect(origin: .zero, size: size))
+        for (frame, img) in shots {
+            // View coordinates may be flipped; NSImage.draw wants bottom-left origin here.
+            let r = view.isFlipped ? NSRect(x: frame.minX, y: size.height - frame.maxY, width: frame.width, height: frame.height) : frame
+            img.draw(in: r)
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        try? out.representation(using: .png, properties: [:])?.write(to: url)
     }
 
     /// Quits from a run-loop callout rather than from this main-actor task, so terminate's
@@ -45,9 +181,8 @@ enum SelfTest {
         RunLoop.main.perform { MainActor.assumeIsolated { NSApp.terminate(nil) } }
     }
 
-    private static func write(_ image: NSImage, to url: URL) {
-        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: .png, properties: [:]) else { return }
+    static func write(_ image: NSImage, to url: URL) {
+        guard let png = image.pngData else { return }
         try? png.write(to: url)
     }
 }

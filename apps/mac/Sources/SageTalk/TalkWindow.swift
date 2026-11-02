@@ -39,20 +39,10 @@ struct TalkWindow: View {
 
     @ViewBuilder private var navigator: some View {
         if model.holds.isEmpty {
-            placeholder("No talk open", "File ▸ Open Talk… (⌘O)")
+            placeholder(model.talk == nil ? "No talk open" : "Opening…",
+                        model.talk == nil ? "File ▸ Open Talk… (⌘O)" : (model.status ?? ""))
         } else {
-            List(selection: Binding(get: { model.selectedHold }, set: { model.select($0) })) {
-                ForEach(model.holds) { h in
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(h.backup ? "B" : "\(h.index)").monospacedDigit().foregroundStyle(.secondary).frame(width: 26, alignment: .trailing)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(h.label.isEmpty ? "Untitled" : h.label).lineLimit(1)
-                            Text(String(format: "%.1f s", h.at)).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .tag(h.id)
-                }
-            }
+            NavigatorView(model: model)
         }
     }
 
