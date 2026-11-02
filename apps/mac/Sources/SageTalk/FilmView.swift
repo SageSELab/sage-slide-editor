@@ -33,6 +33,10 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     var onCanvas: (CanvasMessage) -> Void = { _ in }
 
     private var readyWaiters: [CheckedContinuation<FilmInfo?, Never>] = []
+    /// The last load request, kept so a load that fails transiently can be retried.
+    private var lastLoad: (url: URL, readAccess: URL)?
+    private var loadRetries = 0
+    static let maxLoadRetries = 3
 
     init(frame: NSRect = .zero) {
         let config = WKWebViewConfiguration()
@@ -56,7 +60,38 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         if let time { q.append(URLQueryItem(name: "t", value: String(time))) }
         if capture { q.append(URLQueryItem(name: "capture", value: nil)) }
         c.queryItems = q.isEmpty ? nil : q
-        webView.loadFileURL(c.url ?? film, allowingReadAccessTo: readAccess)
+        let url = c.url ?? film
+        lastLoad = (url, readAccess)
+        loadRetries = 0
+        webView.loadFileURL(url, allowingReadAccessTo: readAccess)
+    }
+
+    /// What to do with a failed navigation: a load interrupted by a newer one is not an error, and
+    /// "cannot open file" right after a rebuild or a new talk (a reload landing while the first load
+    /// of a fresh web content process is still starting) goes away on a retry.
+    enum LoadFailure: Equatable { case superseded, retry, report }
+    static func classify(_ error: Error) -> LoadFailure {
+        let e = error as NSError
+        if e.domain == NSURLErrorDomain && e.code == NSURLErrorCancelled { return .superseded }
+        if e.domain == "WebKitErrorDomain" && e.code == 102 { return .superseded } // frame load interrupted
+        if e.domain == NSURLErrorDomain && [NSURLErrorCannotOpenFile, NSURLErrorFileDoesNotExist].contains(e.code) { return .retry }
+        return .report
+    }
+
+    private func failed(_ error: Error) {
+        let kind = Self.classify(error)
+        if kind == .superseded { return }
+        if kind == .retry, loadRetries < Self.maxLoadRetries, let (url, readAccess) = lastLoad {
+            loadRetries += 1
+            let attempt = loadRetries
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25 * Double(attempt)) { [weak self] in
+                // A newer load() resets loadRetries and replaces lastLoad: it wins.
+                guard let self, self.loadRetries == attempt, self.lastLoad?.url == url else { return }
+                self.webView.loadFileURL(url, allowingReadAccessTo: readAccess)
+            }
+            return
+        }
+        onLoadError(error.localizedDescription)
     }
 
     /// Waits for the next engine boot (or returns at once if it has booted since the last load).
@@ -165,11 +200,11 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        onLoadError(error.localizedDescription)
+        failed(error)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        onLoadError(error.localizedDescription)
+        failed(error)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
