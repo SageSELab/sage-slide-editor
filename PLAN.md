@@ -587,9 +587,17 @@ spent money is recycled after its request. Claude's writes are labelled `claude`
 and clear the human's undo stack. The Claude tab streams Markdown, tool rows, inline permission
 cards, cost and context, and the canvas follows Claude's edits unless pinned. Tests: protocol
 fixtures, policy, sessions and fork, a replayed live recording (`tests/claude/`), Swift chat
-model tests, the self-test pane, and an opt-in live smoke (`SAGE_LIVE_CLAUDE=1`). Not done:
-effort control, attachments by drag from a Materials sidebar, `talk_insert_beat` and
-`talk_set_notes`.
+model tests, the self-test pane, and an opt-in live smoke (`SAGE_LIVE_CLAUDE=1`).
+
+Update (2026-11-02, Phase 4 gaps closed; only the exit run remains): `talk_insert_beat` and
+`talk_set_notes` write through `talk.edit` labelled `claude` (badged, follow the beat); the
+effort control (low to max) uses the SDK's `effort` option and switches a live query with
+`applyFlagSettings`; the navigator has a Materials tab (Quick Look, drag a file onto the pane
+to attach it); inline code no longer turns a whole reply paragraph monospaced. Skill v2
+(`skill/academic-talk-film`): talk folders scaffolded from `assets/starter-v2` by
+`scripts/new-talk.sh`, the ISSTA helpers as `assets/lib-starter`, the B API, gotchas and
+storyboard rewritten, an "Inside the SAGE Talk app" section, v1 kept under `legacy/`, four
+evals (checked structurally by `packages/core/test/skill.test.ts`; not run live).
 
 Agent SDK bridge, chat UI, permissions sheet, sessions per talk, app tools including
 `talk_frame`, Materials sidebar, live follow of Claude's edits, skill v2 with evals.
