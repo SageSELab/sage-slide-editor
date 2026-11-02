@@ -26,7 +26,9 @@ describe('built-in themes', () => {
     expect(r.missingFonts).toEqual([]);
     expect(`${r.theme!.id}.talktheme`).toBe(n);
     expect(fs.readFileSync(path.join(dir, 'theme.css'), 'utf8')).toBe(themePackageCss(r.theme!));
-    for (const f of fs.readdirSync(path.join(dir, 'fonts')).filter((x) => x.endsWith('.woff2'))) {
+    // git keeps no empty folders: a theme with only engine/system fonts may have no fonts/ at all.
+    const fontsDir = path.join(dir, 'fonts');
+    for (const f of (fs.existsSync(fontsDir) ? fs.readdirSync(fontsDir) : []).filter((x) => x.endsWith('.woff2'))) {
       expect(fs.readFileSync(path.join(dir, 'fonts', f)).subarray(0, 4).toString('latin1'), f).toBe('wOF2');
     }
   });
