@@ -14,10 +14,12 @@ struct NavigatorView: View {
                 ForEach(model.sections) { section in
                     Section(isExpanded: expanded(section.id)) {
                         ForEach(section.holds) { h in
-                            HoldRow(hold: h, dark: section.dark, thumbnails: model.thumbnails)
+                            HoldRow(hold: h, dark: section.dark, thumbnails: model.thumbnails,
+                                    changed: h.beat.map(model.changedBeats.contains) ?? false)
                                 .tag(h.id)
                                 .id(h.id)
                                 .listRowBackground(section.dark ? Self.darkTint.opacity(0.55) : nil)
+                                .contextMenu { BeatMenu(model: model, hold: h) }
                         }
                     } header: {
                         SectionHeader(section: section)
@@ -58,6 +60,8 @@ private struct HoldRow: View {
     let hold: Hold
     let dark: Bool
     let thumbnails: ThumbnailStore
+    /// Changed outside the app since the user last looked (PLAN 13, risk 5).
+    var changed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -66,6 +70,11 @@ private struct HoldRow: View {
                 Text(hold.backup ? "B" : "\(hold.index)")
                     .monospacedDigit().foregroundStyle(.secondary)
                 Text(hold.label.isEmpty ? "Untitled" : hold.label).lineLimit(1)
+                if changed {
+                    Image(systemName: "circle.fill").font(.system(size: 7)).foregroundStyle(.orange)
+                        .help("Changed outside the app")
+                        .accessibilityLabel("changed outside the app")
+                }
                 Spacer(minLength: 4)
                 Text(HoldTimeline.format(hold.at)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }

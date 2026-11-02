@@ -20,6 +20,20 @@ struct SageTalkApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                     .disabled(model.talk == nil)
             }
+            // Undo/redo of the app's own edits (inverses kept by EditSession). A focused text
+            // field keeps its own undo.
+            CommandGroup(replacing: .undoRedo) {
+                Button(model.edits.undoTitle) { model.undo() }
+                    .keyboardShortcut("z")
+                Button(model.edits.redoTitle) { model.redo() }
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+            }
+            CommandGroup(after: .undoRedo) {
+                Divider()
+                Button(model.editMode ? "Stop Editing Canvas" : "Edit Canvas") { model.toggleEditMode() }
+                    .keyboardShortcut("e")
+                    .disabled(!model.canEdit)
+            }
             CommandMenu("Play") {
                 Button("Present") { model.present(.present) }
                     .keyboardShortcut("p", modifiers: [.command, .option])

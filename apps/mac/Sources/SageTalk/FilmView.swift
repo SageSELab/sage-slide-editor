@@ -29,6 +29,8 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     var onReady: (FilmInfo) -> Void = { _ in }
     var onState: (_ t: Double, _ playing: Bool) -> Void = { _, _ in }
     var onLoadError: (String) -> Void = { _ in }
+    /// Messages from the editing overlay (canvas.js), when it is enabled.
+    var onCanvas: (CanvasMessage) -> Void = { _ in }
 
     private var readyWaiters: [CheckedContinuation<FilmInfo?, Never>] = []
 
@@ -132,6 +134,8 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             t = dict["t"] as? Double ?? 0
             onReady(info)
             releaseWaiters(info)
+        case "canvas":
+            if let msg = CanvasMessage.parse(dict) { onCanvas(msg) }
         case "bc":
             // The engine's talk-sync broadcast: {t, playing, started} after each render and pause.
             guard dict["name"] as? String == "talk-sync", let data = dict["data"] as? [String: Any],
@@ -151,7 +155,7 @@ final class FilmView: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
             let notes = h["notes"] as? String
             return Hold(index: i + 1, at: h["at"] as? Double ?? 0, label: h["label"] as? String ?? "",
                         backup: h["backup"] as? Bool ?? false, chapter: chapter,
-                        notes: notes?.isEmpty == false ? notes : nil)
+                        notes: notes?.isEmpty == false ? notes : nil, beat: chapter == nil ? nil : id)
         }
         let chapters = (dict["chapters"] as? [[String: Any]] ?? []).map { c in
             ChapterInfo(id: c["id"] as? String ?? "", label: c["label"] as? String ?? "",

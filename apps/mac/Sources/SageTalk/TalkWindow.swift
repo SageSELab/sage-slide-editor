@@ -22,7 +22,7 @@ struct TalkWindow: View {
                 .pickerStyle(.segmented).labelsHidden().padding(10)
                 Divider()
                 switch rightPane {
-                case .inspector: placeholder("Inspector", "Object, Beat, Chapter and Talk tabs arrive in Phase 3.")
+                case .inspector: InspectorView(model: model)
                 case .claude: placeholder("Claude", "The chat pane arrives in Phase 4.")
                 }
             }
@@ -34,6 +34,7 @@ struct TalkWindow: View {
                 Button { model.prev() } label: { Label("Previous", systemImage: "backward.end.fill") }
                 Button { model.next() } label: { Label("Next Hold", systemImage: "play.fill") }
             }
+            ToolbarItem { EditModeButton(model: model) }
         }
     }
 

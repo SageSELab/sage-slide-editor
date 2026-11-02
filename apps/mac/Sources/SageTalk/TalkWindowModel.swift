@@ -13,7 +13,7 @@ final class TalkWindowModel {
     /// even when the talk was opened through a symlink (/var -> /private/var). WebKit refuses
     /// subresources outside the granted path, and the load never finishes.
     private(set) var filmRoot: URL?
-    private(set) var holds: [Hold] = []
+    var holds: [Hold] = []
     private(set) var chapters: [ChapterInfo] = []
     private(set) var duration: Double = 0
     var selectedHold: Hold.ID?
@@ -22,13 +22,27 @@ final class TalkWindowModel {
     private(set) var playing = false
     var error: String?
     /// One line about the sidecar or the last build.
-    private(set) var status: String?
+    var status: String?
     private(set) var diagnostics: [SidecarProtocol.Diagnostic] = []
     /// Reloads of the canvas after an external edit (self-test).
     private(set) var reloads = 0
 
     /// Navigator sections the user folded.
     var collapsed: Set<String> = []
+
+    // Editing (Phase 3; TalkWindowModel+Editing.swift)
+    /// The canvas shows the editing overlay (⌘E).
+    var editMode = false
+    /// The object selected on the canvas, as it last reported it.
+    var selection: CanvasObject?
+    /// The human's undo stack and the edit pipeline to the sidecar.
+    let edits = EditSession()
+    /// talk.json as last read (beat labels, notes, holds, flags for the inspector and menus).
+    var spine: SpineSnapshot?
+    /// Beats changed outside the app (badged in the navigator until looked at).
+    var changedBeats: Set<String> = []
+    /// The spine before an external talk.json change, to find which beats it touched.
+    @ObservationIgnored var spineBeforeExternal: SpineSnapshot?
 
     let canvas = FilmView()
     let thumbnails: ThumbnailStore
@@ -44,6 +58,8 @@ final class TalkWindowModel {
         canvas.onReady = { [weak self] info in self?.filmBooted(info) }
         canvas.onState = { [weak self] t, playing in self?.filmMoved(t, playing) }
         canvas.onLoadError = { [weak self] msg in self?.error = msg }
+        canvas.onCanvas = { [weak self] msg in self?.handleCanvas(msg) }
+        edits.onApplied = { [weak self] r in self?.editApplied(r) }
         NotificationCenter.default.addObserver(forName: .sageOpenPath, object: nil, queue: .main) { [weak self] note in
             guard let path = note.object as? String else { return }
             MainActor.assumeIsolated {
@@ -81,6 +97,9 @@ final class TalkWindowModel {
         selectedHold = nil; error = nil; status = nil; diagnostics = []
         filmURL = nil
         filmRoot = nil
+        selection = nil; spine = nil; changedBeats = []; spineBeforeExternal = nil
+        edits.reset()
+        edits.service = nil
         thumbnails.close()
         switch folder.kind {
         case .legacy:
@@ -108,6 +127,8 @@ final class TalkWindowModel {
             filmURL = r.filmURL
             let root = URL(fileURLWithPath: r.root, isDirectory: true)
             filmRoot = root
+            edits.service = sup.client
+            spine = SpineSnapshot.load(root)
             canvas.load(film: r.filmURL, readAccess: root)
         } catch {
             guard gen == openGeneration else { return }
@@ -141,6 +162,7 @@ final class TalkWindowModel {
                 error = nil
                 status = "Rebuilt in \(Int(built.ms)) ms"
                 if let wire = built.holds { holds = wire.map(\.hold) }
+                reloadSpine()
                 reloadCanvas()
             } else {
                 // Keep showing the last good film.
@@ -150,6 +172,7 @@ final class TalkWindowModel {
         case .notification(SidecarProtocol.Notification.changed, let params):
             if let c: SidecarProtocol.ChangedParams = try? params?.decode(), c.source == .external {
                 status = "Changed: " + c.paths.prefix(3).joined(separator: ", ")
+                externalChange(c.paths)
             }
         case .notification: break
         case .crashed(_, let willRestart):
@@ -195,6 +218,7 @@ final class TalkWindowModel {
                 ?? filmRoot.appendingPathComponent(".sage/thumbs", isDirectory: true)
             thumbnails.setFilm(filmURL, talkRoot: filmRoot, cacheDirectory: cacheDir, holds: holds)
         }
+        if editMode { Task { await restoreEditing() } }
     }
 
     private func filmMoved(_ t: Double, _ playing: Bool) {
@@ -208,13 +232,17 @@ final class TalkWindowModel {
 
     func select(_ id: Hold.ID?) {
         selectedHold = id
-        if let id, let h = holds.first(where: { $0.id == id }) { canvas.seek(h.at) }
+        if let id, let h = holds.first(where: { $0.id == id }) {
+            canvas.seek(h.at)
+            if let b = h.beat { changedBeats.remove(b) }
+        }
     }
 
     func scrub(to t: Double) { canvas.scrub(t) }
-    func next() { canvas.next() }
-    func prev() { canvas.prev() }
-    func through() { canvas.through() }
+    // In edit mode the overlay gets the arrow keys and Return first (nudge, caret, commit).
+    func next() { forwardKey("ArrowRight") { $0.canvas.next() } }
+    func prev() { forwardKey("ArrowLeft") { $0.canvas.prev() } }
+    func through() { forwardKey("Enter") { $0.canvas.through() } }
 
     /// Play > Present / Rehearse, from the canvas's current time.
     func present(_ mode: PresenterState.Mode, offscreen: Bool = false) {
