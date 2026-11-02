@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "ok": true,
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "code": "hold-before-motion-end",
+        "message": "line.fifteen holds at 8.5 s but its motion runs to 9.1 s",
+        "beat": "line.fifteen"
+      }
+    ],
+    "ms": 38
+  }
+}

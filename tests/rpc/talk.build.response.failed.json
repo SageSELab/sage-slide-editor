@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "ok": false,
+    "diagnostics": [
+      {
+        "severity": "error",
+        "code": "build-failed",
+        "message": "SyntaxError: Unexpected token '}'",
+        "file": "beats/line.js"
+      }
+    ],
+    "ms": 12
+  }
+}

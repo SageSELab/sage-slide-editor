@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "pong": true,
+    "protocol": 1,
+    "version": "0.0.0",
+    "pid": 48213
+  }
+}

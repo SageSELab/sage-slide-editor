@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "method": "talk.built",
+  "params": {
+    "ok": false,
+    "diagnostics": [
+      {
+        "severity": "error",
+        "code": "invalid-spine",
+        "message": "talk.json is not valid JSON: Unexpected end of JSON input",
+        "file": "talk.json"
+      }
+    ],
+    "ms": 0,
+    "trigger": "change"
+  }
+}

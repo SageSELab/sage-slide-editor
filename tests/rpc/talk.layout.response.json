@@ -1,0 +1,62 @@
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "result": {
+    "holds": [
+      {
+        "index": 1,
+        "at": 5,
+        "label": "Title",
+        "backup": false,
+        "beat": "line.title",
+        "chapter": "line",
+        "auto": false
+      },
+      {
+        "index": 2,
+        "at": 13.5,
+        "label": "Fifteen years",
+        "backup": false,
+        "beat": "line.fifteen",
+        "chapter": "line",
+        "auto": false
+      },
+      {
+        "index": 3,
+        "at": 20.5,
+        "label": "Where it was measured",
+        "backup": false,
+        "beat": "line.measured",
+        "chapter": "line",
+        "auto": false
+      },
+      {
+        "index": 4,
+        "at": 37.25,
+        "label": "Exploded view",
+        "backup": false,
+        "beat": "phone.exploded",
+        "chapter": "phone",
+        "auto": true
+      },
+      {
+        "index": 5,
+        "at": 42,
+        "label": "Backup: raw numbers",
+        "backup": true,
+        "beat": "backup.raw",
+        "chapter": "backup",
+        "auto": false
+      }
+    ],
+    "duration": 43,
+    "diagnostics": [
+      {
+        "severity": "info",
+        "code": "auto-hold-approximate",
+        "message": "phone.exploded has no explicit hold",
+        "beat": "phone.exploded"
+      }
+    ]
+  }
+}

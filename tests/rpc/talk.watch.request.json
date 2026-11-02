@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "talk.watch",
+  "params": {
+    "enabled": false
+  }
+}

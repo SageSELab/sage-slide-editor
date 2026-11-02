@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "error": {
+    "code": -32000,
+    "message": "/Users/kevin/Desktop is not a talk folder (expected talk.json, or index.html with talk.js)"
+  }
+}

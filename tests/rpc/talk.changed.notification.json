@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "talk.changed",
+  "params": {
+    "paths": [
+      "beats/line.js",
+      "scenes/line.html"
+    ],
+    "source": "external"
+  }
+}

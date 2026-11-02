@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "talk.open",
+  "params": {
+    "path": "/Users/kevin/talks/issta26-original"
+  }
+}

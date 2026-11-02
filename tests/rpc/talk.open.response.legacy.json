@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "kind": "legacy",
+    "root": "/Users/kevin/talks/issta26-original",
+    "filmURL": "file:///Users/kevin/talks/issta26-original/index.html"
+  }
+}

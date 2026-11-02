@@ -1,0 +1,21 @@
+{
+  "name": "@sage/sidecar",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node sidecar for the SAGE talk editor: NDJSON JSON-RPC over stdio (PLAN 2, 6.1)",
+  "bin": {
+    "sage-sidecar": "./src/main.ts"
+  },
+  "scripts": {
+    "start": "node --import tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  },
+  "dependencies": {
+    "@sage/core": "workspace:*"
+  }
+}
