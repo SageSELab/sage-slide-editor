@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  EditError, applyPatches, deleteBeat, duplicateBeat, insertBeat, loadTalk, makeEdit, moveBeat, sceneElements, setAttr,
+  EditError, applyPatches, recordTalk, deleteBeat, duplicateBeat, insertBeat, loadTalk, makeEdit, moveBeat, sceneElements, setAttr,
   setBeatProps, setChapterProps, setHold, setNotes, setStyle, setText, spineSources, stretchBeat,
   type Edit, type LoadedTalk, type Patch, type SourceFile,
 } from '@sage/core';
@@ -47,12 +47,45 @@ function sceneFor(talk: LoadedTalk, id: string, scene?: string): SourceFile {
   return hits[0]!;
 }
 
+/**
+ * Element ids whose text the film rewrites while it plays: targets of count, type, or a
+ * `B.set` that steps `text`. Editing such an element in place would capture whatever the
+ * runtime happened to show and write it into the source.
+ */
+export function runtimeTextKeys(talk: LoadedTalk): string[] {
+  const rec = recordTalk(talk);
+  const keys = new Set<string>();
+  for (const b of rec.beats.values()) for (const c of b.calls) {
+    const m = c.method.replace(/^T\./, '');
+    if (m === 'count' || m === 'type' || (m === 'set' && c.keys?.includes('text'))) {
+      for (const i of c.targets) { const el = rec.elements[i]; if (el) keys.add(el.key); }
+    }
+  }
+  return [...keys];
+}
+
+/** Refuses a text edit that would contain runtime-rewritten text (PLAN 13, risk 4). */
+function guardRuntimeText(talk: LoadedTalk, id: string, html: string) {
+  const hits = runtimeTextKeys(talk).filter((k) => {
+    if (k === '#' + id || k.startsWith('#' + id + '/')) return true; // the element or an unnamed descendant
+    const own = /^#([^/]+)/.exec(k)?.[1];
+    return !!own && new RegExp(`\\bid\\s*=\\s*["']${own.replace(/[.*+?^${}()|[\]\\]/g, '\\/** Computes the core Edit for an op against the talk as loaded from disk. */')}["']`).test(html); // a named descendant
+  });
+  if (hits.length) {
+    throw new RpcError(ErrorCode.EditFailed, `#${id} contains text the film rewrites while it plays (${hits.join(', ')}); edit it in the beat's motion instead`, { code: 'runtime-text' });
+  }
+}
+
 /** Computes the core Edit for an op against the talk as loaded from disk. */
 export function computeEdit(talk: LoadedTalk, p: EditParams): Edit & { stretch?: Applied['stretch'] } {
   try {
     const spine = () => spineSources(talk);
     switch (p.op) {
-      case 'setText': return setText(sceneFor(talk, p.args.id, p.args.scene), p.args.id, p.args.html);
+      case 'setText': {
+        const scene = sceneFor(talk, p.args.id, p.args.scene);
+        guardRuntimeText(talk, p.args.id, p.args.html);
+        return setText(scene, p.args.id, p.args.html);
+      }
       case 'setStyle': return setStyle(sceneFor(talk, p.args.id, p.args.scene), p.args.id, p.args.style);
       case 'setAttr': return setAttr(sceneFor(talk, p.args.id, p.args.scene), p.args.id, p.args.name, p.args.value);
       case 'insertBeat': return insertBeat(spine(), p.args.chapter, p.args.index, p.args.beat);
