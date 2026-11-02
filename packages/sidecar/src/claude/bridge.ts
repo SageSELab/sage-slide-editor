@@ -33,6 +33,7 @@ import { absFrom, relInside, truncate } from './paths.ts';
 import { PermissionStore, WRITE_TOOLS, decide, type Decision } from './policy.ts';
 import { clearSession, loadSession, planResume, saveSession, type ResumePlan } from './session-store.ts';
 import { talkTools, type TalkTool, type ToolResult } from './tools.ts';
+import type { Themer } from '../themes/index.ts';
 import { Translator, summarize, type InitInfo } from './translate.ts';
 
 export const DEFAULT_MODEL = 'claude-opus-5-5';
@@ -46,7 +47,7 @@ export const SYSTEM_APPEND = [
   'You are the assistant pane of SAGE, a Mac app for editing, presenting and publishing Kevin Moran\'s animation-first research talk films.',
   'The working directory is a sage-talk/1 talk: talk.json (the spine: chapters, beats, holds, notes), scenes/*.html, beats/*.js (motion), lib/*.js, theme.css. build/ is generated.',
   'The user is watching the canvas while you work: every file you save is rebuilt and reloaded, and the canvas follows the beat you last edited.',
-  'Use the academic-talk-film skill for the format, style and voice. Use the talk tools: talk_layout for holds and diagnostics, talk_goto to show the user a beat, talk_frame to look at frames (it builds and renders with Chromium; then Read the PNG), talk_state for what the user is looking at, talk_materials for the paper, talk_insert_beat to add a beat and talk_set_notes to change presenter notes (both keep talk.json valid; do not hand-edit those parts of talk.json).',
+  'Use the academic-talk-film skill for the format, style and voice. Use the talk tools: talk_layout for holds and diagnostics, talk_goto to show the user a beat, talk_frame to look at frames (it builds and renders with Chromium; then Read the PNG), talk_state for what the user is looking at, talk_materials for the paper, talk_insert_beat to add a beat and talk_set_notes to change presenter notes (both keep talk.json valid; do not hand-edit those parts of talk.json). For the look of the whole talk (colors and fonts of the light slides and the dark passage) use themes: talk_theme_list, talk_theme_create (from a description; see the skill\'s references/themes.md), talk_theme_apply, and talk_fonts_search / talk_fonts_add to embed a Google font.',
   'Do not start browsers, servers or headless Chrome yourself. Keep replies short; the user sees your tool calls.',
 ].join('\n');
 
@@ -60,6 +61,8 @@ export interface BridgeHost {
   build(): Promise<BuildResult>;
   /** The sidecar's talk.edit, labelled as Claude's write (the spine tools). */
   edit?(p: EditParams): Promise<EditResult>;
+  /** Themes and fonts (talk_theme_*, talk_fonts_*). */
+  themer?: Themer;
   expectWrite(rel: string, content: string | null, author: 'claude'): void;
   notify<N extends ClaudeNotificationName>(method: N, params: ClaudeNotifications[N]): void;
   /** sidecar -> app request (app.ask, app.state, app.goto). */
@@ -159,6 +162,7 @@ export class ClaudeBridge {
       materials: () => this.materials,
       spine: () => host.spine(),
       ...(host.edit ? { edit: (p: EditParams) => host.edit!(p) } : {}),
+      ...(host.themer ? { themer: host.themer } : {}),
       app: {
         state: () => this.appRequest<AppStateResult>('app.state', {}),
         goto: (p: AppGotoParams) => this.appRequest<AppGotoResult>('app.goto', p),

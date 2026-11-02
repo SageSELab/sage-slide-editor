@@ -125,6 +125,7 @@ function claudeBridge(): ClaudeBridge {
     layout: () => session.layout(),
     build: () => session.build(),
     edit: (p) => session.edit(p, 'claude'),
+    themer,
     expectWrite: (rel, content, author) => session.expectWrite(rel, content, author),
     notify: (m, p) => peer.notify(m, p),
     request: (m, p, timeoutMs) => peer.request(m, p, timeoutMs),

@@ -12,6 +12,8 @@ import type {
 } from '../protocol.ts';
 import type { FrameRenderer } from './frames.ts';
 import { inventory, type Materials } from './materials.ts';
+import type { Themer } from '../themes/index.ts';
+import { RpcError } from '../protocol.ts';
 
 export interface ToolContext {
   talkRoot: string;
@@ -22,6 +24,8 @@ export interface ToolContext {
   spine?(): Promise<{ chapters?: { id: string; beats?: { id: string }[] }[] }>;
   /** The sidecar's talk.edit, writing as Claude. Absent: the spine tools report an error. */
   edit?(p: EditParams): Promise<EditResult>;
+  /** Themes and fonts; absent: the theme tools report an error. */
+  themer?: Themer;
   app: {
     state(): Promise<AppStateResult>;
     goto(p: AppGotoParams): Promise<AppGotoResult>;
@@ -210,11 +214,110 @@ export function talkTools(ctx: ToolContext): TalkTool[] {
         return text(editReport(`Set the notes of ${h.beat} ("${h.label}", hold ${h.index}).`, r));
       },
     },
+    ...themeTools(ctx),
     {
       name: 'talk_materials',
       description: 'The paper materials attached to this talk (talk.json "materials"): resolved paths and a short inventory of each folder.',
       shape: {},
       handler: async () => text(inventory(ctx.materials())),
+    },
+  ];
+}
+
+// --- Themes and fonts (talk_theme_*, talk_fonts_*) ----------------------------------------
+
+/** Problems from an RpcError's data (ThemeInvalid), else its message. */
+const failure = (e: unknown) => {
+  const d = e instanceof RpcError ? (e.data as { problems?: string[] } | undefined) : undefined;
+  return d?.problems?.length ? `${(e as Error).message.split(':')[0]}:\n${d.problems.map((p) => `- ${p}`).join('\n')}` : (e as Error).message;
+};
+
+const fontLine = (f: { id: string; family: string; category: string; weights: number[]; styles: string[] }) =>
+  `${f.id}\t${f.family}\t${f.category}\tweights ${f.weights.join(',')}${f.styles.includes('italic') ? '\titalic' : ''}`;
+
+function applyReport(head: string, r: { fonts: string[]; edit: EditResult }) {
+  const lines = [head, `Changed: ${r.edit.changed.join(', ') || 'nothing (the talk already had this theme)'}.`];
+  if (!r.edit.ok) lines.push('The rebuild failed.');
+  const ds = r.edit.diagnostics.filter((d) => d.severity === 'error');
+  if (ds.length) lines.push(`Errors (${ds.length}):`, ...ds.slice(0, 10).map(fmtDiag));
+  lines.push('Look at a light beat and a dark one with talk_frame before you call it done.');
+  return lines.join('\n');
+}
+
+function themeTools(ctx: ToolContext): TalkTool[] {
+  const need = () => { if (!ctx.themer) throw new Error('Themes are not available here.'); return ctx.themer; };
+  const run = (fn: (t: Themer, args: Record<string, unknown>) => Promise<string>) => async (args: Record<string, unknown>) => {
+    try { return text(await fn(need(), args)); } catch (e) { return text(failure(e), true); }
+  };
+  return [
+    {
+      name: 'talk_theme_list',
+      description: 'The themes in the SAGE theme library (built-in and the user\'s): id, name, description. Also shows the talk\'s current fonts and colors.',
+      shape: {},
+      handler: run(async (t) => {
+        const lines = ['id\tname\tkind\tdescription', ...t.list().map((e) => `${e.id}\t${e.name}\t${e.builtin ? 'built-in' : 'user'}\t${e.description ?? ''}`)];
+        try {
+          const cur = await t.current();
+          lines.push('', `This talk now: display ${cur.fonts.display.family}, body ${cur.fonts.body.family}, mono ${cur.fonts.mono.family}; light bg ${cur.light.bg}, ink ${cur.light.ink}, accent ${cur.light.accent1}; dark bg ${cur.dark.bg}, ink ${cur.dark.ink}.`);
+        } catch { /* no talk */ }
+        return lines.join('\n');
+      }),
+    },
+    {
+      name: 'talk_theme_create',
+      description: 'Creates a theme (a sage-theme/1 theme.json object: light and dark palettes, display/body/mono fonts, optional type scale; see the skill\'s references/themes.md), validates it, downloads its Google fonts, saves it in the user\'s SAGE theme library (replacing a user theme with the same id) and, unless apply is false, applies it to this talk. An invalid theme comes back with the list of problems to fix.',
+      shape: {
+        theme: z.record(z.string(), z.unknown()).describe('The theme.json object, format "sage-theme/1"'),
+        apply: z.boolean().optional().describe('Apply it to this talk (default true)'),
+      },
+      handler: run(async (t, args) => {
+        const saved = await t.saveToLibrary(args.theme);
+        const head = `Saved the theme "${saved.theme.name}" (${saved.theme.id}) to the library: ${saved.path}${saved.fonts.length ? ` with ${saved.fonts.length} font files` : ''}.`;
+        if (args.apply === false) return head;
+        const r = await t.applyTheme(saved.theme, saved.path, 'claude');
+        return applyReport(`${head}\nApplied it to this talk.`, r);
+      }),
+    },
+    {
+      name: 'talk_theme_apply',
+      description: 'Applies a library theme to this talk (by id, name, or the absolute path of a .talktheme): its fonts go into assets/fonts, its colors and fonts into the generated blocks at the top of theme.css. Rules below the blocks still win over them.',
+      shape: { theme: z.string().describe('Theme id, name, or absolute .talktheme path') },
+      handler: run(async (t, args) => {
+        const e = t.find(String(args.theme ?? ''));
+        if (!e) throw new Error(`No theme "${String(args.theme)}". Call talk_theme_list for the library.`);
+        const r = await t.apply({ path: e.path }, 'claude');
+        return applyReport(`Applied the theme "${r.theme.name}" (${r.theme.id}).`, r);
+      }),
+    },
+    {
+      name: 'talk_fonts_search',
+      description: 'Searches the Google Fonts catalog (Fontsource; only fonts whose license allows embedding): id, family, category, weights. An empty query lists suggested families. Use the id with talk_fonts_add or in a theme\'s fonts.',
+      shape: {
+        query: z.string().describe('Family name or part of it'),
+        category: z.string().optional().describe('sans-serif, serif, display, handwriting or monospace'),
+      },
+      handler: run(async (t, args) => {
+        const r = await t.searchFonts({ query: String(args.query ?? ''), ...(typeof args.category === 'string' ? { category: args.category } : {}), limit: 25 });
+        if (!r.fonts.length) return 'No fonts match.';
+        return ['id\tfamily\tcategory\tweights', ...r.fonts.map(fontLine)].join('\n');
+      }),
+    },
+    {
+      name: 'talk_fonts_add',
+      description: 'Embeds a Google font into this talk (woff2 files in assets/fonts, @font-face rules in the fonts block of theme.css) and returns the CSS font-family value to use in a scene or in theme.css. For the talk\'s main fonts, use a theme instead.',
+      shape: {
+        id: z.string().describe('Fontsource id from talk_fonts_search, e.g. "inter"'),
+        weights: z.array(z.number().int()).optional().describe('Weights to embed (default 400 and 700)'),
+        styles: z.array(z.enum(['normal', 'italic'])).optional().describe("Default ['normal']"),
+      },
+      handler: run(async (t, args) => {
+        const r = await t.addFont({
+          id: String(args.id ?? ''),
+          ...(Array.isArray(args.weights) ? { weights: args.weights as number[] } : {}),
+          ...(Array.isArray(args.styles) ? { styles: args.styles as ('normal' | 'italic')[] } : {}),
+        }, 'claude');
+        return [`Embedded ${r.family}: ${r.files.join(', ')}.`, `Use font-family: ${r.fontFamily};`, r.edit.ok ? 'The talk rebuilt.' : 'The rebuild failed.'].join('\n');
+      }),
     },
   ];
 }

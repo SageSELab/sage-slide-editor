@@ -98,7 +98,7 @@ describe('ClaudeBridge', () => {
     // The in-process server marks its tools always-loaded (not deferred behind ToolSearch).
     const server = o.mcpServers!.talk as unknown as { instance: { _registeredTools?: Record<string, { _meta?: Record<string, unknown> }> } };
     const reg = server.instance._registeredTools;
-    expect(Object.keys(reg ?? {})).toHaveLength(7);
+    expect(Object.keys(reg ?? {})).toHaveLength(12);
     for (const t of Object.values(reg ?? {})) expect(t._meta?.['anthropic/alwaysLoad']).toBe(true);
     // The session id from init is stored for the next open.
     expect(JSON.parse(fs.readFileSync(path.join(s.t.root, '.sage/session.json'), 'utf8')).sessionId).toBe(SID);
@@ -245,7 +245,7 @@ describe('ClaudeBridge', () => {
   it('serves the app tools: talk_goto and talk_frame move the canvas; talk_layout lists holds', async () => {
     const s = setup([]);
     const tools = s.bridge.toolHandlers;
-    expect([...tools.keys()]).toEqual(['talk_state', 'talk_layout', 'talk_goto', 'talk_frame', 'talk_insert_beat', 'talk_set_notes', 'talk_materials']);
+    expect([...tools.keys()]).toEqual(['talk_state', 'talk_layout', 'talk_goto', 'talk_frame', 'talk_insert_beat', 'talk_set_notes', 'talk_theme_list', 'talk_theme_create', 'talk_theme_apply', 'talk_fonts_search', 'talk_fonts_add', 'talk_materials']);
     expect((await tools.get('talk_layout')!({})).content[0]!.text).toContain('1\t5\tline.title\tTitle');
     expect((await tools.get('talk_goto')!({ beat: 'title' })).content[0]!.text).toBe('The canvas is at t = 5 s (hold 1, line.title, "Title").');
     const frame = await tools.get('talk_frame')!({ beat: 'line.title', around: 0.5 });

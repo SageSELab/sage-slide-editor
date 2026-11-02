@@ -64,6 +64,13 @@ export function summarize(name: string, input: Record<string, unknown>, talkRoot
       return { summary: [`${s(input.id)} "${truncate(s(input.label), 40)}"`, where].filter(Boolean).join(' ') };
     }
     case 'talk_set_notes': return { summary: s(input.beat) };
+    case 'talk_theme_create': {
+      const t = (input.theme ?? {}) as Record<string, unknown>;
+      return { summary: `"${truncate(s(t.name) || s(t.id), 40)}"${input.apply === false ? '' : ', applied'}` };
+    }
+    case 'talk_theme_apply': return { summary: s(input.theme) };
+    case 'talk_fonts_search': return { summary: `"${truncate(s(input.query), 40)}"${s(input.category) ? ` (${s(input.category)})` : ''}` };
+    case 'talk_fonts_add': return { summary: s(input.id) + (Array.isArray(input.weights) ? ` ${input.weights.join(', ')}` : '') };
     default: {
       const first = Object.values(input).find((v) => typeof v === 'string') as string | undefined;
       return { summary: first ? truncate(first, 80) : '' };
