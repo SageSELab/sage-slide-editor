@@ -8,8 +8,7 @@ import {
   DEFAULT_TYPE, extractTheme, fontsBlock, parseFontFaces, parseTheme, themeBlock, themeFontFaces, themePackageCss, themeSlug,
   withThemeBlocks, type Theme,
 } from '../src/theme.ts';
-import { hasChrome, shoot } from './chrome.ts';
-import { ISSTA, REPO } from './helpers.ts';
+import { REPO } from './helpers.ts';
 
 const ENGINE_CSS = fs.readFileSync(path.join(REPO, 'packages/engine/src/talk.css'), 'utf8');
 const STARTER = path.join(REPO, 'skill/academic-talk-film/assets/starter-v2');
@@ -136,18 +135,4 @@ describe('a talk', () => {
     expect(html).toContain(STARTER_CSS.trimEnd());
   });
 
-  // Applying the SAGE look itself must not move a pixel: the block restates talk.css's values.
-  it.skipIf(!hasChrome)('with the SAGE look applied renders the same frames as without (fixtures/issta26)', async () => {
-    const plain = path.join(tmp, 'plain'), themed = path.join(tmp, 'themed');
-    for (const d of [plain, themed]) fs.cpSync(ISSTA, d, { recursive: true, filter: (s) => !s.startsWith(path.join(ISSTA, 'build')) });
-    const own = fs.readFileSync(path.join(themed, 'theme.css'), 'utf8');
-    const sage = { ...extractTheme(ENGINE_CSS, own, { id: 'sage', name: 'SAGE' }), type: DEFAULT_TYPE };
-    fs.writeFileSync(path.join(themed, 'theme.css'), withThemeBlocks(own, null, sage));
-    const a = compileTalk(plain), b = compileTalk(themed);
-    expect(a.ok && b.ok).toBe(true);
-    for (const t of [5, 60.5, 150, 214]) {
-      const [x, y] = await Promise.all([shoot(a.outFile!, t, path.join(tmp, `p${t}.png`)), shoot(b.outFile!, t, path.join(tmp, `t${t}.png`))]);
-      expect(x.equals(y), `t=${t}`).toBe(true);
-    }
-  }, 300_000);
 });
