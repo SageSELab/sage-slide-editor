@@ -12,7 +12,7 @@ import Testing
         .filter { $0.hasSuffix(".json") }.sorted()
 
     @Test func fixturesArePresent() {
-        #expect(Self.names.count >= 18)
+        #expect(Self.names.count >= 20)
     }
 
     @Test(arguments: names)
@@ -28,6 +28,8 @@ import Testing
         case (.request, P.Method.export): try RPCFixtureTests.roundTrip(message.params, as: P.ExportParams.self)
         case (.request, P.Method.stage): try RPCFixtureTests.roundTrip(message.params, as: P.StageParams.self)
         case (.request, P.Method.commit): try RPCFixtureTests.roundTrip(message.params, as: P.CommitParams.self)
+        case (.request, P.Method.qr): try RPCFixtureTests.roundTrip(message.params, as: P.QRParams.self)
+        case (.response, P.Method.qr): try RPCFixtureTests.roundTrip(message.result, as: P.QRResult.self)
         case (.response, P.Method.publish): try RPCFixtureTests.roundTrip(message.result, as: P.PublishResult.self)
         case (.response, P.Method.export): try RPCFixtureTests.roundTrip(message.result, as: P.ExportResult.self)
         case (.response, P.Method.stage): try RPCFixtureTests.roundTrip(message.result, as: P.StageResult.self)

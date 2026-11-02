@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 37,
+  "result": {
+    "files": [
+      "assets/qr-paper.svg",
+      "assets/qr-slides.svg",
+      "assets/qr-package.svg"
+    ]
+  }
+}

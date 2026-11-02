@@ -69,6 +69,13 @@ public final class PublishModel {
     public private(set) var export: ExportState?
     public private(set) var stages: [PublishProtocol.Site: SiteStage] = [:]
 
+    // QR codes for the title and end card (talk.qr).
+    public var qrPaper = ""
+    public var qrSlides = ""
+    public var qrPackage = ""
+    public private(set) var qrPhase: Phase = .idle
+    public private(set) var qrFiles: [String] = []
+
     @ObservationIgnored public var service: (any PublishService)?
     @ObservationIgnored public var settings: SiteSettings
     /// The talk's title, for the default commit message.
@@ -85,6 +92,7 @@ public final class PublishModel {
         paperEntry = ""
         talkTitle = title
         phase = .idle; result = nil; export = nil; stages = [:]
+        qrPaper = ""; qrSlides = ""; qrPackage = ""; qrPhase = .idle; qrFiles = []
     }
 
     // MARK: Publish
@@ -209,6 +217,32 @@ public final class PublishModel {
     /// What the sheet tells the user after a commit: pushing is theirs to do.
     public static func pushHint(repo: String) -> String {
         "Committed, not pushed. Check it, then push it yourself: cd \(shellQuote(repo)) && git push"
+    }
+
+    // MARK: QR codes
+
+    private static func url(_ s: String) -> String? {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.range(of: #"^https?://\S+$"#, options: .regularExpression) != nil ? t : nil
+    }
+
+    /// At least one field holds a URL, and none holds something that is not one.
+    public var canMakeQRCodes: Bool {
+        let fields = [qrPaper, qrSlides, qrPackage].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return service != nil && !fields.isEmpty && fields.allSatisfy { Self.url($0) != nil } && qrPhase != .running
+    }
+
+    /// Writes assets/qr-<name>.svg into the talk for each URL given.
+    public func makeQRCodes() async {
+        guard canMakeQRCodes, let service else { return }
+        qrPhase = .running
+        do {
+            qrFiles = try await service.qrCodes(.init(paper: Self.url(qrPaper), slides: Self.url(qrSlides), package: Self.url(qrPackage))).files
+            qrPhase = .done
+        } catch {
+            qrFiles = []
+            qrPhase = .failed(Self.message(error))
+        }
     }
 
     // MARK: Helpers

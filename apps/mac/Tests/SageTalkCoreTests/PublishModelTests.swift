@@ -39,6 +39,10 @@ import Testing
                 .init(path: "src/content/talks.yaml", status: p.site == .lab ? .unchanged : .modified),
             ], diff: "public/talks/\(p.slug).html: new file, 1.42 MB\n", notes: p.site == .lab ? ["src/content/talks.yaml is generated"] : [])
         }
+        func qrCodes(_ p: P.QRParams) async throws -> P.QRResult {
+            calls.append("qr")
+            return P.QRResult(files: [p.paper.map { _ in "assets/qr-paper.svg" }, p.slides.map { _ in "assets/qr-slides.svg" }].compactMap { $0 })
+        }
         func commit(_ p: P.CommitParams) async throws -> P.CommitResult {
             calls.append("commit \(p.repo)")
             commitParams.append(p)
@@ -144,6 +148,19 @@ import Testing
         #expect(m.stage(for: .personal).result == nil)
     }
 
+    @Test func qrCodesNeedAtLeastOneValidURL() async {
+        let fake = FakeService()
+        let m = PublishModel(service: fake)
+        #expect(!m.canMakeQRCodes)
+        m.qrPaper = "not a url"
+        #expect(!m.canMakeQRCodes)
+        m.qrPaper = " https://example.org/paper.pdf "
+        m.qrSlides = "https://example.org/talks/x.html"
+        #expect(m.canMakeQRCodes)
+        await m.makeQRCodes()
+        #expect(m.qrPhase == .done && m.qrFiles == ["assets/qr-paper.svg", "assets/qr-slides.svg"])
+    }
+
     @Test func nothingToCommitWhenStagingChangedNothing() async {
         struct Unchanged: PublishService {
             func publish(_ p: P.PublishParams) async throws -> P.PublishResult { P.PublishResult(path: "/t/x.html", bytes: 1, holds: 1, duration: 1) }
@@ -152,6 +169,7 @@ import Testing
                 P.StageResult(site: p.site, repo: p.repo, url: "/talks/x.html", files: [.init(path: "public/talks/x.html", status: .unchanged)], diff: "")
             }
             func commit(_ p: P.CommitParams) async throws -> P.CommitResult { Issue.record("no commit expected"); throw CancellationError() }
+            func qrCodes(_ p: P.QRParams) async throws -> P.QRResult { P.QRResult(files: []) }
         }
         let m = PublishModel(service: Unchanged(), settings: settings(lab: "/tmp/lab"))
         m.reset(talkFolder: URL(fileURLWithPath: "/t/x"))

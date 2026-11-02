@@ -177,6 +177,23 @@ describe('talk.export', () => {
   });
 });
 
+describe('talk.qr', () => {
+  it('writes an SVG QR code per URL into assets/', async () => {
+    const slides = fs.readFileSync(path.join(root, 'assets/qr-slides.svg'), 'utf8'); // the deck's own
+    const r = await c.request<{ files: string[] }>('talk.qr', { paper: 'https://example.org/paper.pdf', package: 'https://example.org/pkg' });
+    expect(r.files).toEqual(['assets/qr-paper.svg', 'assets/qr-package.svg']);
+    for (const f of r.files) {
+      const svg = fs.readFileSync(path.join(root, f), 'utf8');
+      expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"[^>]*viewBox="0 0 (\d+) \1"/);
+      expect(svg).toContain('<path');
+    }
+    expect(fs.readFileSync(path.join(root, 'assets/qr-slides.svg'), 'utf8')).toBe(slides); // not asked for: untouched
+    await expect(c.request('talk.qr', {})).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    await expect(c.request('talk.qr', { slides: 'javascript:alert(1)' })).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+    expect(c.problems).toEqual([]);
+  });
+});
+
 describe('site.stage and site.commit (temp repositories only)', () => {
   const slug = 'ui-repair-issta26';
   const published = () => fs.readFileSync(path.join(root, 'build/public', `${slug}.html`));

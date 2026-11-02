@@ -120,6 +120,7 @@ const publisher = new Publisher({
   build: () => session.build(),
   spine: () => session.spine(),
   notifyProgress: (p) => peer.notify('talk.exportProgress', p),
+  writeFile: (rel, content) => session.writeFile(rel, content),
 });
 function publishMethod<M extends PublishMethodName>(name: M, fn: (params: never) => unknown) {
   peer.handle(name, (params) => {
@@ -133,6 +134,7 @@ publishMethod('talk.publish', (p) => publisher.publish(p));
 publishMethod('talk.export', (p) => publisher.export(p));
 publishMethod('site.stage', (p) => publisher.stage(p));
 publishMethod('site.commit', (p) => publisher.commit(p));
+publishMethod('talk.qr', (p) => publisher.qr(p));
 
 peer.onClose(() => void shutdown('stdin closed'));
 process.stdout.on('error', () => void shutdown('stdout closed', 0));

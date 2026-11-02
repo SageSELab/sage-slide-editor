@@ -865,6 +865,13 @@ export interface SiteCommitResult {
   summary: string;
 }
 
+/** QR codes for the title and end card (publishing.md): each URL given becomes assets/qr-<name>.svg. */
+export interface QrParams { paper?: string; slides?: string; package?: string }
+export interface QrResult {
+  /** Talk-relative paths written (assets/qr-paper.svg, ...), in the order paper, slides, package. */
+  files: string[];
+}
+
 export interface PublishMethods {
   /** Writes the public single file (talkc publish). PublishFailed (data.diagnostics) when it cannot. */
   'talk.publish': { params: PublishParams | undefined; result: PublishResult };
@@ -874,12 +881,16 @@ export interface PublishMethods {
   'site.stage': { params: SiteStageParams; result: SiteStageResult };
   /** Commits the given paths in a site repo (the user clicked Commit). Never pushes. */
   'site.commit': { params: SiteCommitParams; result: SiteCommitResult };
+  /** Writes SVG QR codes into the talk's assets/ (as app writes). */
+  'talk.qr': { params: QrParams; result: QrResult };
 }
 export type PublishMethodName = keyof PublishMethods;
 export interface PublishNotifications { 'talk.exportProgress': ExportProgressParams }
 export type PublishNotificationName = keyof PublishNotifications;
 
-export const PUBLISH_METHOD_NAMES: readonly PublishMethodName[] = ['talk.publish', 'talk.export', 'site.stage', 'site.commit'];
+export const PUBLISH_METHOD_NAMES: readonly PublishMethodName[] = ['talk.publish', 'talk.export', 'site.stage', 'site.commit', 'talk.qr'];
+export const QR_NAMES = ['paper', 'slides', 'package'] as const;
+const isUrl = (v: unknown) => typeof v === 'string' && /^https?:\/\/[^\s]+$/.test(v) && v.length <= 2000;
 export const PUBLISH_NOTIFICATION_NAMES: readonly PublishNotificationName[] = ['talk.exportProgress'];
 
 export const PublishErrorCode = {
@@ -910,6 +921,10 @@ export const publishParamCheckers: { [M in PublishMethodName]: (p: unknown) => P
     ...want(absPath(v.repo), 'params.repo: expected an absolute path'),
     ...want(isSlug(v.slug), 'params.slug: expected letters, digits, . _ -'),
     ...want(v.paperEntry === undefined || (typeof v.paperEntry === 'string' && v.paperEntry.trim().length > 0), 'params.paperEntry: expected a non-empty string'),
+  ]),
+  'talk.qr': (p) => shape(p, 'params', [], [...QR_NAMES], (v) => [
+    ...want(QR_NAMES.some((k) => v[k] !== undefined), 'params: expected at least one of paper, slides, package'),
+    ...QR_NAMES.flatMap((k) => want(v[k] === undefined || isUrl(v[k]), `params.${k}: expected an http(s) URL`)),
   ]),
   'site.commit': (p) => shape(p, 'params', ['repo', 'paths', 'message'], [], (v) => [
     ...want(absPath(v.repo), 'params.repo: expected an absolute path'),
@@ -944,6 +959,9 @@ export const publishResultCheckers: { [M in PublishMethodName]: (r: unknown) => 
     ])),
     ...strs(v, ['diff'], 'result'),
     ...strList(v.notes, 'result.notes'),
+  ]),
+  'talk.qr': (r) => shape(r, 'result', ['files'], [], (v) => [
+    ...checkList(v.files, 'result.files', (x, at) => want(typeof x === 'string' && /^assets\/qr-(paper|slides|package)\.svg$/.test(x), `${at}: expected assets/qr-<name>.svg`)),
   ]),
   'site.commit': (r) => shape(r, 'result', ['commit', 'summary'], [], (v) => [
     ...want(typeof v.commit === 'string' && /^[0-9a-f]{40,64}$/.test(v.commit), 'result.commit: expected a commit hash'),

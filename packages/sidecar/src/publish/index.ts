@@ -1,10 +1,11 @@
 // The Phase 5 methods (docs/rpc.md "Publish and export"): talk.publish, talk.export,
-// site.stage, site.commit. main.ts registers them; they run in the request queue, one at a time
-// with builds and edits, so an export never renders a half-written film.
-import { ErrorCode, PublishErrorCode, RpcError, type BuildResult, type ExportParams, type ExportProgressParams, type PublishParams, type SiteCommitParams, type SiteStageParams, type TalkKind } from '../protocol.ts';
+// site.stage, site.commit, talk.qr. main.ts registers them; they run in the request queue, one
+// at a time with builds and edits, so an export never renders a half-written film.
+import { ErrorCode, PublishErrorCode, RpcError, type BuildResult, type ExportParams, type ExportProgressParams, type PublishParams, type QrParams, type SiteCommitParams, type SiteStageParams, type TalkKind } from '../protocol.ts';
 import type { Spine } from '../core-port.ts';
 import { exportFilm, type ExportDeps } from './export.ts';
 import { publishOpenTalk } from './publish.ts';
+import { writeQrCodes } from './qr.ts';
 import { commitSite, stageSite } from './site.ts';
 
 export interface PublisherHost {
@@ -13,6 +14,8 @@ export interface PublisherHost {
   build(): Promise<BuildResult>;
   spine(): Promise<Spine>;
   notifyProgress(p: ExportProgressParams): void;
+  /** An app write into the talk (announced to the watcher, then atomic). */
+  writeFile(rel: string, content: string): void;
 }
 
 export class Publisher {
@@ -44,5 +47,10 @@ export class Publisher {
 
   commit(p: SiteCommitParams) {
     return commitSite(p);
+  }
+
+  qr(p: QrParams) {
+    this.root('talk.qr');
+    return writeQrCodes(p, (rel, content) => this.host.writeFile(rel, content));
   }
 }

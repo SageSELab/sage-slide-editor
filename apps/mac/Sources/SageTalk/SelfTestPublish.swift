@@ -4,7 +4,7 @@ import SageTalkCore
 import SwiftUI
 
 /// SAGE_SELFTEST, publish and export (Phase 5) on a temp copy of the talk: publishes it, exports
-/// a 3-page PDF and PNGs around a hold, stages the public file into two temp repositories laid
+/// a 3-page PDF and PNGs around a hold, writes a QR code into its assets, stages the public file into two temp repositories laid
 /// out like the websites (never the real ones: the step swaps in its own settings), commits in
 /// one of them as the Commit button does, and writes
 ///   publish-sheet.png            the Publish sheet after staging (dark), and -light.png
@@ -75,6 +75,12 @@ extension SelfTest {
         let sizes = pngs.compactMap { NSImageRep(contentsOf: URL(fileURLWithPath: $0)) }.map { "\($0.pixelsWide)x\($0.pixelsHigh)" }
         check(pngs.map { URL(fileURLWithPath: $0).lastPathComponent } == ["hold-02-before.png", "hold-02.png", "hold-02-after.png"] && sizes == Array(repeating: "1920x1080", count: 3),
               "export: PNGs \(pngs.map { URL(fileURLWithPath: $0).lastPathComponent }) at \(sizes)")
+
+        // QR codes into the copy's assets/.
+        pub.qrSlides = "https://example.org/talks/selftest-talk.html"
+        await pub.makeQRCodes()
+        let qr = (try? String(contentsOf: copy.appendingPathComponent("assets/qr-slides.svg"), encoding: .utf8)) ?? ""
+        check(pub.qrFiles == ["assets/qr-slides.svg"] && qr.hasPrefix("<svg") && qr.contains("<path"), "qr: wrote assets/qr-slides.svg (\(pub.qrPhase))")
 
         // 4. Stage on both temp sites; nothing is committed.
         pub.paperEntry = "pub-002"

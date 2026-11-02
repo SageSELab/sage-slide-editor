@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 37,
+  "method": "talk.qr",
+  "params": {
+    "paper": "https://example.org/documents/paper.pdf",
+    "slides": "https://example.org/talks/ui-repair-issta26.html",
+    "package": "https://example.org/SageSELab/UI-Program-Repair"
+  }
+}

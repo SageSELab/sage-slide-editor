@@ -10,7 +10,8 @@ public enum PublishProtocol {
         public static let export = "talk.export"
         public static let stage = "site.stage"
         public static let commit = "site.commit"
-        public static let all = [publish, export, stage, commit]
+        public static let qr = "talk.qr"
+        public static let all = [publish, export, stage, commit, qr]
     }
 
     public enum Notification {
@@ -137,6 +138,19 @@ public enum PublishProtocol {
         public var summary: String
         public init(commit: String, summary: String) { self.commit = commit; self.summary = summary }
     }
+
+    /// URLs to encode; each one given becomes assets/qr-<name>.svg.
+    public struct QRParams: Codable, Equatable, Sendable {
+        public var paper: String?
+        public var slides: String?
+        public var package: String?
+        public init(paper: String? = nil, slides: String? = nil, package: String? = nil) { self.paper = paper; self.slides = slides; self.package = package }
+    }
+
+    public struct QRResult: Codable, Equatable, Sendable {
+        public var files: [String]
+        public init(files: [String]) { self.files = files }
+    }
 }
 
 /// What publishes, exports and stages: the sidecar client, or a fake in tests.
@@ -145,6 +159,7 @@ public protocol PublishService: Sendable {
     func export(_ p: PublishProtocol.ExportParams) async throws -> PublishProtocol.ExportResult
     func stage(_ p: PublishProtocol.StageParams) async throws -> PublishProtocol.StageResult
     func commit(_ p: PublishProtocol.CommitParams) async throws -> PublishProtocol.CommitResult
+    func qrCodes(_ p: PublishProtocol.QRParams) async throws -> PublishProtocol.QRResult
 }
 
 extension SidecarClient: PublishService {
@@ -160,5 +175,8 @@ extension SidecarClient: PublishService {
     }
     public func commit(_ p: PublishProtocol.CommitParams) async throws -> PublishProtocol.CommitResult {
         try await call(PublishProtocol.Method.commit, p, timeout: .seconds(60))
+    }
+    public func qrCodes(_ p: PublishProtocol.QRParams) async throws -> PublishProtocol.QRResult {
+        try await call(PublishProtocol.Method.qr, p)
     }
 }

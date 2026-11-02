@@ -22,6 +22,8 @@ struct PublishSheet: View {
                         Divider()
                         stageSection
                     }
+                    Divider()
+                    qrSection
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,6 +121,40 @@ struct PublishSheet: View {
                 }
             }
             .accessibilityIdentifier("publish.warnings")
+        }
+    }
+
+    // MARK: QR codes
+
+    private var qrSection: some View {
+        DisclosureGroup("QR codes for the title and end card") {
+            VStack(alignment: .leading, spacing: 6) {
+                qrField("Paper", \.qrPaper, "https://…/paper.pdf")
+                qrField("Slides", \.qrSlides, "https://…/talks/\(pub.slug).html")
+                qrField("Package", \.qrPackage, "https://… (replication package)")
+                HStack {
+                    Text("Writes assets/qr-paper.svg, qr-slides.svg and qr-package.svg into the talk, for each URL given.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Make QR Codes") { Task { await pub.makeQRCodes() } }
+                        .disabled(!pub.canMakeQRCodes)
+                        .accessibilityIdentifier("publish.qr")
+                }
+                switch pub.qrPhase {
+                case .done: Label("Wrote \(pub.qrFiles.joined(separator: ", "))", systemImage: "qrcode").font(.caption)
+                case .failed(let m): Label(m, systemImage: "xmark.octagon.fill").foregroundStyle(.red).font(.caption)
+                default: EmptyView()
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private func qrField(_ title: String, _ key: ReferenceWritableKeyPath<PublishModel, String>, _ prompt: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(title).frame(width: 80, alignment: .leading)
+            TextField(title, text: Binding(get: { pub[keyPath: key] }, set: { pub[keyPath: key] = $0 }), prompt: Text(prompt))
+                .textFieldStyle(.roundedBorder)
         }
     }
 

@@ -329,6 +329,7 @@ All four methods run in the request queue, one at a time with builds and edits.
 | `talk.export` | `{kind: 'png'\|'pdf', holds?: 'all'\|number[], around?: number}` | `{kind, dir, files, frames, width, height, ms, errors}` | NoTalkOpen, UnsupportedForKind, InvalidParams, PublishFailed |
 | `site.stage` | `{site: 'personal'\|'lab', repo, slug, paperEntry?}` | `{site, repo, url, files: {path, status}[], diff, notes}` | NoTalkOpen, InvalidParams, NotPublished, SiteFailed |
 | `site.commit` | `{repo, paths, message}` | `{commit, summary}` | InvalidParams, SiteFailed |
+| `talk.qr` | `{paper?, slides?, package?}` (http(s) URLs, at least one) | `{files}` | NoTalkOpen, UnsupportedForKind, InvalidParams |
 
 | Notification | Params |
 |---|---|
@@ -359,6 +360,12 @@ All four methods run in the request queue, one at a time with builds and edits.
   preceded by one line for the HTML file. Running it again changes nothing.
 - `site.commit` commits exactly `paths` (other staged changes stay staged), with `message`. The
   app sends it only when the user clicks Commit. Nothing in the sidecar pushes.
+- `talk.qr` writes `assets/qr-<name>.svg` for each URL given (the `qrcode` package, pure JS:
+  SVG, margin 0, error correction M, as the skill's recipe), as app writes, so the watcher
+  reports them with `source: 'app'` and the talk rebuilds.
+- Dependencies: `yaml` (its Document API gives source ranges and keeps comments), `pdf-lib`
+  (pure-JS PDF assembly; Chromium's `page.pdf()` would print the page's layout rather than the
+  rendered frame), `qrcode`.
 
 | Code | Name | Meaning |
 |---|---|---|
