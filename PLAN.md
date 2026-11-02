@@ -4,7 +4,7 @@ Working title. A native macOS app (Windows later) for editing, presenting, and p
 Kevin Moran's "film with checkpoints" talks, with Claude embedded as a chat pane that builds
 and revises the film in real time while the human makes quick edits on the canvas.
 
-Written 2026-11-01 after reading the `academic-talk-film` skill, its `talk.js` engine,
+Revised 2026-11-01 after Phase 0 (see docs/phase0-memo.md). Written 2026-11-01 after reading the `academic-talk-film` skill, its `talk.js` engine,
 `edit.js`, `serve.py`, `build-public.py`, the style and gotchas references, and the ISSTA 2026
 example deck, and after verifying the Claude Agent SDK's embedding story against the current
 docs.
@@ -108,7 +108,7 @@ talk/
     "pdf": "../paper/main.pdf",
     "package": "../replication"
   },
-  "defaults": { "holdPad": 0.3 },
+  "defaults": { "holdPad": 1.0 },
   "chapters": [
     {
       "id": "title", "label": "Title", "scene": "scenes/title.html",
@@ -132,17 +132,39 @@ talk/
 }
 ```
 
-- `hold` is optional. If absent, the hold is placed at the end of the beat's last registered
-  motion plus `holdPad`. If present, it is the hold time relative to the beat start and must be
-  at or after the last motion end (validator error otherwise: this is the ghost-tile gotcha,
-  now impossible).
+- **Boundary rule (normative).** Beat k+1 starts at hold k and owns the interval
+  [hold k, hold k+1). Motion registered exactly at hold k is beat k+1's t = 0.
+- `hold` is the hold time relative to the beat start. Explicit holds are the norm: Phase 0
+  found that none of 13 real holds sit at a fixed pad after the motion. If `hold` is absent
+  (a new beat), it is seeded as last motion end plus `holdPad` and written back explicitly the
+  first time the beat is timed in the app.
+- A hold before the beat's own motion ends is a **warning** (real decks do this on purpose).
+  The **error** is the actual ghost: an entrance in the next beat that starts before its hold
+  and ends after it, or a `data-a` element visible at a hold that no beat has brought in.
 - Chapter markers, duration, dark windows, backup numbering, and the public/private split are
-  all derived. Nothing in the format holds an absolute time.
+  all derived. Nothing in the format holds an absolute time. The first chapter marker is at 0;
+  every other marker is at its first beat's start plus 0.1 s.
+- Each chapter's motion lives in `beats/<chapter>.js` by convention (`"motion"` overrides it).
+- Duration is the last hold plus `defaults.tail` (default 1.0 s); the public section has its
+  own `tail`.
+- A chapter's `scene` is optional: a chapter may reuse DOM that lives in another chapter's
+  scene file (the ISSTA backups live inside the dark passage's scene).
+- `dark` may be set per beat to override its chapter (a light backup inside a dark section).
+  A beat is dark over (start, hold], so the hold frame belongs to the beat that ends on it.
+- The public section has the shape `{id, label, tail, scene, motion, beats}`. Its motion file is
+  loaded only in the public build; notes are stripped there.
+- **Scenes are emitted verbatim.** The compiler never re-indents or reformats scene HTML:
+  `white-space: pre` code panes made re-indenting cost up to 9,671 px in the port.
+- Known divergence from the hand-written ISSTA deck: two chapter markers land 0.5 s earlier
+  under the start + 0.1 rule. It is visible only in the scrub bar between holds, never at a
+  hold, and is accepted rather than adding a per-chapter offset field.
+- Text edits made in the app are written into the scene source. Where an override layer is
+  still needed (generated DOM), it is keyed by element id, never by DOM path.
 - `private` and `backup` replace today's `<!-- private:start -->` markers.
 
 ### 3.2 Scenes
 
-A scene fragment is the inside of one `.scene` div, exactly as today, with two conventions
+A scene file contains one or more whole `<div class="scene">` elements, exactly as today, with two conventions
 the compiler checks: every object the inspector should edit has an `id`, and positioned
 objects carry `style="position:absolute;left:…;top:…"` (width/height optional). Anything
 else is free HTML. Shared layers that persist across chapters (the device rig, `#black`) are
@@ -168,7 +190,19 @@ Talk.beat('c2.layout', (B) => {
 `type`, `draw`, `tween`, `els`) with **times relative to the beat start**, plus `B.at`
 (absolute start, for the rare helper that needs it), `B.lib`, and `B.set(sel, t, {text, class,
 style})` for the text-swap and class-toggle tweens that today are hand-written. Every call
-records its end time, which is how auto-hold works.
+records its end time, which is how hold seeding and the ghost check work.
+
+`B.set` semantics: one step track per element and key (text, class, or one style property);
+a step applies from its time inclusive; the value before the first step is the one captured at
+registration; seeking backwards is exact. Motion that spans beats (a visibility window, a
+glitch that runs past a hold) is a pair of steps in the beats where it opens and closes, with
+the initial state in markup. `B.at` and `B.T` (the raw engine) remain as escape hatches and the
+validator reports their use.
+
+**Registration order is semantic.** The first animation registered on an element property
+fills backwards, so it decides what shows before it starts. Beats register in talk order, and
+moving a beat re-runs the validator's first-owner check. `Talk.lib` helpers load before beats
+and may generate DOM; `Talk.ready` hooks run after layout.
 
 Classic scripts with a registry, no ES modules and no bundler, because headless Chrome and
 `file://` must keep working.
@@ -196,9 +230,12 @@ the format; they are the convention Claude follows and the inspector recognises 
 
 ### 3.6 Layout algorithm (shared by compiler, canvas, and Claude tools)
 
-1. Walk chapters in order; for each beat, run its motion function against a recorder to get
-   `lastEnd`; `hold = beat.hold ?? lastEnd + holdPad`; `start_next = start + hold`.
-2. Chapter `at = firstBeat.start + 0.1` (the marker gotcha, encoded).
+1. Walk chapters in order; for each beat, run its motion function once against the real `T`
+   with times offset by the beat start, recording `lastEnd`; `hold = beat.hold ?? lastEnd +
+   holdPad`; `start_next = start + hold`. (Single pass: Phase 0 showed a separate recorder
+   pass is unnecessary and would run helper side effects twice.)
+2. Chapter `at = 0` for the first chapter, `firstBeat.start + 0.1` otherwise. Computed times
+   snap to 6 decimals only when within 1e-9 of that value.
 3. `duration = lastBeat.start + lastBeat.hold + 1.0`; public duration computed on the filtered
    set.
 4. Emit `cp(start + hold, label, notes, backup)` and run each motion function against the real
@@ -211,15 +248,16 @@ The runtime does this at page load from `talk.json` plus the registered beats, s
 
 ## 4. Compiler and tooling (`@sage/core`, `talkc`)
 
-- `talkc build <talk>` writes `build/index.html` (scenes assembled, scripts concatenated,
-  layout runtime included, overrides block kept for compatibility with the presenter notes
-  editor) and copies engine assets.
+- `talkc build <talk>` writes `build/index.html` (layers then scenes, theme and spine inlined,
+  each lib and beat file as its own script with a `sourceURL` and a syntax check) and copies
+  the engine and `assets/` into `build/` so relative font and image paths resolve.
 - `talkc validate <talk>`: unique ids, referenced selectors exist in the right scene, `data-a`
   on everything a beat brings in, explicit holds not before motion end, notes present (warn),
   dark chapters have a `#black` fade, private/public markers consistent, assets exist.
 - `talkc layout <talk>` prints the hold list (replaces `cplist.sh`).
-- `talkc shoot <talk> <beat|time>...` renders PNGs with headless Chrome (replaces `shoot.sh`;
-  the app uses the canvas instead).
+- `talkc shoot <talk> <beat|time>...` renders PNGs with headless Chromium (replaces `shoot.sh`).
+  This is also the renderer behind the app's `talk_frame` tool and exports, because WebKit's
+  `takeSnapshot` flattens 3D transforms (Phase 0).
 - `talkc publish <talk> [slug]` writes the self-contained public file (replaces
   `build-public.py`; TypeScript because the machine's Python is 3.6).
 - `talkc import-legacy <index.html>` is **not** planned. The ISSTA deck is ported by hand once
@@ -250,7 +288,8 @@ the transport (play to hold, previous, next, time).
 One thumbnail per beat, grouped by chapter with collapsible headers, dark chapters tinted,
 backups in a separate section. Drag to reorder within and across chapters. Context menu:
 duplicate, delete, insert empty beat, move to backups, mark private. Thumbnails are
-`render(hold)` snapshots from an offscreen WKWebView, cached in `.sage/thumbs` by a hash of
+`T.seek(hold)` plus `takeSnapshot` on a hidden WKWebView (about 55 ms each; 3D is flattened,
+which is acceptable at thumbnail size; offscreen views need occlusion detection disabled), cached in `.sage/thumbs` by a hash of
 the inputs that affect that beat.
 
 ### 5.3 Canvas
@@ -283,8 +322,8 @@ dark, scene file, z-order of layers), **Talk** (title, venue, materials, theme).
 
 Present mode opens the film fullscreen on the chosen display and the presenter view
 (notes, next label, clock, current frame) on the other. Both are WKWebViews in the same
-process; the app relays play/seek state between them rather than relying on
-`BroadcastChannel` across web views. Keys are the engine's keys. A Rehearse mode plays
+process; the app relays play/seek state between them (about 10 ms in Phase 0). BroadcastChannel
+also works between WKWebViews, but the relay keeps presenter state in the app. Keys are the engine's keys. A Rehearse mode plays
 through with the clock running.
 
 ### 5.6 Export
@@ -312,20 +351,30 @@ A Node sidecar bundled in the app (`Contents/Resources/sidecar`, Node runtime ve
 Node single-executable application), started per open talk, speaking NDJSON JSON-RPC over
 stdio to Swift. It hosts `@sage/core` services and the Agent SDK bridge.
 
-Verified facts the design relies on (Agent SDK docs, fetched 2026-11-01):
+Verified in the docs and confirmed by the Phase 0 spike (SDK 0.3.316, `claude-opus-5-5`):
 
 - The TypeScript SDK bundles the Claude Code binary as a platform optional dependency; the app
   can also point at an installed `claude` via `pathToClaudeCodeExecutable`.
-- `settingSources` defaults to user, project, and local, so `~/.claude/skills` (including
-  `academic-talk-film`) and `~/.claude/CLAUDE.md` load automatically. The app also loads its
-  own bundled copy of the skill as a local plugin so the app and skill versions match.
+- The sidecar passes `settingSources: []`. Allow rules in settings files bypass `canUseTool`
+  (the SDK warns `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED`), and the default sources also start
+  Kevin's personal MCP servers inside the sidecar. Consequence: user skills do not load, so
+  the app always loads its bundled copy of the skill as a local plugin. `strictMcpConfig`
+  should keep claude.ai connectors out (to verify in Phase 4).
 - `cwd` is the talk folder; `additionalDirectories` carries the paper and package folders.
 - `includePartialMessages` streams text and tool-input deltas for the chat UI.
 - `canUseTool` plus `allowedTools` drive a native approval sheet; reads inside the talk and
   materials need no prompt; writes inside the talk folder are pre-approved; anything else asks.
-- `PostToolUse` hooks report file edits (`Write`, `Edit`, and Bash, since Bash can write too);
-  the sidecar also watches the folder so edits from a terminal session are caught the same way.
-- `resume`/`forkSession` keep one conversation per talk, stored in `.sage/session.json`.
+- `PostToolUse` hooks report file edits (`Write`, `Edit`, and Bash, since Bash can write too).
+  The SDK's `FileChanged` hook only covers registered watch paths, so the sidecar's own folder
+  watcher is the source of truth for reloads, including edits from a terminal session.
+- `resume`/`forkSession` keep one conversation per talk, stored in `.sage/session.json`. The SDK
+  files transcripts under a path derived from `cwd`, so a moved talk is detected and offered a
+  fork of its old session.
+- App tools are marked always-loaded; by default they are deferred behind tool search, which
+  cost an extra turn in Phase 0.
+- Cost: a trivial turn is about 0.15 USD on Opus 5.5. The footer shows session cost, an effort
+  control is exposed, and `maxBudgetUsd` caps each request (it is checked between turns, so a
+  run can overshoot by one turn).
 - In-process tools via `createSdkMcpServer` with no extra process.
 
 ### 6.2 Tools the app gives Claude
@@ -335,7 +384,7 @@ Verified facts the design relies on (Agent SDK docs, fetched 2026-11-01):
 | `talk_state` | Current beat, time, selection, open inspector tab, display size |
 | `talk_layout` | The hold list with computed times and validator diagnostics |
 | `talk_goto` | Moves the canvas to a beat or time (the user watches) |
-| `talk_frame` | Renders a frame at a beat or time (and optionally 0.5 s before and after) via the canvas and returns image paths. Replaces headless Chrome in the skill's "check every frame" step. |
+| `talk_frame` | Renders a frame at a beat or time (and optionally 0.5 s before and after) with the sidecar's headless Chromium, moves the visible canvas to the same time so the user sees it, and returns image paths. Chromium rather than `takeSnapshot` because the latter flattens 3D. |
 | `talk_materials` | The attached paper, PDF, package paths and a short inventory |
 | `talk_insert_beat`, `talk_set_notes` | Structured edits through core, so the spine stays valid |
 
@@ -409,6 +458,10 @@ DOM, a dark passage, backups, private regions, and a public end card.
    acceptance bar is pixel-identical frames at every hold (timing inside a beat may differ by
    less than 50 ms).
 
+**Done 2026-11-01.** All 61 holds ported. The hold list is identical, and 207 frames (every hold,
+hold ± 0.5 s, and mid-motion samples) plus 9 independently chosen times are byte-identical to
+the original. Helpers live in `fixtures/issta26/lib/` as the starter library for skill v2.
+
 ---
 
 ## 10. Repository layout
@@ -433,7 +486,7 @@ sage-slide-editor/
 
 ## 11. Phases and acceptance criteria
 
-### Phase 0 — Spikes (about a week)
+### Phase 0 — Spikes (done 2026-11-01, see docs/phase0-memo.md)
 
 - **SDK spike.** A Node script runs `query()` with the talk folder as cwd and the paper as an
   additional directory, confirms the skill is listed in the init message, streams partial
@@ -449,7 +502,14 @@ sage-slide-editor/
 Exit: a one-page memo with the three outcomes and any plan changes. The WebKit spike also
 produces the first golden-frame harness, since it has to compare frames anyway.
 
-### Phase 1 — Core and format
+### Phase 1 — Core and format (largely done 2026-11-01)
+
+Status: `@sage/core` (schema, loader, recorder, layout, validator, compiler, source-edit API,
+`talkc build|validate|layout`) with 118 tests; ISSTA fully ported and pixel-identical; sidecar
+running on the real core (67 tests) with the Swift client (27 tests); engine font and dash
+fixes applied (Chrome output unchanged, WebKit vs Chromium median 0.99 % to 0.15 %, only the
+five 3D exploded-view holds above 1 %). Remaining: `talkc shoot` and `publish`, so the skill's
+scripts can be retired; the second ghost-check clause; CI wiring of the golden suite.
 
 Schema, layout runtime, compiler, validator, source-edit API, `talkc`, and the full ISSTA port
 passing the frame diff. The skill's scripts replaced by `talkc`.
@@ -550,9 +610,12 @@ format, the editing operations, the Swift shell, the Claude bridge, and the skil
   primitive: in, out, anim, words, count, type, draw, set, dark passage, backup), and
   `fixtures/edge` (overlapping motion, zero-duration tweens, elements shared across chapters,
   helpers that register deferred motion).
-- **Golden frames**: for every fixture, a PNG at every hold plus 0.5 s before and after each
-  hold, rendered by Playwright's WebKit (the engine the canvas uses). Comparison with a
-  perceptual threshold (pixelmatch, 0.1 percent of pixels, anti-aliasing tolerant). Golden
+- **Golden frames** (`tests/golden`, built in Phase 0): for every fixture, a PNG at every hold
+  plus 0.5 s before and after each hold, rendered by Playwright WebKit and Chromium.
+  Thresholds from Phase 0: 0.1 percent of pixels within one engine; 1 percent between
+  WKWebView and Playwright WebKit and across engines (after the engine font fix). Frames whose
+  hold shows 3D transforms are compared in Chromium only. Never sample exactly on a `B.set`
+  step time. A partially ported deck is compared against a truncated control of the original. Golden
   files are regenerated only by an explicit command that also writes a review contact sheet,
   so a change in a golden frame is always a visible decision in a PR.
 - **Cross-engine parity**: nightly, the same frames in Chromium, compared with the WebKit
@@ -657,10 +720,10 @@ Recorded Agent sessions are scrubbed of absolute home paths before commit.
 
 1. **Auth and terms** for the embedded Agent SDK (Section 6.4). Resolve in Phase 0; design auth
    as a swappable layer.
-2. **WebKit versus Chromium rendering.** The canvas is WebKit; the podium browser and headless
-   screenshots have been Chrome. Phase 0 checks parity on the ISSTA deck; the public web
-   version already has to work in Safari, so divergence should be small, but blur-clipping and
-   `plaintext-only` behaviour differ in places.
+2. **WebKit versus Chromium rendering.** Phase 0 measured a 0.99 percent median difference,
+   mostly from the font stack (fixed in the engine by putting `system-ui` first and Menlo for
+   mono) plus a WebKit round cap on zero-length dashes (fixed with an `L 2L` dash array).
+   Remaining: `takeSnapshot` flattens 3D, so exact frames come from Chromium (Sections 4, 6.2).
 3. **App Sandbox.** Spawning Node and reading arbitrary paper folders argue for a non-sandboxed
    Developer ID app in v1. Revisit if Mac App Store distribution ever matters.
 4. **Source editing fidelity.** Rewriting attributes and innerHTML in HTML the human did not
