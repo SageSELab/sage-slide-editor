@@ -1,8 +1,12 @@
 schema_version: "1.1"
 name: insert-hold-in-existing-deck
 expected_outcome: |
-  In the copied deck a new cp() hold sits after the two counters finish counting and before the 67% bar starts
-  growing; the Results overview heading reads "Two numbers"; every later time in the deck (chapter markers,
-  duration, dark-window logic, public build constants) is shifted consistently so later holds still land where
-  their content is complete; the hold list (cplist) shows one extra main hold; the frames at the new hold and at
-  the next hold are screenshot-checked; the original talk folder is unchanged.
+  Hold 39 is mapped to the beat results.overview (with talkc layout) and the copy in /tmp/talk-eval2 gains one
+  beat: talk.json lists a new beat right after results.overview (or results.overview is split into two beats),
+  with its own label, notes and an explicit hold; the two counters (#ct1, #ct2) finish in the first beat, which
+  holds after they finish, and the 67% bar (#ct3, #bar67, #n67) starts at or after t = 0 of the new beat, in
+  beats/results.js. The pane heading (#c6-h6) reads "Two numbers", changed in scenes/results.html with a minimal
+  edit (no re-indented scene). No other beat's motion or hold changed and no absolute times were shifted by
+  hand: `talkc layout` lists 62 holds where every later hold moved by the same delta, and frames of other beats
+  are unchanged apart from that shift. `talkc validate --render` reports no errors. The new hold and the next one
+  were checked with talkc shoot frames. The original fixtures/issta26 folder is unchanged.

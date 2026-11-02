@@ -4,4 +4,4 @@ focus: trace
 weight: 1
 ---
 
-The result matches this description: in the copied deck a new cp() hold sits after the two counters finish and before the 67% bar grows; the pane heading reads "Two numbers"; later times (chapter markers, duration, dark window, public build constants) are shifted consistently; the hold list shows one extra main hold; the new hold and the next one are screenshot-checked; the original talk folder is unchanged.
+The result matches this description: hold 39 was mapped to beat results.overview; in the copy at /tmp/talk-eval2 a new beat with a label, notes and an explicit hold sits between the counters finishing and the 67% bar starting (talk.json plus beats/results.js, at beat-relative times); the heading reads "Two numbers" via a minimal scene edit; no other beat's motion or hold was changed and nothing was shifted by hand, so talkc layout shows one extra hold with every later hold moved by the same delta; talkc validate --render reports no errors; the new hold and the next one were screenshot-checked; the original fixtures/issta26 folder is unchanged.

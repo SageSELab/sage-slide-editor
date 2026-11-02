@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: fix-validator-diagnostic
+expected_outcome: |
+  In the copy at /tmp/talk-eval3, `talkc validate` was run first and its error read: ghost-entrance at
+  beats/claim.js line 12 in beat claim.number (B.in('#c2-stat', -0.4, ...) starts before the beat, so the stat
+  shows at the previous hold). The fix moves that entrance to t >= 0 inside claim.number (for example t = 0,
+  right on the click), without deleting the entrance, without using B.at or B.T, without touching build/, and
+  without changing the hold of claim.number by more than the motion needs. `talkc validate --render` then reports
+  0 errors; `talkc layout` lists the same holds as before for every other beat. The frames at "The claim" hold
+  (the stat not visible) and at "The number" hold (stat counted to 11) were checked with talkc shoot. The
+  original fixture folder is unchanged.
