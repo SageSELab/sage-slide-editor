@@ -626,6 +626,21 @@ produced by `build-public.py` today (title autoplays, end card, private content 
 
 ### Phase 6 — Hardening and distribution
 
+Status (2026-11-02, packaging done; Developer ID, notarization, crash reporting and Windows
+remain): `apps/mac/scripts/package.sh` builds a self-contained `SAGE Talk.app` (docs/packaging.md):
+the release binary, Node 24.22.2 from nodejs.org (pinned SHA-256), the sidecar as two esbuild
+ESM files with only the Agent SDK (plus its 296 MB native `claude`) and playwright-core beside
+them, the engine, the plugin with the skill copied in, and a `talkc` shim first on Claude's
+PATH. 432 MB, of which `claude` is 68 % and Node 27 %. The sidecar finds everything from its
+own location (`runtime.ts`); the app runs it through `SidecarConfiguration.bundled`. Chromium
+is not bundled: an installed Google Chrome is used, else Playwright's headless shell is
+downloaded on first use. Ad-hoc signed with the hardened runtime (Node needs only
+`allow-jit`); `scripts/notarize.sh` is written but untested. A first-run sheet checks Node,
+the sidecar, the Claude login (the SDK's `accountInfo()`, no message sent) and the browser,
+and states the 6.4 login caveat. `scripts/package-smoke.sh` runs a copy of the app away from
+the repository with a Finder-like environment: the full self-test in bundled mode, and
+`talkc publish` byte-identical to the repository's.
+
 Developer ID signing, notarization, hardened runtime, sidecar bundling, crash reporting,
 onboarding (choose auth, pick skill sync), first Windows shell spike (WebView2 host over the
 same sidecar).
