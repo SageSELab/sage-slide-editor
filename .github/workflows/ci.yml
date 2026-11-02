@@ -24,8 +24,8 @@ jobs:
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r --if-present typecheck
-      # @sage/render and the tests that use it drive Playwright Chromium.
-      - run: pnpm --filter @sage/render exec playwright install chromium
+      # @sage/render drives Playwright Chromium; the engine canvas tests drive WebKit.
+      - run: pnpm --filter @sage/render exec playwright install chromium webkit
       # Browser-equivalence tests use the runner's preinstalled Google Chrome (CHROME_BIN
       # overrides the path) and skip themselves when it is missing.
       - run: pnpm -r --if-present test
