@@ -202,7 +202,7 @@ final class TalkWindowModel {
         if let id, let h = holds.first(where: { $0.id == id }) { canvas.seek(h.at) }
     }
 
-    func scrub(to t: Double) { canvas.seek(t) }
+    func scrub(to t: Double) { canvas.scrub(t) }
     func next() { canvas.next() }
     func prev() { canvas.prev() }
     func through() { canvas.through() }

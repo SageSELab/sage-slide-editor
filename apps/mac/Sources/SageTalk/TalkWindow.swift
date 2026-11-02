@@ -47,10 +47,30 @@ struct TalkWindow: View {
     }
 
     @ViewBuilder private var canvas: some View {
-        ZStack {
-            Color.black
-            if model.talk != nil { FilmViewRepresentable(film: model.canvas) }
-            if let err = model.error { Text(err).foregroundStyle(.white).padding() }
+        VStack(spacing: 0) {
+            ZStack(alignment: .top) {
+                Color.black
+                if model.talk != nil { FilmViewRepresentable(film: model.canvas) }
+                if let err = model.error {
+                    // A failed rebuild keeps the last good film visible underneath.
+                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(.red.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .accessibilityIdentifier("canvas.error")
+                }
+            }
+            TransportBar(model: model)
+            if let status = model.status {
+                Text(status)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.bottom, 5)
+                    .background(.bar)
+                    .accessibilityIdentifier("canvas.status")
+            }
         }
     }
 
