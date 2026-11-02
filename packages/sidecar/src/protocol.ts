@@ -307,7 +307,11 @@ export interface StyleArgs {
   color?: string | null; textAlign?: string | null; fontWeight?: number | string | null; fontStyle?: string | null; fontFamily?: string | null; textDecoration?: string | null;
 }
 
-/** talk.edit ops and their args. Element ops find the scene holding #id unless `scene` names it. */
+/**
+ * talk.edit ops and their args. Element ops find the scene holding #id unless `scene` names it.
+ * `id` may be an element address (`g1>div.t`: an element without an id under #g1; see core
+ * edit-html.ts): the edit gives it an id first, returned as `assigned`.
+ */
 export interface EditOps {
   setText: { id: string; html: string; scene?: string };
   setStyle: { id: string; style: StyleArgs; scene?: string };
@@ -341,6 +345,11 @@ export interface EditResult {
   holds?: Hold[];
   /** stretchBeat only: calls rewritten, and those left alone. */
   stretch?: { stretched: number; skipped: StretchSkip[] };
+  /**
+   * setText/setStyle/setAttr on an element address (`g1>div.t`, an element without an id):
+   * the id the edit gave the element, which the host selects from now on.
+   */
+  assigned?: string;
 }
 
 export interface EditMethods {
@@ -415,7 +424,8 @@ export function checkEditResult(r: unknown): Problems {
   if (!isObj(r)) return ['result: expected an object'];
   const s = r.stretch;
   return [
-    ...keys(r, 'result', ['inverse', 'changed', 'ok', 'diagnostics'], ['holds', 'stretch']),
+    ...keys(r, 'result', ['inverse', 'changed', 'ok', 'diagnostics'], ['holds', 'stretch', 'assigned']),
+    ...want(r.assigned === undefined || (isStr(r.assigned) && /^[^\s>]+$/.test(r.assigned)), 'result.assigned: expected an id'),
     ...checkInverse(r.inverse, 'result.inverse'),
     ...checkList(r.changed, 'result.changed', (x, at) => want(isStr(x) && !x.startsWith('/'), `${at}: expected a relative path`)),
     ...want(typeof r.ok === 'boolean', 'result.ok: expected a boolean'),

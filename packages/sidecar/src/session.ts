@@ -132,6 +132,7 @@ export class Session {
   private async afterWrite(t: OpenTalk, a: Applied, author: WriteAuthor = 'app'): Promise<EditResult> {
     const result: EditResult = { inverse: a.inverse, changed: a.changed, ok: true, diagnostics: [] };
     if (a.stretch) result.stretch = a.stretch;
+    if (a.assigned) result.assigned = a.assigned;
     if (!a.changed.length) return result;
     // The watcher will report these paths as 'app'; this build already covers them.
     if (author === 'app') for (const f of a.changed) this.builtByEdit.add(f);

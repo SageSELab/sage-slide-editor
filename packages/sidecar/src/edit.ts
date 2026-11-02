@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  EditError, applyPatches, recordTalk, deleteBeat, duplicateBeat, insertBeat, loadTalk, makeEdit, moveBeat, sceneElements, setAttr,
+  EditError, applyPatches, assignId, isAddress, parseAddress, recordTalk, deleteBeat, duplicateBeat, insertBeat, loadTalk, makeEdit, moveBeat, sceneElements, setAttr,
   setBeatProps, setChapterProps, setHold, setNotes, setStyle, setText, spineSources, stretchBeat,
   type Edit, type LoadedTalk, type Patch, type SourceFile,
 } from '@sage/core';
@@ -24,6 +24,8 @@ export interface Applied {
   changed: string[];
   inverse: Inverse;
   stretch?: { stretched: number; skipped: StretchSkip[] };
+  /** An element op on an address: the id the edit gave the element. */
+  assigned?: string;
 }
 
 const failed = (e: unknown): never => {
@@ -31,11 +33,17 @@ const failed = (e: unknown): never => {
   throw e;
 };
 
-/** The scene file (layers, chapter scenes, public scene) that holds #id. */
-function sceneFor(talk: LoadedTalk, id: string, scene?: string): SourceFile {
+/** The talk's scene files (layers, chapter scenes, public scene) by path. */
+function sceneFiles(talk: LoadedTalk): Map<string, SourceFile> {
   const files = new Map<string, SourceFile>();
   if (talk.layers) files.set(talk.layers.path, talk.layers);
   for (const c of [...talk.chapters, ...(talk.publicChapter ? [talk.publicChapter] : [])]) if (c.scene) files.set(c.scene.path, c.scene);
+  return files;
+}
+
+/** The scene file that holds #id. */
+function sceneFor(talk: LoadedTalk, id: string, scene?: string): SourceFile {
+  const files = sceneFiles(talk);
   if (scene !== undefined) {
     const f = files.get(scene);
     if (!f) throw new RpcError(ErrorCode.EditFailed, `${scene} is not a scene of this talk`, { code: 'no-scene' });
@@ -64,10 +72,13 @@ export function runtimeTextKeys(talk: LoadedTalk): string[] {
   return [...keys];
 }
 
-/** Refuses a text edit that would contain runtime-rewritten text (PLAN 13, risk 4). */
-function guardRuntimeText(talk: LoadedTalk, id: string, html: string) {
+/**
+ * Refuses a text edit that would contain runtime-rewritten text (PLAN 13, risk 4). `key` is
+ * the element's recording key when it differs from `#id` (an addressed element, `#g1/1`).
+ */
+function guardRuntimeText(talk: LoadedTalk, id: string, html: string, key = '#' + id) {
   const hits = runtimeTextKeys(talk).filter((k) => {
-    if (k === '#' + id || k.startsWith('#' + id + '/')) return true; // the element or an unnamed descendant
+    if (k === key || k.startsWith(key + '/')) return true; // the element or an unnamed descendant
     const own = /^#([^/]+)/.exec(k)?.[1];
     return !!own && new RegExp(`\\bid\\s*=\\s*["']${own.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`).test(html); // a named descendant
   });
@@ -76,10 +87,36 @@ function guardRuntimeText(talk: LoadedTalk, id: string, html: string) {
   }
 }
 
+/**
+ * An element op on an address (an element without an id, `g1>div.t`): in one edit, the
+ * element gets a readable unique id and the op runs on it. The edit is a single patch from the
+ * new id to the op's change, so one undo takes both back.
+ */
+function addressedEdit(talk: LoadedTalk, p: Extract<EditParams, { op: 'setText' | 'setStyle' | 'setAttr' }>): Edit & { assigned: string } {
+  const base = parseAddress(p.args.id)?.base;
+  if (!base) throw new EditError('bad-address', `"${p.args.id}" is not an element address`);
+  const scene = sceneFor(talk, base, p.args.scene);
+  const taken = new Set<string>();
+  for (const f of sceneFiles(talk).values()) for (const e of sceneElements(f.text)) if (e.id) taken.add(e.id);
+  const r = assignId(scene, p.args.id, taken);
+  let op: Edit;
+  switch (p.op) {
+    case 'setText':
+      guardRuntimeText(talk, r.id, p.args.html, r.key);
+      op = setText(r.scene, r.id, p.args.html);
+      break;
+    case 'setStyle': op = setStyle(r.scene, r.id, p.args.style); break;
+    case 'setAttr': op = setAttr(r.scene, r.id, p.args.name, p.args.value); break;
+  }
+  const next = applyPatches(r.scene.text, op.patches, scene.path);
+  return { ...makeEdit({ [scene.path]: scene.text }, [{ file: scene.path, range: [0, scene.text.length], newText: next }]), assigned: r.id };
+}
+
 /** Computes the core Edit for an op against the talk as loaded from disk. */
-export function computeEdit(talk: LoadedTalk, p: EditParams): Edit & { stretch?: Applied['stretch'] } {
+export function computeEdit(talk: LoadedTalk, p: EditParams): Edit & { stretch?: Applied['stretch']; assigned?: string } {
   try {
     const spine = () => spineSources(talk);
+    if ((p.op === 'setText' || p.op === 'setStyle' || p.op === 'setAttr') && isAddress(p.args.id)) return addressedEdit(talk, p);
     switch (p.op) {
       case 'setText': {
         const scene = sceneFor(talk, p.args.id, p.args.scene);
@@ -161,7 +198,7 @@ export function applyEdit(root: string, watcher: TalkWatcher | null, p: EditPara
   const current = new Map<string, string>();
   for (const f of new Set(e.patches.map((x) => x.file))) current.set(f, fs.readFileSync(safePath(root, f), 'utf8'));
   const out = commit(root, watcher, current, e.patches, author);
-  return e.stretch ? { ...out, stretch: e.stretch } : out;
+  return { ...out, ...(e.stretch ? { stretch: e.stretch } : {}), ...(e.assigned ? { assigned: e.assigned } : {}) };
 }
 
 /** talk.revert: refuse when any touched file's digest changed, else apply the inverse. */

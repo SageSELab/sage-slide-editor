@@ -1,6 +1,6 @@
 // Text the film rewrites while it plays (counters, typewriters, B.set text steps) must not be
 // edited in place: the app would capture whatever the runtime showed and save it to the source.
-import { loadTalk } from '@sage/core';
+import { applyPatches, loadTalk } from '@sage/core';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -38,5 +38,31 @@ describe('runtime-rewritten text', () => {
 
   it('still allows ordinary text', () => {
     expect(refusal(() => setText('t-h', '<span class="w">Automated </span><span class="w">repair</span>'))).toBeUndefined();
+  });
+});
+
+describe('element addresses (elements without an id)', () => {
+  const apply = (p: Parameters<typeof computeEdit>[1]) => {
+    const e = computeEdit(talk, p);
+    const f = talk.chapters.flatMap((c) => (c.scene ? [c.scene] : [])).find((s) => s.path === e.patches[0]!.file)!;
+    return { e, text: applyPatches(f.text, e.patches, f.path) };
+  };
+
+  it('gives the element an id and edits it, in one patch', () => {
+    const { e, text } = apply({ op: 'setText', args: { id: 'c1-bench>p.sub:1', html: 'Success was set by unit tests.' } });
+    expect(e.assigned).toBe('c1-bench-sub');
+    expect(e.patches).toHaveLength(1);
+    expect(text).toContain('<p id="c1-bench-sub" class="sub" style="margin-top:10px;font-size:34px">Success was set by unit tests.</p>');
+    const st = apply({ op: 'setStyle', args: { id: 'c1-bench>p.sub', style: { color: '#ff2d78' } } }).text;
+    expect(st).toContain('<p id="c1-bench-sub" class="sub" style="color:#ff2d78;font-weight:600;font-size:40px">');
+  });
+
+  it('keeps the runtime-text guard for addressed elements', () => {
+    expect(refusal(() => setText('verd>span.verdict:2', 'X'))).toBe('runtime-text');
+  });
+
+  it('refuses an address the source does not have', () => {
+    expect(refusal(() => setText('c1-bench>p.sub:5', 'X'))).toBe('stale-path');
+    expect(refusal(() => setText('nope>p', 'X'))).toBe('no-element');
   });
 });

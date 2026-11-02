@@ -179,6 +179,7 @@ interface EditResult {
   diagnostics: Diagnostic[];
   holds?: Hold[];            // after a successful rebuild
   stretch?: { stretched: number; skipped: { file, line, col, call, reason }[] };  // stretchBeat
+  assigned?: string;         // element op on an address: the id the edit gave the element
 }
 ```
 
@@ -200,6 +201,15 @@ interface EditResult {
 - Element ops find the one scene file (layers, chapter scenes, public scene) whose source has
   `#id`. `scene` names it explicitly. An id that only exists in generated DOM is EditFailed
   with `data.code: 'no-element'`.
+- `id` may instead be an **element address**, for an element without an id (the canvas's
+  drill-down into a card's title): the nearest ancestor with an id, then one `>`-separated
+  step per level, each the tag, the first class when it is a plain name, and `:n` for the n-th
+  (0-based) sibling with that tag and class: `g1>div.t`, `c4>p.sub:1`, `g1>div.mini>div.ico`.
+  The edit gives the element a readable id unique across the talk's scenes (`g1-t`, then
+  `g1-t-2`, ...) inserted right after its tag name, applies the op to it, and returns the id
+  as `assigned`; one patch, so one undo removes both. An address the source does not have
+  (the film generated the element, or the source changed) is EditFailed `stale-path`; one
+  whose element has an id is `stale-path` too (use the id). The runtime-text guard applies.
 - The edit is computed against the files as they are on disk. Every touched file is announced
   to the watcher and staged under `.sage/tmp/` before any is renamed into place, so the
   watcher reports the paths with `source: 'app'`, and a failure while staging writes nothing.
@@ -216,7 +226,7 @@ interface EditResult {
 
 | Code | Name | Meaning |
 |---|---|---|
-| -32010 | EditFailed | The core refused the edit. `data.code` is the core's code (`no-element`, `duplicate-element`, `no-end-tag`, `no-beat`, `no-chapter`, `duplicate-beat`, `bad-index`, `bad-prop`, `no-scene`, `invalid-spine`, ...) |
+| -32010 | EditFailed | The core refused the edit. `data.code` is the core's code (`no-element`, `duplicate-element`, `stale-path`, `bad-address`, `no-end-tag`, `no-beat`, `no-chapter`, `duplicate-beat`, `bad-index`, `bad-prop`, `no-scene`, `invalid-spine`, ...) |
 | -32011 | EditConflict | `talk.revert`: a file changed since the inverse was issued. `data.files` |
 
 Fixtures: `talk.edit.request.<op>[-variant].json` (one per op), `talk.edit.response[.variant].json`,
