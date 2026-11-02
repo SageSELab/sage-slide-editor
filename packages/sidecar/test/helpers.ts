@@ -26,6 +26,23 @@ export async function eventually<T>(fn: () => T | undefined | null | false, time
   }
 }
 
+/**
+ * Resolves once none of the watched arrays has grown for `quietMs` (the folder watcher and the
+ * builds it triggers have drained), or throws after `timeoutMs`. Use instead of a fixed sleep:
+ * on a loaded machine a fixed sleep lets one test's late notifications leak into the next.
+ */
+export async function quiet(arrays: unknown[][], quietMs = 400, timeoutMs = 10_000): Promise<void> {
+  const end = Date.now() + timeoutMs;
+  let sizes = arrays.map((a) => a.length), since = Date.now();
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 25));
+    const now = arrays.map((a) => a.length);
+    if (now.some((n, i) => n !== sizes[i])) { sizes = now; since = Date.now(); }
+    else if (Date.now() - since >= quietMs) return;
+    if (Date.now() > end) throw new Error('timed out waiting for the watcher to go quiet');
+  }
+}
+
 /** Beat count and the sum of explicit holds, read from a talk's own talk.json (the fixture is still growing). */
 export function spineStats(root: string): { beats: number; explicitDuration: number | null } {
   const spine = JSON.parse(fs.readFileSync(path.join(root, 'talk.json'), 'utf8')) as { chapters: { beats?: { hold?: number }[] }[] };

@@ -8,7 +8,7 @@ import { applyInverse, sha256 } from '../src/edit.ts';
 import { ErrorCode, editResultCheckers, type BuiltParams, type ChangedParams, type EditParams, type EditResult } from '../src/protocol.ts';
 import { sageCore } from '../src/sage-core.ts';
 import { Session } from '../src/session.ts';
-import { eventually, tempTalk } from './helpers.ts';
+import { eventually, quiet, tempTalk } from './helpers.ts';
 
 const SOURCES = (root: string) => {
   const out: Record<string, string> = {};
@@ -64,6 +64,7 @@ describe('talk.edit on a temp copy', () => {
   ];
 
   it.each(cases)('$name: writes as the app, rebuilds, and the inverse restores every byte', async ({ p, check }) => {
+    await quiet([changed, built]); // nothing from an earlier case may still be in flight
     const before = SOURCES(t.root);
     const nChanged = changed.length, nBuilt = built.length;
     const r = await s.edit(p);
@@ -87,7 +88,7 @@ describe('talk.edit on a temp copy', () => {
     check(redo, t.root);
     await s.revert(redo.inverse);
     expect(SOURCES(t.root)).toEqual(before);
-    await new Promise((r2) => setTimeout(r2, 250)); // let the watcher drain before the next case
+    await quiet([changed, built]); // let the watcher drain before checking and before the next case
     expect(built.slice(nBuilt).every((b) => b.trigger === 'edit')).toBe(true);
   }, 30_000);
 
