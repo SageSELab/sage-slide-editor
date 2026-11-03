@@ -373,6 +373,56 @@ describe('in-place text, without any mode', () => {
     await p.close();
   });
 
+  it('while editing, a drag selects text (even under a transparent full-stage layer); it never moves the object', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    const pt = await at(p, ...H);
+    await p.mouse.click(pt.x, pt.y);
+    await p.waitForTimeout(400);
+    await p.mouse.click(pt.x, pt.y);
+    expect(await editing(p)).toBe('true');
+    await allMsgs(p);
+    const from = await at(p, 1002, 730), to = await at(p, 1250, 730); // from before "Hello" into "bold"
+    await p.mouse.move(from.x, from.y);
+    await p.mouse.down();
+    await p.mouse.move((from.x + to.x) / 2, to.y, { steps: 4 });
+    await p.mouse.move(to.x, to.y, { steps: 4 });
+    await p.mouse.up();
+    const text = await p.evaluate(() => getSelection()!.toString());
+    expect(text.startsWith('Hello')).toBe(true);
+    expect(text.length).toBeGreaterThan(6);
+    expect(await editing(p)).toBe('true'); // still editing
+    expect(await style(p, 'h')).toMatchObject({ left: '1000px', top: '700px' }); // not moved
+    expect((await msgs(p)).filter((m) => m.type === 'move')).toEqual([]);
+    // Shift-click extends the selection to the end of "world".
+    const end = await p.evaluate(() => { const b = document.getElementById('h')!.getBoundingClientRect(); return { x: b.right - 2, y: b.top + b.height / 2 }; });
+    await p.keyboard.down('Shift');
+    await p.mouse.click(end.x, end.y);
+    await p.keyboard.up('Shift');
+    expect(await p.evaluate(() => getSelection()!.toString())).toBe('Hello bold world');
+    // Dragging backwards from the end selects too.
+    await p.waitForTimeout(400);
+    await p.mouse.move(end.x, end.y);
+    await p.mouse.down();
+    await p.mouse.move(to.x, to.y, { steps: 4 });
+    await p.mouse.up();
+    expect((await p.evaluate(() => getSelection()!.toString())).length).toBeGreaterThan(2);
+    await p.close();
+  });
+
+  it('a press outside the edited text still commits it and selects what is there', async () => {
+    const p = await open(path.join(tmp, 'synthetic.html'));
+    const pt = await at(p, ...H);
+    await p.mouse.click(pt.x, pt.y);
+    await p.waitForTimeout(400);
+    await p.mouse.click(pt.x, pt.y);
+    expect(await editing(p)).toBe('true');
+    const b = await at(p, 700, 500);
+    await p.mouse.click(b.x, b.y);
+    expect(await editing(p)).toBeNull();
+    expect(await p.evaluate(() => (window as any).SageCanvas.selection())).toBe('b');
+    await p.close();
+  });
+
   it('typing with a text object selected starts editing with that character; Enter commits, keeping inline tags', async () => {
     const p = await open(path.join(tmp, 'synthetic.html'));
     await p.mouse.click(...Object.values(await at(p, ...H)) as [number, number]);

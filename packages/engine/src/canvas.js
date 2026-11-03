@@ -47,6 +47,9 @@
 // editing with it, Cmd-B/I/U format it, Escape goes up a level, Tab cycles objects. While
 // editing text: Escape or Enter commits and leaves the text (the object stays selected),
 // Shift-Enter is a line break, a click elsewhere commits; Cmd-B/I/U format the selected range.
+// Inside the edited text a press places the caret, a drag selects (Shift-click extends, a
+// double-click takes the word, a triple-click all of it); the canvas does this itself, since a
+// transparent full-stage layer above the text would otherwise take the press and move the box.
 // Space is never taken from the engine unless the caret is in text.
 (function () {
   'use strict';
@@ -591,7 +594,7 @@
       if (e.button !== 0 || this.suspended) return;
       const handle = e.target?.closest?.('.sage-canvas-overlay .sc-h');
       if (this.editing) {
-        if (this.editing.el.contains(e.target)) return; // caret placement inside the edited text
+        if (this.overText(this.editing.el, e.clientX, e.clientY)) return this.startTextDrag(e);
         this.commitText();
       }
       if (!handle && !this.inStage(e)) return;
@@ -607,6 +610,38 @@
       if (hit.el) this.startDrag(e, hit.el, null, hit);
     },
 
+    /** True when a client point lies on the edited element's box (a few px of slack). */
+    overText(el, x, y) {
+      const b = el.getBoundingClientRect(), pad = 4;
+      return x >= b.left - pad && x <= b.right + pad && y >= b.top - pad && y <= b.bottom + pad;
+    },
+
+    /**
+     * A press on the text being edited: the caret goes to the point, a drag extends the
+     * selection, Shift extends the current one, a triple-click selects all of it (a
+     * double-click selects the word, onDblClick). Done by hand rather than left to the browser,
+     * because a transparent layer above the text (a full-stage background) would take the
+     * press, and the browser would neither place the caret nor select.
+     */
+    startTextDrag(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const el = this.editing.el, s = getSelection();
+      if (document.activeElement !== el) el.focus({ preventScroll: true });
+      if (e.detail >= 3) {
+        const all = document.createRange();
+        all.selectNodeContents(el);
+        s?.removeAllRanges();
+        s?.addRange(all);
+        return;
+      }
+      const r = this.caretAt(e.clientX, e.clientY);
+      if (!r || !s) return;
+      if (e.shiftKey && s.rangeCount && el.contains(s.anchorNode)) s.extend(r.startContainer, r.startOffset);
+      else { s.removeAllRanges(); s.addRange(r); }
+      this.textDrag = { node: s.anchorNode, offset: s.anchorOffset };
+    },
+
     startDrag(e, el, handle, { was = false, deeper = null } = {}) {
       this.drag = {
         el, handle, x0: e.clientX, y0: e.clientY, moved: false, pointerId: e.pointerId, wasSelected: was, deeper,
@@ -616,6 +651,13 @@
     },
 
     onMove(e) {
+      if (this.textDrag) {
+        e.preventDefault();
+        e.stopPropagation();
+        const r = this.editing && this.caretAt(e.clientX, e.clientY), a = this.textDrag;
+        if (r) getSelection()?.setBaseAndExtent(a.node, a.offset, r.startContainer, r.startOffset);
+        return;
+      }
       const d = this.drag;
       if (!d) { if (!this.suspended) this.hoverAt(e.clientX, e.clientY); return; }
       e.preventDefault();
@@ -691,6 +733,12 @@
     },
 
     onUp(e) {
+      if (this.textDrag) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.textDrag = null;
+        return;
+      }
       const d = this.drag;
       if (!d) return;
       e.preventDefault();
@@ -899,6 +947,7 @@
     endText() {
       const ed = this.editing;
       this.editing = null;
+      this.textDrag = null;
       ed.el.removeEventListener('paste', ed.onPaste);
       ed.el.removeEventListener('drop', ed.onDrop);
       ed.el.removeEventListener('input', ed.onInput);
