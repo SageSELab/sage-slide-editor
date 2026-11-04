@@ -43,13 +43,13 @@
 
 **Implications.** Four `.impl` cards entering staggered, each with a number, a claim, one sentence, and a mini illustration; then a summary pane with the four big numbers and a `.report` package card plus `.qrtile` row.
 
-**One more thing.** Fade `#black` to 1 over 0.9 s, type "One more thing." with a cursor, hold; then the dark setup pane (agents with logos, configurations, the 600-cell grid) and the heat-map outcome grid; back to light only for backups.
+**One more thing.** Fade `#black` to 1 over 0.9 s, type "One more thing." with a cursor, hold; then the dark setup pane (the tools with logos, the settings, a cell grid that counts every run) and the heat-map outcome grid; back to light only for backups.
 
 **Close.** `.h-xl` "How far are we?", two-line verdict, links block (package, DOI, contact emails, lab URL), QR tiles beside the title, affiliation logos in white.
 
 **Recruiting slide.** A round headshot, eyebrow "One more one more thing", the student's name in `.h-xl`, two lines on who they are, the bold line about what they are looking for, an email. Private (stripped from the public build).
 
-**Backups.** Title card "Backup", then each backup as its own hold with `backup=true`: agent trajectory replay in a `.term`, headline counters, per-bug patch tree, failure families, the test replay. Backups may re-show the light theme by fading `#black` out.
+**Backups.** Title card "Backup", then each backup as its own hold with `backup=true`: a run replayed in a `.term`, headline counters, per-bug patch tree, failure categories, the test replay. Backups may re-show the light theme by fading `#black` out.
 
 ## Writing on slides
 
