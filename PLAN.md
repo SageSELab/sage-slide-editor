@@ -528,7 +528,7 @@ pixel-identical; sidecar running on the real core (67 tests) with the Swift clie
 engine font and dash fixes applied (Chrome output unchanged, WebKit vs Chromium median 0.99 %
 to 0.15 %, only the five 3D exploded-view holds above 1 %). `talkc publish` of the ISSTA port
 matches the original's published file at all 49 holds (byte-identical frames, same hold list),
-loads alone from `file://` with no network, and carries no private text; the agent charts
+loads alone from `file://` with no network, and carries no private text; the private chapters' charts
 moved from `lib/dots.js` and `lib/bars.js` to `lib/agents.js` so the cut can drop them. The
 second ghost clause is `talkc validate --render` (`ghost-visible`); the ISSTA port is clean,
 presented and public. Remaining: CI wiring of the golden suite; retiring the skill's scripts
