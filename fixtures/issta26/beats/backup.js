@@ -1,5 +1,5 @@
-// beats/backup.js — chapter "Backup" (private, backup; dark except the last beat): the agent
-// at work, the headline, twelve patches, tests vs localization, why agents fail, and the
+// beats/backup.js — chapter "Backup" (private, backup; dark except the last beat): an invented
+// tool run, the headline, twelve variants, setting Y, why runs fail (all placeholders), and the
 // two-tests-per-bug replay. Times relative to each beat's start; BK = 271.3.
 
 Talk.beat('backup.backup', (B) => {        // @271.3 (BK)
@@ -25,9 +25,9 @@ Talk.beat('backup.agent', (B) => {         // @273.3 (AG)
 Talk.beat('backup.headline', (B) => {      // @303.8 (HL)
   B.out('#c8-th, #bigterm, #c8-tcap, #aok', 0, { dur: 0.5, stagger: 0.03 });
   B.lib.device.menuOut(B, 0); B.lib.device.rigShow(B, 0, false);
-  B.in('#hl1', 0.5, { dur: 1, y: 0, scale: 0.9, blur: 16 }); B.count('#n74', 0.7, 1.4, 74);
-  B.in('#hl2', 1.0, { dur: 1, y: 0, scale: 0.9, blur: 16 }); B.count('#n50b', 1.2, 1.4, 50);
-  B.in('#hl3', 1.5, { dur: 1, y: 0, scale: 0.9, blur: 16 }); B.count('#n9', 1.7, 1.4, 9);
+  B.in('#hl1', 0.5, { dur: 1, y: 0, scale: 0.9, blur: 16 }); B.count('#n74', 0.7, 1.4, 67);
+  B.in('#hl2', 1.0, { dur: 1, y: 0, scale: 0.9, blur: 16 }); B.count('#n50b', 1.2, 1.4, 44);
+  B.in('#hl3', 1.5, { dur: 1, y: 0, scale: 0.9, blur: 16 }); B.count('#n9', 1.7, 1.4, 32);
 });
 
 Talk.beat('backup.patches', (B) => {       // @308.8 (TP)
