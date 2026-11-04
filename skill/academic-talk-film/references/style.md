@@ -53,6 +53,7 @@
 
 ## Writing on slides
 
+- No commas in any headline, card title, or hold label (Kevin's rule). Rewrite with "and", "on", "over", "but" or "for". Dates inside a milestone label are not titles and may keep theirs.
 - Headline ≤ 6 words, verb optional, in his paper voice: "Fifteen years of automated program repair", "What a repair tool needs", "Synthetic bugs: Android mutants injected into real code."
 - Subtitle ≤ 2 lines, concrete: "Three software engineering agents on the real bugs of DroidFixBench".
 - Captions state the data source or the mechanism: "1,074 of 1,592. The tools reference things that do not exist in the project."
