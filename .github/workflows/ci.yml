@@ -1,9 +1,10 @@
-# CI per PLAN 12.9. Runs on pull requests and on demand only: macOS runner minutes on a private
-# repository are billed at a multiple of Linux minutes, so there is no push or nightly trigger
-# yet. Add `push: { branches: [main] }` or a `schedule` when the budget allows.
+# CI per PLAN 12.9: every push to main, every pull request, and on demand. The repository is
+# public, so macOS runner minutes are free.
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -13,7 +14,7 @@ concurrency:
 
 jobs:
   typescript:
-    name: Core and sidecar (TypeScript)
+    name: TypeScript (core, sidecar, engine, render)
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -31,7 +32,7 @@ jobs:
       - run: pnpm -r --if-present test
 
   swift:
-    name: Mac app (Swift)
+    name: Mac app (Swift tests)
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -47,3 +48,78 @@ jobs:
       - name: Test
         working-directory: apps/mac
         run: swift test
+
+  selftest:
+    name: App self-test
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: pnpm --filter @sage/render exec playwright install chromium
+      # The self-test edits the talk it opens: run it on a copy, never on the fixture.
+      - name: Self-test on a copy of fixtures/issta26
+        run: |
+          mkdir -p "$RUNNER_TEMP/talk"
+          cp -R fixtures/issta26 "$RUNNER_TEMP/talk/ISSTA.talk"
+          bash apps/mac/scripts/selftest.sh "$RUNNER_TEMP/talk/ISSTA.talk" "$RUNNER_TEMP/selftest"
+      - name: Upload the self-test renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest
+          path: ${{ runner.temp }}/selftest
+          if-no-files-found: ignore
+
+  golden:
+    name: Golden frames (port vs original deck, Chromium)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: npm ci
+        working-directory: spikes/format
+      - name: Build the port (fixtures/issta26/build, gitignored)
+        run: node packages/core/src/cli.ts build fixtures/issta26
+      # Shoots every hold, hold ± 0.5 s and mid-motion times of both decks with the runner's
+      # Google Chrome and diffs them; any differing pixel or checkpoint list fails the job.
+      - name: Compare
+        working-directory: spikes/format
+        run: |
+          node diff.mjs --out ci-out | tee "$RUNNER_TEMP/golden.txt"
+          grep -q '^cplist: identical' "$RUNNER_TEMP/golden.txt" || { echo "::error::checkpoint lists differ"; exit 1; }
+          n=$(grep -cE '^\s+t=' "$RUNNER_TEMP/golden.txt" || true)
+          [ "$n" -gt 0 ] || { echo "::error::no frames compared"; exit 1; }
+          if grep -E '^\s+t=' "$RUNNER_TEMP/golden.txt" | grep -vE 'diff=0 raw=0'; then
+            echo "::error::frames differ from the original deck"; exit 1
+          fi
+          echo "$n frames identical"
+
+  package:
+    name: Package and smoke-test the app
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the bundle version comes from git describe
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: bash apps/mac/scripts/package.sh
+      - run: bash apps/mac/scripts/package-smoke.sh
+      - name: Zip the app
+        run: ditto -c -k --sequesterRsrc --keepParent "apps/mac/build/SAGE Talk.app" "$RUNNER_TEMP/SAGE-Talk.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SAGE-Talk-${{ github.sha }}
+          path: ${{ runner.temp }}/SAGE-Talk.zip
+          retention-days: 14

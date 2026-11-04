@@ -1,0 +1,49 @@
+# Release: push a tag like v0.2.0. Builds the packaged app, runs its smoke test, and publishes
+# SAGE-Talk-<version>.zip on a GitHub release. The app is ad-hoc signed, not notarized (no
+# Developer ID yet): users open it the first time with Control-click ▸ Open.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build a release for
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: bash apps/mac/scripts/package.sh
+      - run: bash apps/mac/scripts/package-smoke.sh
+      - name: Zip the app
+        run: ditto -c -k --sequesterRsrc --keepParent "apps/mac/build/SAGE Talk.app" "SAGE-Talk-${TAG#v}.zip"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<NOTES
+          Apple silicon, macOS 15 or later. Unzip, move **SAGE Talk.app** to Applications, and
+          the first time Control-click it and choose **Open** (the app is not notarized yet).
+          NOTES
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "SAGE-Talk-${TAG#v}.zip" --clobber
+          else
+            gh release create "$TAG" "SAGE-Talk-${TAG#v}.zip" --title "SAGE Talk ${TAG#v}" --notes-file notes.md --generate-notes
+          fi
