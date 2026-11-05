@@ -143,7 +143,7 @@ public final class ThemesModel {
         if selectedID == nil || !entries.contains(where: { $0.id == selectedID }) { selectedID = entries.first?.id }
     }
 
-    private func run<T>(_ what: String, _ body: () async throws -> T) async -> T? {
+    private func run<T>(_ what: String, _ body: @MainActor () async throws -> T) async -> T? {
         busy = true
         defer { busy = false }
         do {
