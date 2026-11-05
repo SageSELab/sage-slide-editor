@@ -194,6 +194,9 @@ public enum CanvasMessage: Equatable, Sendable {
     case format(CanvasTextState)
     case rect(id: String, rect: CanvasRect)
     case refused(id: String, reason: String)
+    /// The film started (true) or stopped (false) playing: the overlay stepped aside or came
+    /// back. Sent at once, so the app does not wait for the film's own progress messages.
+    case playing(Bool)
 
     /// Parses a `{kind: 'canvas', type, ...}` message body (nil for anything else).
     public static func parse(_ body: [String: Any]) -> CanvasMessage? {
@@ -233,6 +236,9 @@ public enum CanvasMessage: Equatable, Sendable {
         case "refused":
             guard let id else { return nil }
             return .refused(id: id, reason: body["reason"] as? String ?? "")
+        case "playing":
+            guard let p = body["playing"] as? Bool else { return nil }
+            return .playing(p)
         default: return nil
         }
     }
@@ -245,7 +251,7 @@ public enum CanvasMessage: Equatable, Sendable {
     /// The source edit a canvas change asks for.
     public var editOp: EditOp? {
         switch self {
-        case .select, .refused, .editing, .format, .rect: nil
+        case .select, .refused, .editing, .format, .rect, .playing: nil
         case .move(let id, let l, let t): .setStyle(id: id, style: .px(left: l, top: t))
         case .resize(let id, let l, let t, let w, let h): .setStyle(id: id, style: .px(left: l, top: t, width: w, height: h))
         case .text(let id, let html): .setText(id: id, html: html)

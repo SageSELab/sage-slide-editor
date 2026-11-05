@@ -596,12 +596,12 @@ describe('playback', () => {
     }));
     await p.evaluate(() => (window as any).T.play());
     expect(await overlay()).toEqual({ shown: false, suspended: true, on: false });
-    expect(await msgs(p)).toEqual([{ type: 'text', id: 'c1-eye', html: 'Fifteen years of automated program repair!' }]); // committed on play
+    expect(await msgs(p)).toEqual([{ type: 'text', id: 'c1-eye', html: 'Fifteen years of automated program repair!' }, { type: 'playing', playing: true }]); // committed on play; the host told at once
     expect(await p.evaluate(() => (window as any).SageCanvas.key('ArrowRight', {}))).toBe(false); // the transport's
     await p.evaluate(() => (window as any).T.pause());
     expect(await overlay()).toEqual({ shown: true, suspended: false, on: true });
     await p.waitForTimeout(50);
-    expect((await msgs(p)).map((m) => [m.type, m.id])).toEqual([['select', 'c1-eye']]); // state at the new time
+    expect((await msgs(p)).map((m) => [m.type, m.id ?? m.playing])).toEqual([['playing', false], ['select', 'c1-eye']]); // stopped, then the state at the new time
     expect(await p.evaluate(() => (window as any).SageCanvas.selection())).toBe('c1-eye');
     await p.evaluate(() => (window as any).T.seek(0)); // scrubbed to before #c1-eye comes in
     await p.waitForTimeout(50);

@@ -24,6 +24,7 @@
 //   {type: 'editing', id}                                       the caret went into #id's text (id null: left it)
 //   {type: 'format', id, bold, italic, underline, color, range} the text selection's formatting while editing
 //   {type: 'rect', id, rect}                                    the selected element's client box changed
+//   {type: 'playing', playing}                                  the film started or stopped (overlay hidden or back)
 //   {type: 'refused', id, reason}                               'block-children': text edit refused
 //
 // Selection (Keynote): a click selects the OUTERMOST object under the pointer (a card, not its
@@ -173,6 +174,7 @@
       }
       this.film.classList.toggle('sage-canvas-on', !playing);
       this.update();
+      this.post({ type: 'playing', playing });
       if (!playing) this.revalidate();
     },
 

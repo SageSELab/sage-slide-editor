@@ -72,6 +72,8 @@ extension TalkWindowModel {
             if id == nil { textState = nil }
         case .format(let state):
             if state.id == textEditing { textState = state }
+        case .playing(let p):
+            playing = p
         case .refused(let id, _):
             status = "\(CanvasObject.describe(id)) holds other blocks: click it again to select the text inside, or double-click the text."
         default:

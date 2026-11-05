@@ -19,7 +19,8 @@ final class TalkWindowModel {
     var selectedHold: Hold.ID?
     /// The canvas film's time and play state, relayed after every render.
     private(set) var t: Double = 0
-    private(set) var playing = false
+    /// Set by the film's progress messages and, at once, by the canvas overlay when play starts or stops.
+    var playing = false
     var error: String?
     /// One line about the sidecar or the last build.
     var status: String?
