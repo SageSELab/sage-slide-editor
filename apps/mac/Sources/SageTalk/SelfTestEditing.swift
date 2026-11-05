@@ -52,9 +52,13 @@ extension SelfTest {
         let moved = await waitForEdit(model, applied: 1, ready: ready0, reload: false)
         let scene = copy.appendingPathComponent("scenes/line.html")
         let sceneText = (try? String(contentsOf: scene, encoding: .utf8)) ?? ""
-        check(moved && sceneText.contains("id=\"c1-eye\" data-a style=\"position:absolute;left:\(InspectorFormat.number(left0 + 40))px;top:110px\""),
-              "edit: dragging #c1-eye 40 px wrote left:\(InspectorFormat.number(left0 + 40))px into scenes/line.html")
-        check(abs(model.canvas.t - h2.at) < 1e-6 && model.selection?.id == "c1-eye" && model.selection?.left == left0 + 40,
+        // WebKit rounds synthetic pointer positions to whole screen px, so on a display whose
+        // stage scale is not a nice fraction the 40 stage px land within a pixel of it.
+        let pattern = #"id="c1-eye" data-a style="position:absolute;left:(-?\d+)px;top:110px""#
+        let written = sceneText.firstMatch(of: try! Regex(pattern)).flatMap { Double(String($0.output[1].substring ?? "")) }
+        check(moved && written.map { abs($0 - (left0 + 40)) <= 1 } == true,
+              "edit: dragging #c1-eye 40 px wrote left:\(written.map(InspectorFormat.number) ?? "?")px into scenes/line.html (want \(InspectorFormat.number(left0 + 40)) ± 1)")
+        check(abs(model.canvas.t - h2.at) < 1e-6 && model.selection?.id == "c1-eye" && written != nil && model.selection?.left == written,
               "edit: after the move the canvas stayed at t=\(h2.at) (t=\(model.canvas.t)) without a reload (loads \(model.canvas.readyCount - ready0)) with #c1-eye still selected at left \(model.selection.map { InspectorFormat.number($0.left) } ?? "-")")
         log.append("move: left \(left0) -> \(model.selection?.left ?? .nan), undo \(model.edits.undoTitle)")
         await shot(model, out, "edit-moved.png")
