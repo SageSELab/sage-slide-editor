@@ -61,10 +61,13 @@ enum SelfTest {
         writeHolds(model, to: out.appendingPathComponent("holds.txt"))
         check(model.holds.allSatisfy { $0.notes?.isEmpty == false } || talk.kind == .legacy, "every hold has notes")
 
-        // Thumbnails for every hold.
+        // Thumbnails for every hold, without asking for them: opening a talk must render them
+        // all by itself (rows that appeared before the film booted were once forgotten, and
+        // stayed blank until scrolled).
         let clock = ContinuousClock(), t0 = clock.now
-        model.thumbnails.requestAll()
-        let thumbsDone = await waitFor(seconds: 120) { model.thumbnails.pendingCount == 0 && !model.thumbnails.busy }
+        let thumbsDone = await waitFor(seconds: 120) {
+            !model.thumbnails.busy && model.holds.allSatisfy { model.thumbnails.isFresh($0) && model.thumbnails.image(for: $0) != nil }
+        }
         let th = model.thumbnails
         let line = "holds \(model.holds.count) rendered \(th.rendered) adopted \(th.adopted) fromDisk \(th.loadedFromDisk) in \(clock.now - t0)"
         try? (line + "\n").write(to: out.appendingPathComponent("thumbs.txt"), atomically: true, encoding: .utf8)
