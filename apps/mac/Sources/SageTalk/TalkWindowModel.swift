@@ -173,8 +173,10 @@ final class TalkWindowModel {
 
     private func openThroughSidecar(_ folder: TalkFolder, generation gen: Int) async {
         do {
+            ThumbnailStore.log("open: starting the sidecar")
             let sup = try supervisorOrStart()
             let r = try await sup.open(folder.root)
+            ThumbnailStore.log("open: talk.open returned (build \(r.build.map { "\(Int($0.ms)) ms" } ?? "-"))")
             guard gen == openGeneration else { return }
             if let wire = r.holds { holds = wire.map(\.hold) }
             if let b = r.build {
@@ -190,6 +192,9 @@ final class TalkWindowModel {
             spine = SpineSnapshot.load(root)
             chat.attachmentBase = root
             reloadMaterials()
+            // Thumbnails start now, from the sidecar's hold list: cached ones show at once and
+            // the rest render while the canvas boots (filmBooted points them at the same film).
+            if !holds.isEmpty { refreshThumbnails() }
             canvas.load(film: r.filmURL, readAccess: root)
         } catch {
             guard gen == openGeneration else { return }
@@ -268,6 +273,7 @@ final class TalkWindowModel {
     // MARK: Film state
 
     private func filmBooted(_ info: FilmInfo) {
+        ThumbnailStore.log("canvas: film booted (\(info.holds.count) holds)")
         // The engine's hold list carries notes; keep the sidecar's chapter ids where it has none.
         let wire = Dictionary(holds.map { (ThumbnailCache.timeKey($0.at), $0) }, uniquingKeysWith: { a, _ in a })
         holds = info.holds.map { h in

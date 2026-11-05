@@ -37,6 +37,14 @@ final class ThumbnailStore {
     @ObservationIgnored private var window: NSWindow?
     @ObservationIgnored private var rendererHash: String?
 
+    /// SAGE_THUMB_TRACE=1: timings on stderr (open, film boot, each frame).
+    static let trace = ProcessInfo.processInfo.environment["SAGE_THUMB_TRACE"] != nil
+    static let t0 = Date()
+    static func log(_ s: @autoclosure () -> String) {
+        guard trace else { return }
+        FileHandle.standardError.write(Data((String(format: "[thumbs %7.3f] ", Date().timeIntervalSince(t0)) + s() + "\n").utf8))
+    }
+
     func image(for hold: Hold) -> NSImage? { images[ThumbnailCache.timeKey(hold.at)] }
     func isFresh(_ hold: Hold) -> Bool { freshKeys.contains(ThumbnailCache.timeKey(hold.at)) }
 
@@ -46,23 +54,39 @@ final class ThumbnailStore {
     /// A talk was opened or rebuilt. Stale thumbnails stay visible until replaced.
     func setFilm(_ film: URL, talkRoot: URL, cacheDirectory: URL, holds: [Hold]) {
         if cache?.directory != cacheDirectory {
+            // A new cache (the talk was just opened). Rows that appeared before the film was
+            // ready have already asked for their thumbnails: keep those requests, or the rows
+            // stay blank until they scroll out of view and back.
             cache = ThumbnailCache(directory: cacheDirectory)
             images = [:]
-            requested = [:]
             queue = []
         }
+        let hash = try? ThumbnailCache.filmHash(of: film)
+        let sameFilm = hash != nil && hash == filmHash && self.film == film
         self.film = film
         readAccess = talkRoot
         self.holds = holds
-        filmHash = try? ThumbnailCache.filmHash(of: film)
-        freshKeys = []
+        filmHash = hash
+        Self.log("setFilm \(film.lastPathComponent) hash \(filmHash ?? "-") holds \(holds.count) requested \(requested.count)\(sameFilm ? " (unchanged)" : "")")
         let times = Set(holds.map { ThumbnailCache.timeKey($0.at) })
         requested = requested.filter { times.contains($0.key) }
+        // The same film again (the canvas reloaded without a rebuild): what is fresh stays fresh,
+        // with no flash of stale thumbnails and nothing re-read from disk.
+        freshKeys = sameFilm ? freshKeys.intersection(times) : []
         queue = []
-        for h in holds.sorted(by: { $0.index < $1.index }) where requested[ThumbnailCache.timeKey(h.at)] != nil {
-            enqueue(h)
-        }
+        // The rows on screen first, then every other hold in the background, so scrolling finds
+        // its thumbnails ready.
+        let ordered = holds.sorted(by: { $0.index < $1.index })
+        for h in ordered where requested[ThumbnailCache.timeKey(h.at)] != nil { enqueue(h) }
+        for h in ordered where requested[ThumbnailCache.timeKey(h.at)] == nil { prefetch(h) }
         pump()
+    }
+
+    /// Queues a hold no row has asked for yet, behind the asked-for ones.
+    private func prefetch(_ h: Hold) {
+        let key = ThumbnailCache.timeKey(h.at)
+        requested[key] = h
+        enqueue(h)
     }
 
     func close() {
@@ -71,12 +95,16 @@ final class ThumbnailStore {
         window?.close(); window = nil; renderer = nil; rendererHash = nil
     }
 
-    /// A navigator row became visible.
+    /// A navigator row became visible: its hold moves to the front of the queue.
     func request(_ hold: Hold) {
         let key = ThumbnailCache.timeKey(hold.at)
-        guard requested[key] == nil else { return }
+        if requested[key] != nil {
+            if let i = queue.firstIndex(where: { ThumbnailCache.timeKey($0.at) == key }), i > 0 { queue.insert(queue.remove(at: i), at: 0) }
+            return
+        }
         requested[key] = hold
         enqueue(hold)
+        if let i = queue.firstIndex(where: { ThumbnailCache.timeKey($0.at) == key }), i > 0 { queue.insert(queue.remove(at: i), at: 0) }
         pump()
     }
 
@@ -113,10 +141,14 @@ final class ThumbnailStore {
             guard let film, let filmHash, var cache = self.cache else { break }
             let key = ThumbnailCache.timeKey(h.at)
             if case .fresh = cache.status(at: h.at, film: filmHash) { enqueue(h); continue }
+            let tr0 = Date()
             guard let r = await renderer(for: film, hash: filmHash) else { break }
+            let tr1 = Date()
             r.seek(h.at)
             do {
                 let frame = try await r.call(Self.fingerprintJS) as? String ?? ""
+                let tr2 = Date()
+                defer { Self.log(String(format: "hold %.1f renderer %.0f ms, fingerprint %.0f ms, snapshot/adopt %.0f ms", h.at, tr1.timeIntervalSince(tr0) * 1000, tr2.timeIntervalSince(tr1) * 1000, Date().timeIntervalSince(tr2) * 1000)) }
                 if let old = cache.reusable(at: h.at, frame: frame) {
                     let u = try cache.adopt(old, at: h.at, film: filmHash, frame: frame)
                     if images[key] == nil { images[key] = NSImage(contentsOf: u) }
@@ -162,7 +194,9 @@ final class ThumbnailStore {
         guard let r = renderer, let readAccess else { return nil }
         if rendererHash != hash {
             r.onLoadError = { e in FileHandle.standardError.write(Data("[thumbs] load failed: \(e)\n".utf8)) }
+            Self.log("renderer: loading the film")
             r.load(film: film, readAccess: readAccess, capture: true)
+            defer { Self.log("renderer: booted") }
             guard await r.waitUntilReady() != nil else {
                 FileHandle.standardError.write(Data("[thumbs] the film did not boot in the thumbnail renderer\n".utf8))
                 return nil
