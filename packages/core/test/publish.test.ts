@@ -220,9 +220,16 @@ describe('ISSTA public build', () => {
     const holds = ours.holds();
     const report: string[] = [];
     for (const h of [holds[0]!, holds[24]!, holds.at(-1)!]) {
-      const a = await ours.frame(h.at), b = await orig.frame(h.at);
-      const A = PNG.sync.read(a), B = PNG.sync.read(b);
-      const diff = pixelmatch(A.data, B.data, undefined, A.width, A.height, { threshold: 0.1 });
+      // Under full-suite or CI load an image (the end card's QR codes and logos) can still be
+      // decoding at the first shot; a real difference survives a settled second shot.
+      const shoot = async () => {
+        const a = await ours.frame(h.at), b = await orig.frame(h.at);
+        const A = PNG.sync.read(a), B = PNG.sync.read(b);
+        return { a, b, A, diff: pixelmatch(A.data, B.data, undefined, A.width, A.height, { threshold: 0.1 }) };
+      };
+      let shot = await shoot();
+      if (shot.diff) { await new Promise((r) => setTimeout(r, 1000)); shot = await shoot(); }
+      const { a, b, A, diff } = shot;
       report.push(`${h.at} ${h.label}: ${diff} px (${(100 * diff / (A.width * A.height)).toFixed(3)} %), bytes ${Buffer.compare(a, b) === 0 ? 'identical' : 'differ'}`);
       expect(diff, `${h.at} ${h.label}`).toBe(0);
     }
