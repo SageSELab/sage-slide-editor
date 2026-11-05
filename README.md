@@ -210,7 +210,7 @@ GitHub Actions ([`.github/workflows`](.github/workflows)):
 
 - **CI** (`ci.yml`), on every push to `main` and every pull request: TypeScript typecheck and
   tests (core, sidecar, engine, render), Swift build and tests, the app self-test on a copy of
-  `fixtures/issta26`, the Chromium golden comparison against the original deck, and a packaged
+  `fixtures/issta26`, the golden-frame comparison against the original deck (Playwright Chromium, every hold ± 0.5 s), and a packaged
   build with its smoke test. The packaged app is uploaded as a build artifact.
 - **Release** (`release.yml`), on a `v*` tag: builds and smoke-tests the app and publishes
   `SAGE-Talk-<version>.zip` on a GitHub release.
