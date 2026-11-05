@@ -225,13 +225,18 @@ describe('ISSTA public build', () => {
       const shoot = async () => {
         const a = await ours.frame(h.at), b = await orig.frame(h.at);
         const A = PNG.sync.read(a), B = PNG.sync.read(b);
-        return { a, b, A, diff: pixelmatch(A.data, B.data, undefined, A.width, A.height, { threshold: 0.1 }) };
+        const out = Buffer.alloc(A.data.length);
+        const diff = pixelmatch(A.data, B.data, out, A.width, A.height, { threshold: 0.1, diffMask: true });
+        // Where the difference is (diffMask paints only differing pixels), for the failure message.
+        let x0 = A.width, y0 = A.height, x1 = -1, y1 = -1;
+        for (let y = 0; y < A.height; y++) for (let x = 0; x < A.width; x++) if (out[(y * A.width + x) * 4 + 3]) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+        return { a, b, A, diff, box: diff ? `${x0},${y0}-${x1},${y1}` : '' };
       };
       let shot = await shoot();
       if (shot.diff) { await new Promise((r) => setTimeout(r, 1000)); shot = await shoot(); }
-      const { a, b, A, diff } = shot;
+      const { a, b, A, diff, box } = shot;
       report.push(`${h.at} ${h.label}: ${diff} px (${(100 * diff / (A.width * A.height)).toFixed(3)} %), bytes ${Buffer.compare(a, b) === 0 ? 'identical' : 'differ'}`);
-      expect(diff, `${h.at} ${h.label}`).toBe(0);
+      expect(diff, `${h.at} ${h.label} (differs in ${box})`).toBe(0);
     }
     console.log('publish vs original:\n  ' + report.join('\n  '));
   }, 60_000);

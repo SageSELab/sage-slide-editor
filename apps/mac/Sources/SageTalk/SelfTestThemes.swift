@@ -96,7 +96,7 @@ extension SelfTest {
         let faces = (try? String(contentsOf: cssURL, encoding: .utf8)) ?? ""
         log.append("font: error \(err ?? "none"), undo stack \(model.edits.undoStack.map(\.title))")
         check(err == nil && styled && faces.contains("assets/fonts/fraunces-latin-400-normal.woff2"),
-              "fonts: Fraunces embedded (fonts.add) and set on #t-g (\(err ?? "ok"))")
+              "fonts: Fraunces embedded (fonts.add) and set on #t-g (\(err ?? "ok"); style in scene \(styled), 400 face in theme.css \(faces.contains("assets/fonts/fraunces-latin-400-normal.woff2")); faces \(faces.components(separatedBy: "assets/fonts/").dropFirst().map { $0.prefix(while: { $0 != ")" && $0 != "'" && $0 != "\"" }) }.joined(separator: ", ")))")
         check(model.edits.undoStack.map(\.title).suffix(2).first == "Add Font “Fraunces”", "fonts: adding the font is undoable (\(model.edits.undoStack.map(\.title)))")
     }
 }
