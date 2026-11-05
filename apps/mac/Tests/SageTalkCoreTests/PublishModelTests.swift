@@ -119,6 +119,45 @@ import Testing
         #expect(await fake.calls == ["export pdf"])
     }
 
+    @Test func exportFilesCopyToTheChosenFileOrFolder() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("sage-exportfiles-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: dir) }
+        let build = dir.appendingPathComponent("talk/build/export", isDirectory: true)
+        try fm.createDirectory(at: build, withIntermediateDirectories: true)
+        let pdf = build.appendingPathComponent("talk.pdf"), a = build.appendingPathComponent("hold-01.png"), b = build.appendingPathComponent("hold-02.png")
+        try Data("pdf".utf8).write(to: pdf); try Data("a".utf8).write(to: a); try Data("b".utf8).write(to: b)
+
+        // A file: written there, and an existing file is replaced.
+        let dest = dir.appendingPathComponent("Desktop/My Talk.pdf")
+        try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: dest)
+        #expect(try ExportFiles.copy([pdf], to: dest, folder: false) == dest)
+        #expect(try String(contentsOf: dest, encoding: .utf8) == "pdf")
+        #expect(fm.fileExists(atPath: pdf.path)) // the build copy stays
+
+        // A folder: created, with every file in it.
+        let folder = dir.appendingPathComponent("Desktop/My Talk PNGs")
+        try ExportFiles.copy([a, b], to: folder, folder: true)
+        #expect(try fm.contentsOfDirectory(atPath: folder.path).sorted() == ["hold-01.png", "hold-02.png"])
+        // Again: same-named files replaced, no temp files left.
+        try ExportFiles.copy([a, b], to: folder, folder: true)
+        #expect(try fm.contentsOfDirectory(atPath: folder.path).sorted() == ["hold-01.png", "hold-02.png"])
+        #expect(try fm.contentsOfDirectory(atPath: dest.deletingLastPathComponent().path).allSatisfy { !$0.contains("sage-tmp") })
+    }
+
+    @Test func aFailedSaveKeepsTheBuiltPage() async {
+        let fake = FakeService() // its paths do not exist: the copy fails
+        let m = PublishModel(service: fake, settings: settings())
+        m.reset(talkFolder: URL(fileURLWithPath: "/t/issta26"))
+        await m.publish(saveTo: URL(fileURLWithPath: "/nonexistent-\(UUID().uuidString)/issta26.html"))
+        guard case .failed(let msg) = m.phase else { Issue.record("expected a failure, got \(m.phase)"); return }
+        #expect(msg.hasPrefix("Built, but could not save to"))
+        #expect(m.result != nil && m.savedCopy == nil) // the build in build/public is still there
+        await m.runExport(.pdf, saveTo: URL(fileURLWithPath: "/nonexistent-\(UUID().uuidString)/t.pdf"))
+        if case .failed = m.export?.phase {} else { Issue.record("export: expected a failure") }
+    }
+
     @Test func stagesOnlyConfiguredSitesAndCommitsOnlyOnRequest() async {
         let fake = FakeService()
         let m = PublishModel(service: fake, settings: settings(personal: "/tmp/personal-site", lab: nil))

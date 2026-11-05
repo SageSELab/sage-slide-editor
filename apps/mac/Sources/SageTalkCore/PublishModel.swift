@@ -41,6 +41,8 @@ public final class PublishModel {
         public var total = 0
         public var phase: Phase = .running
         public var result: PublishProtocol.ExportResult?
+        /// Where the user chose to save it (the PDF, or the folder of PNGs), once copied there.
+        public var saved: URL?
         public var fraction: Double { total > 0 ? Double(done) / Double(total) : 0 }
         public var label: String {
             switch phase {
@@ -66,6 +68,8 @@ public final class PublishModel {
 
     public private(set) var phase: Phase = .idle
     public private(set) var result: PublishProtocol.PublishResult?
+    /// Where the user saved a copy of the public page (File ▸ Export ▸ Web Page, or Save a Copy).
+    public private(set) var savedCopy: URL?
     public private(set) var export: ExportState?
     public private(set) var stages: [PublishProtocol.Site: SiteStage] = [:]
 
@@ -111,30 +115,56 @@ public final class PublishModel {
 
     public var publishedURL: URL? { result.map { URL(fileURLWithPath: $0.path) } }
 
-    public func publish() async {
+    /// Builds the public page into build/public (where staging on a site reads it) and, with
+    /// `saveTo`, copies it to the file the user chose.
+    public func publish(saveTo: URL? = nil) async {
         guard canPublish, let service else { return }
         phase = .running
+        savedCopy = nil
         let slug = self.slug
+        let r: PublishProtocol.PublishResult
         do {
-            result = try await service.publish(.init(slug: slug))
-            phase = .done
-            // A new file: earlier staging is stale.
-            stages = [:]
+            r = try await service.publish(.init(slug: slug))
         } catch {
             result = nil
             phase = .failed(Self.message(error))
+            return
         }
+        result = r
+        // A new file: earlier staging is stale.
+        stages = [:]
+        do {
+            if let saveTo { savedCopy = try ExportFiles.copy([URL(fileURLWithPath: r.path)], to: saveTo, folder: false) }
+            phase = .done
+        } catch {
+            phase = .failed("Built, but could not save to \(saveTo?.path ?? "?"): \(Self.message(error))")
+        }
+    }
+
+    /// Copies the last public page to a file the user chose.
+    public func saveCopy(to url: URL) {
+        guard let r = result else { return }
+        do { savedCopy = try ExportFiles.copy([URL(fileURLWithPath: r.path)], to: url, folder: false) } catch { phase = .failed(Self.message(error)) }
     }
 
     // MARK: Export
 
     public var exporting: Bool { export?.phase == .running }
 
-    public func runExport(_ kind: PublishProtocol.ExportKind, holds: PublishProtocol.HoldSelection = .all, around: Double? = nil) async {
+    /// Renders into the talk's build/export and, with `saveTo`, copies the result there: the PDF
+    /// to that file, the PNGs (and their manifest) into that folder, which is created.
+    public func runExport(_ kind: PublishProtocol.ExportKind, holds: PublishProtocol.HoldSelection = .all, around: Double? = nil,
+                          saveTo: URL? = nil) async {
         guard let service, !exporting else { return }
         export = ExportState(kind: kind)
         do {
             let r = try await service.export(.init(kind: kind, holds: holds, around: around))
+            if let saveTo {
+                var files = r.files.map { URL(fileURLWithPath: $0) }
+                let manifest = URL(fileURLWithPath: r.dir).appendingPathComponent("manifest.json")
+                if kind == .png, FileManager.default.fileExists(atPath: manifest.path), !files.contains(manifest) { files.append(manifest) }
+                export?.saved = try ExportFiles.copy(files, to: saveTo, folder: kind == .png)
+            }
             export?.result = r
             export?.done = r.frames
             export?.total = r.frames
@@ -273,5 +303,36 @@ public final class PublishModel {
     public static func duration(_ s: Double) -> String {
         let t = Int(s.rounded())
         return String(format: "%d:%02d", t / 60, t % 60)
+    }
+}
+
+/// Copies what the sidecar wrote under build/ to where the user chose (Save panels).
+public enum ExportFiles {
+    /// `folder` false: the single file becomes `destination` (replacing it). `folder` true: the
+    /// files go into `destination`, created if needed, replacing same-named files. Returns
+    /// `destination`.
+    @discardableResult
+    public static func copy(_ files: [URL], to destination: URL, folder: Bool) throws -> URL {
+        let fm = FileManager.default
+        if folder {
+            try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+            for f in files { try replace(f, at: destination.appendingPathComponent(f.lastPathComponent)) }
+        } else {
+            guard let f = files.first else { throw CocoaError(.fileNoSuchFile) }
+            try replace(f, at: destination)
+        }
+        return destination
+    }
+
+    private static func replace(_ src: URL, at dst: URL) throws {
+        let fm = FileManager.default
+        if src.standardizedFileURL == dst.standardizedFileURL { return }
+        let tmp = dst.deletingLastPathComponent().appendingPathComponent(".\(dst.lastPathComponent).sage-tmp-\(UUID().uuidString)")
+        try fm.copyItem(at: src, to: tmp)
+        if fm.fileExists(atPath: dst.path) {
+            _ = try fm.replaceItemAt(dst, withItemAt: tmp)
+        } else {
+            try fm.moveItem(at: tmp, to: dst)
+        }
     }
 }
