@@ -89,9 +89,16 @@ extension TalkWindowModel {
     /// Returns an error message, or nil.
     func embedAndApplyFont(_ info: ThemeProtocol.FontInfo) async -> String? {
         guard let s = themeService else { return "Open a talk to add fonts." }
+        // The object is named before embedding: adding the font rewrites theme.css, the canvas
+        // reloads, and while it boots it has no selection to format. So the style goes to the
+        // source directly (setStyle), not through the canvas, which could drop it.
+        let target = formatTarget?.id
         do {
             let r = try await FontEmbedder(service: s, edits: edits).embed(info.id, family: info.family, weights: FontEmbedder.weights(for: .body, of: info))
-            applyFont(r.fontFamily)
+            if let target {
+                let done = await applyNow(.setStyle(id: target, style: StyleArgs(fontFamily: .set(.css(r.fontFamily)))))
+                if done == nil { return edits.lastError ?? "The font was added, but could not be set on the text." }
+            }
             return nil
         } catch {
             return EditSession.describe(error)
