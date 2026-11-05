@@ -76,6 +76,22 @@ extension SelfTest {
         check(pngs.map { URL(fileURLWithPath: $0).lastPathComponent } == ["hold-02-before.png", "hold-02.png", "hold-02-after.png"] && sizes == Array(repeating: "1920x1080", count: 3),
               "export: PNGs \(pngs.map { URL(fileURLWithPath: $0).lastPathComponent }) at \(sizes)")
 
+        // 3b. Saved where the user chose (what the Save panels hand over): a PDF file, a new
+        // folder of PNGs, and a copy of the public page; build/ keeps its own copies.
+        let chosen = base.appendingPathComponent("Chosen Folder", isDirectory: true)
+        try? fm.createDirectory(at: chosen, withIntermediateDirectories: true)
+        await pub.runExport(.pdf, holds: .some([1]), saveTo: chosen.appendingPathComponent("My Talk.pdf"))
+        let savedPDF = chosen.appendingPathComponent("My Talk.pdf")
+        check(pub.export?.saved == savedPDF && PDFDocument(url: savedPDF)?.pageCount == 1 && fm.fileExists(atPath: pub.export?.result?.files.first ?? ""),
+              "save: the PDF went to the chosen file (\(pub.export?.saved?.lastPathComponent ?? "\(pub.export?.phase ?? .idle)"))")
+        await pub.runExport(.png, holds: .some([2]), saveTo: chosen.appendingPathComponent("My Talk PNGs"))
+        let pngDir = (try? fm.contentsOfDirectory(atPath: chosen.appendingPathComponent("My Talk PNGs").path).sorted()) ?? []
+        check(pngDir == ["hold-02.png", "manifest.json"], "save: the PNGs went into a new folder (\(pngDir))")
+        await pub.publish(saveTo: chosen.appendingPathComponent("selftest-talk.html"))
+        let savedHTML = (try? Data(contentsOf: chosen.appendingPathComponent("selftest-talk.html"))) ?? Data()
+        check(pub.savedCopy != nil && !savedHTML.isEmpty && savedHTML == (try? Data(contentsOf: URL(fileURLWithPath: pub.result?.path ?? ""))),
+              "save: the web page went to the chosen file, identical to build/public (\(savedHTML.count) bytes)")
+
         // QR codes into the copy's assets/.
         pub.qrSlides = "https://example.org/talks/selftest-talk.html"
         await pub.makeQRCodes()

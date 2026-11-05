@@ -34,8 +34,9 @@ struct SageTalkApp: App {
                     .keyboardShortcut("p", modifiers: [.command, .shift])
                     .disabled(!model.canPublish)
                 Menu("Export") {
-                    Button("PNGs of Holds…") { model.startExport(.png) }
+                    Button("Web Page (HTML)…") { model.exportWebPage() }
                     Button("PDF of Holds…") { model.startExport(.pdf) }
+                    Button("PNGs of Holds…") { model.startExport(.png) }
                 }
                 .disabled(!model.canPublish || model.publishing.exporting)
             }

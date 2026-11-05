@@ -97,8 +97,14 @@ struct PublishSheet: View {
                 Text(r.path).font(.caption.monospaced()).lineLimit(1).truncationMode(.middle)
                     .textSelection(.enabled)
                 Spacer(minLength: 8)
-                Button("Reveal in Finder") { model.reveal(r.path) }.accessibilityIdentifier("publish.reveal")
-                Button("Open in Browser") { model.openInBrowser(r.path) }.accessibilityIdentifier("publish.open")
+                Button("Save a Copy…") { model.savePublishedCopy() }.accessibilityIdentifier("publish.saveCopy")
+                Button("Reveal in Finder") { model.reveal(model.publishing.savedCopy?.path ?? r.path) }.accessibilityIdentifier("publish.reveal")
+                Button("Open in Browser") { model.openInBrowser(model.publishing.savedCopy?.path ?? r.path) }.accessibilityIdentifier("publish.open")
+            }
+            if let saved = model.publishing.savedCopy {
+                Label("Saved to \(saved.path)", systemImage: "square.and.arrow.down.fill")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    .accessibilityIdentifier("publish.saved")
             }
             warnings(r.warnings)
         }
@@ -292,7 +298,7 @@ struct ExportSheet: View {
                 case .done:
                     Label(e.label, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     if let r = e.result {
-                        Text(r.kind == .pdf ? (r.files.first ?? r.dir) : r.dir).font(.caption.monospaced()).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                        Text(e.saved?.path ?? (r.kind == .pdf ? (r.files.first ?? r.dir) : r.dir)).font(.caption.monospaced()).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
                         if !r.errors.isEmpty {
                             Label("\(r.errors.count) page error\(r.errors.count == 1 ? "" : "s") while rendering: \(r.errors[0])", systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption).foregroundStyle(.orange)
@@ -305,8 +311,9 @@ struct ExportSheet: View {
             HStack {
                 Spacer()
                 if let r = e?.result {
-                    Button("Reveal in Finder") { model.reveal(r.kind == .pdf ? (r.files.first ?? r.dir) : (r.files.first ?? r.dir)) }
-                    if r.kind == .pdf, let f = r.files.first { Button("Open") { NSWorkspace.shared.open(URL(fileURLWithPath: f)) } }
+                    let shown = e?.saved?.path ?? (r.files.first ?? r.dir)
+                    Button("Reveal in Finder") { model.reveal(shown) }
+                    if r.kind == .pdf { Button("Open") { NSWorkspace.shared.open(URL(fileURLWithPath: shown)) } }
                 }
                 Button(model.publishing.exporting ? "Hide" : "Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
